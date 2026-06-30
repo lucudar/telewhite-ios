@@ -529,7 +529,17 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         
         let baseAppBundleId = Bundle.main.bundleIdentifier!
         let appGroupName = "group.\(baseAppBundleId)"
+        #if TELEGRAM_SIDELOAD
+        let maybeAppGroupUrl = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupName) ??
+            FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?.appendingPathComponent("TelegramSideloadGroup", isDirectory: true)
+        #else
         let maybeAppGroupUrl = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupName)
+        #endif
+        #if TELEGRAM_SIDELOAD
+        if let appGroupUrl = maybeAppGroupUrl {
+            let _ = try? FileManager.default.createDirectory(at: appGroupUrl, withIntermediateDirectories: true)
+        }
+        #endif
         
         let buildConfig = BuildConfig(baseAppBundleId: baseAppBundleId)
         self.buildConfig = buildConfig

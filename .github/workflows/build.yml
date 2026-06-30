@@ -37,8 +37,8 @@ jobs:
         env:
           TG_API_ID: ${{ secrets.TG_API_ID }}
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
-          APP_NAME: ${{ inputs.app_name }}
-          APP_URL_SCHEME: ${{ inputs.url_scheme }}
+          APP_NAME: ${{ inputs.app_name || 'Telewhite' }}
+          APP_URL_SCHEME: ${{ inputs.url_scheme || 'telewhite' }}
         run: |
           set -euo pipefail
 
@@ -112,13 +112,14 @@ jobs:
             --codesigningInformationPath=build-input/generated-codesigning \
             --configuration=release_arm64 \
             --buildNumber="$BUILD_NUMBER" \
+            --sideload \
             --outputBuildArtifactsPath=build/artifacts
 
-          cp build/artifacts/Telegram.ipa build/artifacts/Telewhite-fake-signed.ipa
+          cp build/artifacts/Telegram.ipa build/artifacts/Telewhite-sideload-fake-signed.ipa
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: Telewhite-fake-signed-ipa
-          path: /Users/Shared/telegram-ios/build/artifacts/Telewhite-fake-signed.ipa
+          name: Telewhite-sideload-fake-signed-ipa
+          path: /Users/Shared/telegram-ios/build/artifacts/Telewhite-sideload-fake-signed.ipa
           if-no-files-found: error

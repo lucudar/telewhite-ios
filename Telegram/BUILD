@@ -84,6 +84,12 @@ bool_flag(
 )
 
 bool_flag(
+    name = "sideload",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
     name = "projectIncludeRelease",
     build_setting_default = False,
     visibility = ["//visibility:public"],
@@ -101,6 +107,14 @@ config_setting(
     flag_values = {
         ":disableProvisioningProfiles": "True",
     },
+)
+
+config_setting(
+    name = "sideloadSetting",
+    flag_values = {
+        ":sideload": "True",
+    },
+    visibility = ["//visibility:public"],
 )
 
 bool_flag(

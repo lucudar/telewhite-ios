@@ -47,7 +47,12 @@ swift_library(
     ]),
     copts = [
         "-warnings-as-errors",
-    ],
+    ] + select({
+        "//Telegram:sideloadSetting": [
+            "-DTELEGRAM_SIDELOAD",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         "//third-party/recaptcha:RecaptchaEnterprise",
         "//submodules/SSignalKit/SwiftSignalKit:SwiftSignalKit",
