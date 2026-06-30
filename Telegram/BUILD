@@ -48,10 +48,12 @@ load(
     "telegram_bazel_path",
     "telegram_use_xcode_managed_codesigning",
     "telegram_bundle_id",
+    "telegram_app_name",
     "telegram_aps_environment",
     "telegram_team_id",
     "telegram_enable_icloud",
     "telegram_enable_siri",
+    "telegram_app_specific_url_scheme",
 )
 
 load("@build_bazel_rules_apple//apple:resources.bzl",
@@ -420,7 +422,7 @@ plist_fragment(
             <string>{telegram_bundle_id}</string>
             <key>CFBundleURLSchemes</key>
             <array>
-                <string>telegram</string>
+                <string>{telegram_app_specific_url_scheme}</string>
             </array>
         </dict>
         <dict>
@@ -437,6 +439,7 @@ plist_fragment(
     </array>
     """.format(
         telegram_bundle_id = telegram_bundle_id,
+        telegram_app_specific_url_scheme = telegram_app_specific_url_scheme,
     )
 )
 
@@ -629,8 +632,10 @@ plist_fragment(
     template =
     """
     <key>CFBundleDisplayName</key>
-    <string>Telegram</string>
-    """
+    <string>{telegram_app_name}</string>
+    """.format(
+        telegram_app_name = telegram_app_name,
+    )
 )
 
 plist_fragment(
@@ -962,7 +967,7 @@ plist_fragment(
     <key>CFBundleIdentifier</key>
     <string>{telegram_bundle_id}.Share</string>
     <key>CFBundleName</key>
-    <string>Telegram</string>
+    <string>{telegram_app_name}</string>
     <key>CFBundlePackageType</key>
     <string>XPC!</string>
     <key>NSExtension</key>
@@ -999,6 +1004,7 @@ plist_fragment(
     </dict>
     """.format(
         telegram_bundle_id = telegram_bundle_id,
+        telegram_app_name = telegram_app_name,
     )
 )
 
@@ -1568,11 +1574,11 @@ plist_fragment(
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleDisplayName</key>
-    <string>Telegram</string>
+    <string>{telegram_app_name}</string>
     <key>CFBundleIdentifier</key>
     <string>{telegram_bundle_id}</string>
     <key>CFBundleName</key>
-    <string>Telegram</string>
+    <string>{telegram_app_name}</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleSignature</key>
@@ -1729,6 +1735,7 @@ plist_fragment(
     <true/>
     """.format(
         telegram_bundle_id = telegram_bundle_id,
+        telegram_app_name = telegram_app_name,
     )
 )
 

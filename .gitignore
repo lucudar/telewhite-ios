@@ -20,6 +20,9 @@ DerivedData
 *.ipa
 *.xcuserstate
 .DS_Store
+*.cer
+*.mobileprovision
+*.p12
 *.dSYM
 *.dSYM.zip
 *.ipa
@@ -63,6 +66,7 @@ xcodeproj.bazelrc
 */*.swp
 *.swp
 build-input/*
+build-system/fork-configuration.json
 **/*.pyc
 *.pyc
 submodules/OpusBinding/SharedHeaders/*

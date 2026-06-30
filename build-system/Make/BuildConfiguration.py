@@ -11,6 +11,7 @@ from DecryptMatch import decrypt_match_data
 class BuildConfiguration:
     def __init__(self,
         bundle_id,
+        app_name,
         api_id,
         api_hash,
         team_id,
@@ -24,6 +25,7 @@ class BuildConfiguration:
         enable_icloud
     ):
         self.bundle_id = bundle_id
+        self.app_name = app_name
         self.api_id = api_id
         self.api_hash = api_hash
         self.team_id = team_id
@@ -41,6 +43,7 @@ class BuildConfiguration:
         string += 'telegram_bazel_path = "{}"\n'.format(bazel_path)
         string += 'telegram_use_xcode_managed_codesigning = {}\n'.format('True' if use_xcode_managed_codesigning else 'False')
         string += 'telegram_bundle_id = "{}"\n'.format(self.bundle_id)
+        string += 'telegram_app_name = "{}"\n'.format(self.app_name)
         string += 'telegram_api_id = "{}"\n'.format(self.api_id)
         string += 'telegram_api_hash = "{}"\n'.format(self.api_hash)
         string += 'telegram_team_id = "{}"\n'.format(self.team_id)
@@ -86,6 +89,7 @@ def build_configuration_from_json(path):
                 print('Configuration at {} does not contain {}'.format(path, key))
         return BuildConfiguration(
             bundle_id=configuration_dict['bundle_id'],
+            app_name=configuration_dict.get('app_name', 'Telegram'),
             api_id=configuration_dict['api_id'],
             api_hash=configuration_dict['api_hash'],
             team_id=configuration_dict['team_id'],

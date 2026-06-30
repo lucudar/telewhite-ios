@@ -1,0 +1,15 @@
+{
+  "bundle_id": "com.yourname.tgfork",
+  "app_name": "Telewhite",
+  "api_id": "123456",
+  "api_hash": "0123456789abcdef0123456789abcdef",
+  "team_id": "ABCDE12345",
+  "app_center_id": "0",
+  "is_internal_build": "true",
+  "is_appstore_build": "false",
+  "appstore_id": "0",
+  "app_specific_url_scheme": "telewhite",
+  "premium_iap_product_id": "",
+  "enable_siri": false,
+  "enable_icloud": false
+}
