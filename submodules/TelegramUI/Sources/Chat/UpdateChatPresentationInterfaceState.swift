@@ -548,13 +548,33 @@ func updateChatPresentationInterfaceStateImpl(
     } else if let _ = selfController.secondaryRightNavigationButton {
         selfController.secondaryRightNavigationButton = nil
     }
+
+    if let button = tertiaryRightNavigationButtonForChatInterfaceState(context: selfController.context, presentationInterfaceState: updatedChatPresentationInterfaceState, currentButton: selfController.tertiaryRightNavigationButton, target: selfController, selector: #selector(selfController.tertiaryRightNavigationButtonAction)) {
+        if selfController.tertiaryRightNavigationButton != button {
+            if let currentButton = selfController.tertiaryRightNavigationButton?.action, currentButton == button.action {
+                buttonsAnimated = false
+            }
+            selfController.tertiaryRightNavigationButton = button
+        }
+    } else if let _ = selfController.tertiaryRightNavigationButton {
+        selfController.tertiaryRightNavigationButton = nil
+    }
     
     var rightBarButtons: [UIBarButtonItem] = []
+    if let secondaryRightNavigationButton = selfController.secondaryRightNavigationButton, case .toggleGhostMode(_, _) = secondaryRightNavigationButton.action {
+        rightBarButtons.append(secondaryRightNavigationButton.buttonItem)
+    }
     if let rightNavigationButton = selfController.rightNavigationButton {
         rightBarButtons.append(rightNavigationButton.buttonItem)
     }
     if let secondaryRightNavigationButton = selfController.secondaryRightNavigationButton {
-        rightBarButtons.append(secondaryRightNavigationButton.buttonItem)
+        if case .toggleGhostMode(_, _) = secondaryRightNavigationButton.action {
+        } else {
+            rightBarButtons.append(secondaryRightNavigationButton.buttonItem)
+        }
+    }
+    if let tertiaryRightNavigationButton = selfController.tertiaryRightNavigationButton {
+        rightBarButtons.append(tertiaryRightNavigationButton.buttonItem)
     }
     var rightBarButtonsUpdated = false
     let currentRightBarButtons = selfController.navigationItem.rightBarButtonItems ?? []

@@ -6,6 +6,13 @@ import MtProtoKit
 
 private typealias SignalKitTimer = SwiftSignalKit.Timer
 
+private func telewhiteGhostPresenceEnabled() -> Bool {
+    let defaults = UserDefaults.standard
+    if defaults.bool(forKey: "telewhite.mods.ghostMode") {
+        return true
+    }
+    return !(defaults.array(forKey: "telewhite.mods.ghostPeerIds") as? [NSNumber] ?? []).isEmpty
+}
 
 private final class AccountPresenceManagerImpl {
     private let queue: Queue
@@ -43,6 +50,7 @@ private final class AccountPresenceManagerImpl {
     }
     
     private func updatePresence(_ isOnline: Bool) {
+        let isOnline = isOnline && !telewhiteGhostPresenceEnabled()
         let request: Signal<Api.Bool, MTRpcError>
         if isOnline {
             let timer = SignalKitTimer(timeout: 30.0, repeat: false, completion: { [weak self] in

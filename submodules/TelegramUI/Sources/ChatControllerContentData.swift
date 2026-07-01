@@ -15,6 +15,7 @@ import EmojiStatusComponent
 import TelegramUIPreferences
 import TranslateUI
 import TelegramNotices
+import SettingsUI
 
 extension ChatControllerImpl {
     final class ContentData {
@@ -2182,17 +2183,19 @@ extension ChatControllerImpl {
                         isPremium,
                         isHidden,
                         hasAutoTranslate,
-                        ApplicationSpecificNotice.translationSuggestion(accountManager: context.sharedContext.accountManager)
-                    ) |> mapToSignal { isPremium, isHidden, hasAutoTranslate, counterAndTimestamp -> Signal<ChatPresentationTranslationState?, NoError> in
+                        ApplicationSpecificNotice.translationSuggestion(accountManager: context.sharedContext.accountManager),
+                        TelewhiteModsSettings.signal()
+                    ) |> mapToSignal { isPremium, isHidden, hasAutoTranslate, counterAndTimestamp, telewhiteSettings -> Signal<ChatPresentationTranslationState?, NoError> in
                         var maybeSuggestPremium = false
                         if counterAndTimestamp.0 >= 3 {
                             maybeSuggestPremium = true
                         }
-                        if (isPremium || maybeSuggestPremium || hasAutoTranslate) && !isHidden {
+                        if (isPremium || maybeSuggestPremium || hasAutoTranslate || telewhiteSettings.autoTranslateEnglish) && !isHidden {
                             return chatTranslationState(context: context, peerId: peerId, threadId: chatLocation.threadId)
                             |> map { translationState -> ChatPresentationTranslationState? in
                                 if let translationState, !translationState.fromLang.isEmpty && (translationState.fromLang != baseLanguageCode || translationState.isEnabled) {
-                                    return ChatPresentationTranslationState(isEnabled: translationState.isEnabled, fromLang: translationState.fromLang, toLang: translationState.toLang ?? baseLanguageCode)
+                                    let targetLanguage = telewhiteSettings.autoTranslateEnglish && normalizeTranslationLanguage(translationState.fromLang) == "en" ? telewhiteSettings.translationTargetLanguage : (translationState.toLang ?? baseLanguageCode)
+                                    return ChatPresentationTranslationState(isEnabled: translationState.isEnabled, fromLang: translationState.fromLang, toLang: targetLanguage)
                                 } else {
                                     return nil
                                 }

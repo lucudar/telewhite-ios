@@ -7,6 +7,7 @@ import ItemListUI
 import PresentationDataUtils
 import AccountContext
 import AlertUI
+import TelegramCore
 import TelegramUIPreferences
 
 public struct TelewhiteModsSettings: Equatable {
@@ -24,7 +25,10 @@ public struct TelewhiteModsSettings: Equatable {
     public var showUserIds: Bool
     public var showChatIds: Bool
     public var showMessageIds: Bool
-    
+    public var ghostPeerIds: Set<Int64>
+    public var autoTranslateEnglish: Bool
+    public var translationTargetLanguage: String
+
     private enum Key {
         static let vpnEnabled = "telewhite.mods.vpnEnabled"
         static let vpnSubscription = "telewhite.mods.vpnSubscription"
@@ -38,6 +42,9 @@ public struct TelewhiteModsSettings: Equatable {
         static let showUserIds = "telewhite.mods.showUserIds"
         static let showChatIds = "telewhite.mods.showChatIds"
         static let showMessageIds = "telewhite.mods.showMessageIds"
+        static let ghostPeerIds = "telewhite.mods.ghostPeerIds"
+        static let autoTranslateEnglish = "telewhite.mods.autoTranslateEnglish"
+        static let translationTargetLanguage = "telewhite.mods.translationTargetLanguage"
     }
     
     public static var current: TelewhiteModsSettings {
@@ -54,8 +61,32 @@ public struct TelewhiteModsSettings: Equatable {
             amoledMode: defaults.bool(forKey: Key.amoledMode),
             showUserIds: defaults.bool(forKey: Key.showUserIds),
             showChatIds: defaults.bool(forKey: Key.showChatIds),
-            showMessageIds: defaults.bool(forKey: Key.showMessageIds)
+            showMessageIds: defaults.bool(forKey: Key.showMessageIds),
+            ghostPeerIds: Set((defaults.array(forKey: Key.ghostPeerIds) as? [NSNumber] ?? []).map { $0.int64Value }),
+            autoTranslateEnglish: defaults.bool(forKey: Key.autoTranslateEnglish),
+            translationTargetLanguage: defaults.string(forKey: Key.translationTargetLanguage) ?? "ru"
         )
+    }
+
+    public func isGhostEnabled(for peerId: EnginePeer.Id?) -> Bool {
+        if self.ghostMode {
+            return true
+        }
+        guard let peerId else {
+            return false
+        }
+        return self.ghostPeerIds.contains(peerId.toInt64())
+    }
+
+    public func withToggledGhostPeer(_ peerId: EnginePeer.Id) -> TelewhiteModsSettings {
+        var updated = self
+        let rawId = peerId.toInt64()
+        if updated.ghostPeerIds.contains(rawId) {
+            updated.ghostPeerIds.remove(rawId)
+        } else {
+            updated.ghostPeerIds.insert(rawId)
+        }
+        return updated
     }
     
     public func save() {
@@ -72,6 +103,9 @@ public struct TelewhiteModsSettings: Equatable {
         defaults.set(self.showUserIds, forKey: Key.showUserIds)
         defaults.set(self.showChatIds, forKey: Key.showChatIds)
         defaults.set(self.showMessageIds, forKey: Key.showMessageIds)
+        defaults.set(self.ghostPeerIds.map { NSNumber(value: $0) }, forKey: Key.ghostPeerIds)
+        defaults.set(self.autoTranslateEnglish, forKey: Key.autoTranslateEnglish)
+        defaults.set(self.translationTargetLanguage, forKey: Key.translationTargetLanguage)
         NotificationCenter.default.post(name: TelewhiteModsSettings.didChangeNotification, object: nil)
     }
 
@@ -117,6 +151,8 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case preserveDeletedMessages(String, Bool)
     case translateMessages(String, Bool)
     case translateChats(String, Bool)
+    case autoTranslateEnglish(String, Bool)
+    case translationTargetLanguage(String, String)
     case messengerInfo(String)
 
     case vpnHeader(String)
@@ -145,7 +181,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     
     var section: ItemListSectionId {
         switch self {
-        case .messengerHeader, .preserveDeletedMessages, .translateMessages, .translateChats, .messengerInfo:
+        case .messengerHeader, .preserveDeletedMessages, .translateMessages, .translateChats, .autoTranslateEnglish, .translationTargetLanguage, .messengerInfo:
             return TelewhiteModsSection.messenger.rawValue
         case .vpnHeader, .vpnEnabled, .vpnSubscription, .vpnStatus, .vpnStart, .vpnInfo:
             return TelewhiteModsSection.vpn.rawValue
@@ -170,6 +206,10 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 3
         case .messengerInfo:
             return 4
+        case .autoTranslateEnglish:
+            return 5
+        case .translationTargetLanguage:
+            return 6
         case .vpnHeader:
             return 20
         case .vpnEnabled:
@@ -250,6 +290,23 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
                     return updated
                 }
             })
+        case let .autoTranslateEnglish(text, value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: text, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.updateSettings { current in
+                    var updated = current
+                    updated.autoTranslateEnglish = value
+                    return updated
+                }
+                arguments.updateTranslationSettings { current in
+                    var updated = current
+                    if value {
+                        updated = updated.withUpdatedIgnoredLanguages(["ru"])
+                    }
+                    return updated
+                }
+            })
+        case let .translationTargetLanguage(text, value):
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: value.uppercased(), labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .none, action: nil)
         case let .vpnEnabled(text, value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: text, value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.updateSettings { current in
@@ -365,13 +422,15 @@ private func telewhiteModsEntries(settings: TelewhiteModsSettings, translationSe
     entries.append(.preserveDeletedMessages("Keep Deleted Messages", settings.preserveDeletedMessages))
     entries.append(.translateMessages("Show Translate Button", translationSettings.showTranslate))
     entries.append(.translateChats("Translate Entire Chats", translationSettings.translateChats))
-    entries.append(.messengerInfo("Deleted cloud messages stay in chat and are dimmed locally. Translation uses Telegram's built-in Translate pipeline."))
+    entries.append(.autoTranslateEnglish("Auto-translate English", settings.autoTranslateEnglish))
+    entries.append(.translationTargetLanguage("Translation Language", settings.translationTargetLanguage))
+    entries.append(.messengerInfo("Deleted cloud messages stay in chat and are dimmed locally. English auto-translate targets Russian by default and does not touch Russian messages."))
     
     entries.append(.privacyHeader("Privacy"))
     entries.append(.ghostMode("Ghost Mode", settings.ghostMode))
     entries.append(.hideTypingStatus("Hide Typing Status", settings.hideTypingStatus))
     entries.append(.hideReadReceipts("Hide Read Receipts", settings.hideReadReceipts))
-    entries.append(.privacyInfo("Ghost Mode blocks read receipts and typing activity in private chats."))
+    entries.append(.privacyInfo("Ghost Mode blocks read receipts and typing activity. The chat button toggles it for one private chat."))
 
     entries.append(.vpnHeader("VPN"))
     entries.append(.vpnEnabled("Enable VPN Profile", settings.vpnEnabled))
@@ -404,6 +463,9 @@ public func telewhiteModsController(context: AccountContext) -> ViewController {
             let updated = f(current)
             updated.save()
             return updated
+        }
+        if updated.ghostMode || !updated.ghostPeerIds.isEmpty {
+            context.account.shouldKeepOnlinePresence.set(.single(false))
         }
         statePromise.set(updated)
     }

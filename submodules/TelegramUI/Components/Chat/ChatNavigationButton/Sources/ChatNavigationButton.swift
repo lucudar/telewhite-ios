@@ -13,7 +13,8 @@ public enum ChatNavigationButtonAction: Equatable {
     case search(hasTags: Bool)
     case dismiss
     case toggleInfoPanel
-    case toggleGhostMode(isEnabled: Bool)
+    case toggleGhostMode(peerId: Int64, isEnabled: Bool)
+    case toggleTranslation(isEnabled: Bool)
     case spacer
     case edit
 }

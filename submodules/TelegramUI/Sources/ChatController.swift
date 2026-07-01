@@ -299,6 +299,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
     var leftNavigationButton: ChatNavigationButton?
     var rightNavigationButton: ChatNavigationButton?
     var secondaryRightNavigationButton: ChatNavigationButton?
+    var tertiaryRightNavigationButton: ChatNavigationButton?
     var chatInfoNavigationButton: ChatNavigationButton?
     
     var moreBarButton: MoreHeaderButton
@@ -418,10 +419,10 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
     var computedCanReadHistoryPromise = ValuePromise<Bool>(false, ignoreRepeated: true)
     var telewhiteModsSettings = TelewhiteModsSettings.current
     private var telewhiteDisablesReadHistory: Bool {
-        return self.telewhiteModsSettings.ghostMode || self.telewhiteModsSettings.hideReadReceipts
+        return self.telewhiteModsSettings.hideReadReceipts || self.telewhiteModsSettings.isGhostEnabled(for: self.chatLocation.peerId)
     }
     private var telewhiteDisablesActivity: Bool {
-        return self.telewhiteModsSettings.ghostMode || self.telewhiteModsSettings.hideTypingStatus
+        return self.telewhiteModsSettings.hideTypingStatus || self.telewhiteModsSettings.isGhostEnabled(for: self.chatLocation.peerId)
     }
     
     var chatThemeAndDarkAppearancePreviewPromise = Promise<(ChatTheme?, Bool?)>((nil, nil))
@@ -8312,6 +8313,12 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
     
     @objc func secondaryRightNavigationButtonAction() {
         if let button = self.secondaryRightNavigationButton {
+            self.navigationButtonAction(button.action)
+        }
+    }
+
+    @objc func tertiaryRightNavigationButtonAction() {
+        if let button = self.tertiaryRightNavigationButton {
             self.navigationButtonAction(button.action)
         }
     }

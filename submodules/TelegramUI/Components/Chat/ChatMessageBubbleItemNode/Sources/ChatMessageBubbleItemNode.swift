@@ -338,7 +338,8 @@ private func contentNodeMessagesAndClassesForItem(_ item: ChatMessageItem) -> ([
             }
         }
                 
-        if !messageText.isEmpty || (message.attributes.contains(where: { $0 is TypingDraftMessageAttribute }) && richText == nil) || isUnsupportedMedia || isStoryWithText {
+        let isTelewhiteDeleted = message.attributes.contains(where: { $0 is TelewhiteDeletedMessageAttribute })
+        if !messageText.isEmpty || isTelewhiteDeleted || (message.attributes.contains(where: { $0 is TypingDraftMessageAttribute }) && richText == nil) || isUnsupportedMedia || isStoryWithText {
             if !skipText {
                 if case .group = item.content, !isFile {
                     messageWithCaptionToAdd = (message, itemAttributes)
@@ -3825,7 +3826,8 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         
         strongSelf.appliedItem = item
         let isTelewhiteDeleted = item.content.firstMessage.attributes.contains(where: { $0 is TelewhiteDeletedMessageAttribute })
-        strongSelf.mainContextSourceNode.contentNode.alpha = isTelewhiteDeleted ? 0.48 : 1.0
+        strongSelf.mainContainerNode.alpha = isTelewhiteDeleted ? 0.55 : 1.0
+        strongSelf.mainContextSourceNode.contentNode.alpha = 1.0
         strongSelf.appliedForwardInfo = (forwardSource, forwardAuthorSignature)
         strongSelf.updateAccessibilityData(accessibilityData)
         strongSelf.disablesComments = disablesComments

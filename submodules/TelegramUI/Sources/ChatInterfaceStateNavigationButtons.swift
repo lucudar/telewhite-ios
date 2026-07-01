@@ -10,7 +10,12 @@ import SettingsUI
 
 private func telewhiteGhostModeIcon(theme: PresentationTheme, isEnabled: Bool) -> UIImage? {
     let foregroundColor = isEnabled ? theme.list.itemAccentColor : theme.rootController.navigationBar.buttonColor
-    return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/EyeLocked"), color: foregroundColor)
+    return generateTintedImage(image: UIImage(bundleImageName: "Avatar/DeletedIcon"), color: foregroundColor)
+}
+
+private func telewhiteTranslateIcon(theme: PresentationTheme, isEnabled: Bool) -> UIImage? {
+    let foregroundColor = isEnabled ? theme.list.itemAccentColor : theme.rootController.navigationBar.buttonColor
+    return generateTintedImage(image: UIImage(bundleImageName: "Chat/Title Panels/Translate"), color: foregroundColor)
 }
 
 func leftNavigationButtonForChatInterfaceState(_ presentationInterfaceState: ChatPresentationInterfaceState, subject: ChatControllerSubject?, strings: PresentationStrings, currentButton: ChatNavigationButton?, target: Any?, selector: Selector?) -> ChatNavigationButton? {
@@ -284,13 +289,15 @@ func secondaryRightNavigationButtonForChatInterfaceState(context: AccountContext
     }
 
     if case .standard(.default) = presentationInterfaceState.mode, presentationInterfaceState.subject == nil, let user = presentationInterfaceState.renderedPeer?.chatMainPeer as? TelegramUser, user.id != context.account.peerId, !user.id.isSecretChat, user.isGenericUser {
-        let isEnabled = TelewhiteModsSettings.current.ghostMode
-        if currentButton?.action == .toggleGhostMode(isEnabled: isEnabled) {
+        let settings = TelewhiteModsSettings.current
+        let isEnabled = settings.isGhostEnabled(for: user.id)
+        let rawPeerId = user.id.toInt64()
+        if currentButton?.action == .toggleGhostMode(peerId: rawPeerId, isEnabled: isEnabled) {
             return currentButton
         } else {
             let buttonItem = UIBarButtonItem(image: telewhiteGhostModeIcon(theme: presentationInterfaceState.theme, isEnabled: isEnabled), style: .plain, target: target, action: selector)
-            buttonItem.accessibilityLabel = isEnabled ? "Disable Ghost Mode" : "Enable Ghost Mode"
-            return ChatNavigationButton(action: .toggleGhostMode(isEnabled: isEnabled), buttonItem: buttonItem)
+            buttonItem.accessibilityLabel = isEnabled ? "Disable Ghost Mode for this chat" : "Enable Ghost Mode for this chat"
+            return ChatNavigationButton(action: .toggleGhostMode(peerId: rawPeerId, isEnabled: isEnabled), buttonItem: buttonItem)
         }
     }
 
@@ -301,4 +308,28 @@ func secondaryRightNavigationButtonForChatInterfaceState(context: AccountContext
     }
 
     return nil
+}
+
+func tertiaryRightNavigationButtonForChatInterfaceState(context: AccountContext, presentationInterfaceState: ChatPresentationInterfaceState, currentButton: ChatNavigationButton?, target: Any?, selector: Selector?) -> ChatNavigationButton? {
+    if presentationInterfaceState.interfaceState.selectionState != nil {
+        return nil
+    }
+    guard case .standard(.default) = presentationInterfaceState.mode, presentationInterfaceState.subject == nil else {
+        return nil
+    }
+    guard let translationState = presentationInterfaceState.translationState else {
+        return nil
+    }
+    if translationState.fromLang.lowercased() != "en" {
+        return nil
+    }
+
+    let isEnabled = translationState.isEnabled && translationState.toLang.lowercased() == "ru"
+    if currentButton?.action == .toggleTranslation(isEnabled: isEnabled) {
+        return currentButton
+    } else {
+        let buttonItem = UIBarButtonItem(image: telewhiteTranslateIcon(theme: presentationInterfaceState.theme, isEnabled: isEnabled), style: .plain, target: target, action: selector)
+        buttonItem.accessibilityLabel = isEnabled ? "Show original text" : "Translate English to Russian"
+        return ChatNavigationButton(action: .toggleTranslation(isEnabled: isEnabled), buttonItem: buttonItem)
+    }
 }

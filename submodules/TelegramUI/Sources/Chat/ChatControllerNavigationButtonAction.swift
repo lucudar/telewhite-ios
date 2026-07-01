@@ -124,16 +124,39 @@ extension ChatControllerImpl {
         switch action {
         case .spacer, .toggleInfoPanel:
             break
-        case .toggleGhostMode(_):
+        case let .toggleGhostMode(peerId, _):
             var settings = TelewhiteModsSettings.current
-            settings.ghostMode = !settings.ghostMode
+            if settings.ghostMode {
+                settings.ghostMode = false
+                settings.ghostPeerIds = [peerId]
+            } else if settings.ghostPeerIds.contains(peerId) {
+                settings.ghostPeerIds.remove(peerId)
+            } else {
+                settings.ghostPeerIds.insert(peerId)
+            }
             settings.save()
+            self.context.account.shouldKeepOnlinePresence.set(.single(false))
 
             self.updateChatPresentationInterfaceState(transition: .immediate, interactive: false, force: true, { $0 })
 
+            let isEnabled = settings.ghostPeerIds.contains(peerId)
             self.present(UndoOverlayController(
                 presentationData: self.presentationData,
-                content: .info(title: nil, text: settings.ghostMode ? "Ghost Mode enabled" : "Ghost Mode disabled", timeout: nil, customUndoText: nil),
+                content: .info(title: nil, text: isEnabled ? "Ghost Mode enabled for this chat" : "Ghost Mode disabled for this chat", timeout: nil, customUndoText: nil),
+                elevatedLayout: false,
+                action: { _ in
+                    return false
+                }
+            ), in: .current)
+        case let .toggleTranslation(isEnabled):
+            if isEnabled {
+                self.interfaceInteraction?.toggleTranslation(.original)
+            } else {
+                self.interfaceInteraction?.changeTranslationLanguage("ru")
+            }
+            self.present(UndoOverlayController(
+                presentationData: self.presentationData,
+                content: .info(title: nil, text: isEnabled ? "Showing original text" : "Translating English to Russian", timeout: nil, customUndoText: nil),
                 elevatedLayout: false,
                 action: { _ in
                     return false
