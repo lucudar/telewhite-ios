@@ -6,6 +6,26 @@ import TelegramPresentationData
 import Display
 import MoreHeaderButton
 
+private func generateVpnIcon(color: UIColor) -> UIImage? {
+    return generateImage(CGSize(width: 30.0, height: 30.0), contextGenerator: { size, context in
+        context.clear(CGRect(origin: CGPoint(), size: size))
+
+        context.setStrokeColor(color.cgColor)
+        context.setLineWidth(1.8)
+        context.strokeEllipse(in: CGRect(x: 4.5, y: 4.5, width: 21.0, height: 21.0))
+
+        context.setLineWidth(1.6)
+        context.setLineCap(.round)
+        context.move(to: CGPoint(x: 10.0, y: 19.5))
+        context.addCurve(to: CGPoint(x: 20.0, y: 10.5), controlPoint1: CGPoint(x: 12.8, y: 15.8), controlPoint2: CGPoint(x: 16.0, y: 13.0))
+        context.strokePath()
+
+        context.setFillColor(color.cgColor)
+        context.fillEllipse(in: CGRect(x: 7.5, y: 17.0, width: 5.0, height: 5.0))
+        context.fillEllipse(in: CGRect(x: 17.5, y: 8.0, width: 5.0, height: 5.0))
+    })
+}
+
 public final class NavigationButtonComponentEnvironment: Equatable {
     public let theme: PresentationTheme
     
@@ -28,6 +48,7 @@ public final class NavigationButtonComponent: Component {
         case text(title: String, isBold: Bool)
         case more
         case icon(imageName: String)
+        case vpn
         case proxy(status: ChatTitleProxyStatus)
     }
     
@@ -125,6 +146,8 @@ public final class NavigationButtonComponent: Component {
                 isMore = true
             case let .icon(imageNameValue):
                 imageName = imageNameValue
+            case .vpn:
+                imageName = "__telewhite_vpn"
             case let .proxy(status):
                 proxyStatus = status
             }
@@ -165,7 +188,11 @@ public final class NavigationButtonComponent: Component {
                 }
                 if self.iconImageName != imageName || themeUpdated {
                     self.iconImageName = imageName
-                    iconView.image = generateTintedImage(image: UIImage(bundleImageName: imageName), color: theme.chat.inputPanel.panelControlColor)
+                    if imageName == "__telewhite_vpn" {
+                        iconView.image = generateVpnIcon(color: theme.chat.inputPanel.panelControlColor)
+                    } else {
+                        iconView.image = generateTintedImage(image: UIImage(bundleImageName: imageName), color: theme.chat.inputPanel.panelControlColor)
+                    }
                 }
                 
                 if let iconSize = iconView.image?.size {

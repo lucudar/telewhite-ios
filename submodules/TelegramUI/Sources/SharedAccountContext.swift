@@ -2322,6 +2322,10 @@ public final class SharedAccountContextImpl: SharedAccountContext {
         return proxySettingsController(context: context)
     }
     
+    public func makeTelewhiteModsController(context: AccountContext) -> ViewController {
+        return telewhiteModsController(context: context)
+    }
+
     public func makeLocalizationListController(context: AccountContext) -> ViewController {
         return LocalizationListController(context: context)
     }

@@ -9,34 +9,39 @@ import Display
 import SettingsUI
 
 private func telewhiteGhostModeIcon(theme: PresentationTheme, isEnabled: Bool) -> UIImage? {
-    let backgroundColor = isEnabled ? theme.list.itemAccentColor : theme.rootController.navigationBar.opaqueBackgroundColor
-    let foregroundColor = isEnabled ? UIColor.white : theme.rootController.navigationBar.buttonColor
+    let foregroundColor = isEnabled ? theme.list.itemAccentColor : theme.rootController.navigationBar.buttonColor
 
     return generateImage(CGSize(width: 30.0, height: 30.0), contextGenerator: { size, context in
         context.clear(CGRect(origin: CGPoint(), size: size))
 
-        context.setFillColor(backgroundColor.cgColor)
-        context.fillEllipse(in: CGRect(x: 3.0, y: 3.0, width: 24.0, height: 24.0))
-
-        let ghostPath = UIBezierPath()
-        ghostPath.move(to: CGPoint(x: 10.0, y: 22.0))
-        ghostPath.addLine(to: CGPoint(x: 10.0, y: 13.5))
-        ghostPath.addCurve(to: CGPoint(x: 15.0, y: 8.5), controlPoint1: CGPoint(x: 10.0, y: 10.7), controlPoint2: CGPoint(x: 12.1, y: 8.5))
-        ghostPath.addCurve(to: CGPoint(x: 20.0, y: 13.5), controlPoint1: CGPoint(x: 17.9, y: 8.5), controlPoint2: CGPoint(x: 20.0, y: 10.7))
-        ghostPath.addLine(to: CGPoint(x: 20.0, y: 22.0))
-        ghostPath.addLine(to: CGPoint(x: 17.9, y: 20.2))
-        ghostPath.addLine(to: CGPoint(x: 15.8, y: 22.0))
-        ghostPath.addLine(to: CGPoint(x: 13.7, y: 20.2))
-        ghostPath.addLine(to: CGPoint(x: 11.7, y: 22.0))
-        ghostPath.close()
-
         context.setFillColor(foregroundColor.cgColor)
-        context.addPath(ghostPath.cgPath)
+        let bodyPath = UIBezierPath()
+        bodyPath.move(to: CGPoint(x: 8.0, y: 24.0))
+        bodyPath.addLine(to: CGPoint(x: 8.0, y: 13.8))
+        bodyPath.addCurve(to: CGPoint(x: 15.0, y: 6.5), controlPoint1: CGPoint(x: 8.0, y: 9.5), controlPoint2: CGPoint(x: 10.9, y: 6.5))
+        bodyPath.addCurve(to: CGPoint(x: 22.0, y: 13.8), controlPoint1: CGPoint(x: 19.1, y: 6.5), controlPoint2: CGPoint(x: 22.0, y: 9.5))
+        bodyPath.addLine(to: CGPoint(x: 22.0, y: 24.0))
+        bodyPath.addLine(to: CGPoint(x: 19.2, y: 21.4))
+        bodyPath.addLine(to: CGPoint(x: 16.4, y: 24.0))
+        bodyPath.addLine(to: CGPoint(x: 13.6, y: 21.4))
+        bodyPath.addLine(to: CGPoint(x: 10.8, y: 24.0))
+        bodyPath.close()
+        context.addPath(bodyPath.cgPath)
         context.fillPath()
 
-        context.setFillColor(backgroundColor.cgColor)
-        context.fillEllipse(in: CGRect(x: 12.3, y: 13.5, width: 2.0, height: 2.4))
-        context.fillEllipse(in: CGRect(x: 15.8, y: 13.5, width: 2.0, height: 2.4))
+        context.setBlendMode(.clear)
+        context.fillEllipse(in: CGRect(x: 11.0, y: 13.2, width: 2.8, height: 3.2))
+        context.fillEllipse(in: CGRect(x: 16.2, y: 13.2, width: 2.8, height: 3.2))
+        context.setBlendMode(.normal)
+
+        if isEnabled {
+            context.setStrokeColor(UIColor.white.withAlphaComponent(0.9).cgColor)
+            context.setLineWidth(1.5)
+            context.setLineCap(.round)
+            context.move(to: CGPoint(x: 9.5, y: 7.5))
+            context.addLine(to: CGPoint(x: 20.5, y: 22.5))
+            context.strokePath()
+        }
     })
 }
 

@@ -3824,6 +3824,8 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         strongSelf.contentContainersWrapperNode.frame = CGRect(origin: CGPoint(), size: layout.contentSize)
         
         strongSelf.appliedItem = item
+        let isTelewhiteDeleted = item.content.firstMessage.attributes.contains(where: { $0 is TelewhiteDeletedMessageAttribute })
+        strongSelf.mainContextSourceNode.contentNode.alpha = isTelewhiteDeleted ? 0.48 : 1.0
         strongSelf.appliedForwardInfo = (forwardSource, forwardAuthorSignature)
         strongSelf.updateAccessibilityData(accessibilityData)
         strongSelf.disablesComments = disablesComments

@@ -961,9 +961,7 @@ private func finalStateWithUpdatesAndServerTime(accountPeerId: PeerId, postbox: 
                     if previousState.pts >= pts {
                         Logger.shared.log("State", "channel \(peerId) (\((updatedState.peers[peerId] as? TelegramChannel)?.title ?? "nil")) skip old delete update")
                     } else if previousState.pts + ptsCount == pts {
-                        if !telewhitePreserveDeletedMessagesEnabled() {
-                            updatedState.deleteMessages(messages.map({ MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: $0) }))
-                        }
+                        updatedState.deleteMessages(messages.map({ MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: $0) }))
                         updatedState.updateChannelState(peerId, pts: pts)
                     } else {
                         if !missingUpdatesFromChannels.contains(peerId) {
@@ -1053,9 +1051,7 @@ private func finalStateWithUpdatesAndServerTime(accountPeerId: PeerId, postbox: 
                 let peerId = PeerId(namespace: Namespaces.Peer.CloudChannel, id: PeerId.Id._internalFromInt64Value(channelId))
                 updatedState.updateMinAvailableMessage(MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: minId))
             case let .updateDeleteMessages(updateDeleteMessagesData):
-                if !telewhitePreserveDeletedMessagesEnabled() {
-                    updatedState.deleteMessagesWithGlobalIds(updateDeleteMessagesData.messages)
-                }
+                updatedState.deleteMessagesWithGlobalIds(updateDeleteMessagesData.messages)
             case let .updatePinnedMessages(updatePinnedMessagesData):
                 let (flags, peer, messages) = (updatePinnedMessagesData.flags, updatePinnedMessagesData.peer, updatePinnedMessagesData.messages)
                 let peerId = peer.peerId
@@ -3552,9 +3548,7 @@ private func pollChannel(accountPeerId: PeerId, postbox: Postbox, network: Netwo
                     switch update {
                     case let .updateDeleteChannelMessages(updateDeleteChannelMessagesData):
                         let peerId = peer.id
-                        if !telewhitePreserveDeletedMessagesEnabled() {
-                            updatedState.deleteMessages(updateDeleteChannelMessagesData.messages.map({ MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: $0) }))
-                        }
+                        updatedState.deleteMessages(updateDeleteChannelMessagesData.messages.map({ MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: $0) }))
                     case let .updateEditChannelMessage(updateEditChannelMessageData):
                         let apiMessage = updateEditChannelMessageData.message
                         var peerIsForum = peer.isForum
@@ -4481,6 +4475,8 @@ func replayFinalState(
                         let _ = mediaBox.removeCachedResources(Array(Set(resourceIds)), force: true).start()
                     }
                     deletedMessageIds.append(contentsOf: ids.map { .global($0) })
+                } else {
+                    telewhiteMarkMessagesDeleted(transaction: transaction, ids: transaction.messageIdsForGlobalIds(ids))
                 }
             case let .DeleteMessages(ids):
                 if !telewhitePreserveDeletedMessagesEnabled() {
@@ -4488,6 +4484,20 @@ func replayFinalState(
                         addMessageThreadStatsDifference(threadKey: id, remove: remove, addedMessagePeer: nil, addedMessageId: nil, isOutgoing: false)
                     })
                     deletedMessageIds.append(contentsOf: ids.map { .messageId($0) })
+                } else {
+                    let preservableIds = ids.filter { id in
+                        return id.namespace == Namespaces.Message.Cloud || id.namespace == Namespaces.Message.QuickReplyCloud
+                    }
+                    let removableIds = ids.filter { id in
+                        return !preservableIds.contains(id)
+                    }
+                    telewhiteMarkMessagesDeleted(transaction: transaction, ids: preservableIds)
+                    if !removableIds.isEmpty {
+                        _internal_deleteMessages(transaction: transaction, mediaBox: mediaBox, ids: removableIds, manualAddMessageThreadStatsDifference: { id, add, remove in
+                            addMessageThreadStatsDifference(threadKey: id, remove: remove, addedMessagePeer: nil, addedMessageId: nil, isOutgoing: false)
+                        })
+                        deletedMessageIds.append(contentsOf: removableIds.map { .messageId($0) })
+                    }
                 }
             case let .UpdateMinAvailableMessage(id):
                 if let message = transaction.getMessage(id) {

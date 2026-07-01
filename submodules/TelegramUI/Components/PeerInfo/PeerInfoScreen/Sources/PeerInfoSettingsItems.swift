@@ -239,7 +239,8 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
     items[.advanced]!.append(PeerInfoScreenDisclosureItem(id: 3, text: presentationData.strings.Settings_Appearance, icon: PresentationResourcesSettings.appearance, action: {
         interaction.openSettings(.appearance)
     }))
-    items[.extra]!.append(PeerInfoScreenDisclosureItem(id: 10, label: .titleBadge("MOD", presentationData.theme.list.itemAccentColor), text: "Telewhite Mods", icon: PresentationResourcesSettings.settings, action: {
+    let telewhiteModsIcon = generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Telegram"), color: presentationData.theme.list.itemAccentColor)
+    items[.extra]!.append(PeerInfoScreenDisclosureItem(id: 10, label: .titleBadge("MOD", presentationData.theme.list.itemAccentColor), text: "Telewhite Mods", icon: telewhiteModsIcon, action: {
         interaction.openSettings(.telewhiteMods)
     }))
     

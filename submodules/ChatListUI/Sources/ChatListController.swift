@@ -6712,6 +6712,7 @@ private final class ChatListLocationContext {
     
     var leftButton: AnyComponentWithIdentity<NavigationButtonComponentEnvironment>?
     var rightButton: AnyComponentWithIdentity<NavigationButtonComponentEnvironment>?
+    var vpnButton: AnyComponentWithIdentity<NavigationButtonComponentEnvironment>?
     var proxyButton: AnyComponentWithIdentity<NavigationButtonComponentEnvironment>?
     var storyButton: AnyComponentWithIdentity<NavigationButtonComponentEnvironment>?
     
@@ -6722,6 +6723,9 @@ private final class ChatListLocationContext {
         }
         if let storyButton = self.storyButton {
             result.append(storyButton)
+        }
+        if let vpnButton = self.vpnButton {
+            result.append(vpnButton)
         }
         if let proxyButton = self.proxyButton {
             result.append(proxyButton)
@@ -7101,6 +7105,7 @@ private final class ChatListLocationContext {
         if stateAndFilterId.state.editing {
             if case .chatList(.root) = self.location {
                 self.rightButton = nil
+                self.vpnButton = nil
                 self.storyButton = nil
                 self.proxyButton = nil
             }
@@ -7117,6 +7122,7 @@ private final class ChatListLocationContext {
         } else if isReorderingTabs {
             if case .chatList(.root) = self.location {
                 self.rightButton = nil
+                self.vpnButton = nil
                 self.storyButton = nil
                 self.proxyButton = nil
             }
@@ -7208,7 +7214,18 @@ private final class ChatListLocationContext {
                 } else {
                     self.storyButton = nil
                 }
+
+                self.vpnButton = AnyComponentWithIdentity(id: "telewhiteVpn", component: AnyComponent(NavigationButtonComponent(
+                    content: .vpn,
+                    pressed: { [weak self] _ in
+                        guard let self, let parentController = self.parentController else {
+                            return
+                        }
+                        (parentController.navigationController as? NavigationController)?.pushViewController(self.context.sharedContext.makeTelewhiteModsController(context: self.context))
+                    }
+                )))
             } else {
+                self.vpnButton = nil
                 let parentController = self.parentController
                 self.rightButton = AnyComponentWithIdentity(id: "more", component: AnyComponent(NavigationButtonComponent(
                     content: .more,

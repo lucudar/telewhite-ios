@@ -244,6 +244,7 @@ private var declaredEncodables: Void = {
     declareEncodable(ScheduledRepeatAttribute.self, f: { ScheduledRepeatAttribute(decoder: $0) })
     declareEncodable(SummarizationMessageAttribute.self, f: { SummarizationMessageAttribute(decoder: $0) })
     declareEncodable(GuestChatMessageAttribute.self, f: { GuestChatMessageAttribute(decoder: $0) })
+    declareEncodable(TelewhiteDeletedMessageAttribute.self, f: { TelewhiteDeletedMessageAttribute(decoder: $0) })
     return
 }()
 

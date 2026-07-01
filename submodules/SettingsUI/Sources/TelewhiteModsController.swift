@@ -7,6 +7,7 @@ import ItemListUI
 import PresentationDataUtils
 import AccountContext
 import AlertUI
+import TelegramUIPreferences
 
 public struct TelewhiteModsSettings: Equatable {
     public static let didChangeNotification = Notification.Name("TelewhiteModsSettingsDidChange")
@@ -89,25 +90,35 @@ public struct TelewhiteModsSettings: Equatable {
 
 private final class TelewhiteModsControllerArguments {
     let updateSettings: ((TelewhiteModsSettings) -> TelewhiteModsSettings) -> Void
+    let updateTranslationSettings: ((TranslationSettings) -> TranslationSettings) -> Void
     let startVpn: () -> Void
     
     init(
         updateSettings: @escaping ((TelewhiteModsSettings) -> TelewhiteModsSettings) -> Void,
+        updateTranslationSettings: @escaping ((TranslationSettings) -> TranslationSettings) -> Void,
         startVpn: @escaping () -> Void
     ) {
         self.updateSettings = updateSettings
+        self.updateTranslationSettings = updateTranslationSettings
         self.startVpn = startVpn
     }
 }
 
 private enum TelewhiteModsSection: Int32 {
-    case vpn
+    case messenger
     case privacy
+    case vpn
     case appearance
     case developer
 }
 
 private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
+    case messengerHeader(String)
+    case preserveDeletedMessages(String, Bool)
+    case translateMessages(String, Bool)
+    case translateChats(String, Bool)
+    case messengerInfo(String)
+
     case vpnHeader(String)
     case vpnEnabled(String, Bool)
     case vpnSubscription(String, String)
@@ -117,7 +128,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     
     case privacyHeader(String)
     case ghostMode(String, Bool)
-    case preserveDeletedMessages(String, Bool)
     case hideTypingStatus(String, Bool)
     case hideReadReceipts(String, Bool)
     case privacyInfo(String)
@@ -135,9 +145,11 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     
     var section: ItemListSectionId {
         switch self {
+        case .messengerHeader, .preserveDeletedMessages, .translateMessages, .translateChats, .messengerInfo:
+            return TelewhiteModsSection.messenger.rawValue
         case .vpnHeader, .vpnEnabled, .vpnSubscription, .vpnStatus, .vpnStart, .vpnInfo:
             return TelewhiteModsSection.vpn.rawValue
-        case .privacyHeader, .ghostMode, .preserveDeletedMessages, .hideTypingStatus, .hideReadReceipts, .privacyInfo:
+        case .privacyHeader, .ghostMode, .hideTypingStatus, .hideReadReceipts, .privacyInfo:
             return TelewhiteModsSection.privacy.rawValue
         case .appearanceHeader, .hideStories, .compactChatList, .amoledMode:
             return TelewhiteModsSection.appearance.rawValue
@@ -148,48 +160,56 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     
     var stableId: Int32 {
         switch self {
-        case .vpnHeader:
+        case .messengerHeader:
             return 0
-        case .vpnEnabled:
+        case .preserveDeletedMessages:
             return 1
-        case .vpnSubscription:
+        case .translateMessages:
             return 2
-        case .vpnStatus:
+        case .translateChats:
             return 3
-        case .vpnStart:
+        case .messengerInfo:
             return 4
+        case .vpnHeader:
+            return 20
+        case .vpnEnabled:
+            return 21
+        case .vpnSubscription:
+            return 22
+        case .vpnStatus:
+            return 23
+        case .vpnStart:
+            return 24
         case .vpnInfo:
-            return 5
+            return 25
         case .privacyHeader:
             return 10
         case .ghostMode:
             return 11
-        case .preserveDeletedMessages:
-            return 12
         case .hideTypingStatus:
-            return 13
+            return 12
         case .hideReadReceipts:
-            return 14
+            return 13
         case .privacyInfo:
-            return 15
+            return 14
         case .appearanceHeader:
-            return 20
-        case .hideStories:
-            return 21
-        case .compactChatList:
-            return 22
-        case .amoledMode:
-            return 23
-        case .developerHeader:
             return 30
-        case .showUserIds:
+        case .hideStories:
             return 31
-        case .showChatIds:
+        case .compactChatList:
             return 32
-        case .showMessageIds:
+        case .amoledMode:
             return 33
+        case .developerHeader:
+            return 40
+        case .showUserIds:
+            return 41
+        case .showChatIds:
+            return 42
+        case .showMessageIds:
+            return 43
         case .developerInfo:
-            return 34
+            return 44
         }
     }
     
@@ -200,8 +220,36 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
         let arguments = arguments as! TelewhiteModsControllerArguments
         switch self {
-        case let .vpnHeader(text), let .privacyHeader(text), let .appearanceHeader(text), let .developerHeader(text):
+        case let .messengerHeader(text), let .vpnHeader(text), let .privacyHeader(text), let .appearanceHeader(text), let .developerHeader(text):
             return ItemListSectionHeaderItem(presentationData: presentationData, text: text, sectionId: self.section)
+        case let .preserveDeletedMessages(text, value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: text, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.updateSettings { current in
+                    var updated = current
+                    updated.preserveDeletedMessages = value
+                    return updated
+                }
+            })
+        case let .translateMessages(text, value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: text, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.updateTranslationSettings { current in
+                    var updated = current.withUpdatedShowTranslate(value)
+                    if !updated.showTranslate && !updated.translateChats {
+                        updated = updated.withUpdatedIgnoredLanguages(nil)
+                    }
+                    return updated
+                }
+            })
+        case let .translateChats(text, value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: text, value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.updateTranslationSettings { current in
+                    var updated = current.withUpdatedTranslateChats(value)
+                    if !updated.showTranslate && !updated.translateChats {
+                        updated = updated.withUpdatedIgnoredLanguages(nil)
+                    }
+                    return updated
+                }
+            })
         case let .vpnEnabled(text, value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: text, value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.updateSettings { current in
@@ -224,21 +272,13 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return ItemListActionItem(presentationData: presentationData, systemStyle: .glass, title: text, kind: .generic, alignment: .natural, sectionId: self.section, style: .blocks, action: {
                 arguments.startVpn()
             })
-        case let .vpnInfo(text), let .privacyInfo(text), let .developerInfo(text):
+        case let .messengerInfo(text), let .vpnInfo(text), let .privacyInfo(text), let .developerInfo(text):
             return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
         case let .ghostMode(text, value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: text, value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.updateSettings { current in
                     var updated = current
                     updated.ghostMode = value
-                    return updated
-                }
-            })
-        case let .preserveDeletedMessages(text, value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: text, value: value, sectionId: self.section, style: .blocks, updated: { value in
-                arguments.updateSettings { current in
-                    var updated = current
-                    updated.preserveDeletedMessages = value
                     return updated
                 }
             })
@@ -310,7 +350,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     }
 }
 
-private func telewhiteModsEntries(settings: TelewhiteModsSettings) -> [TelewhiteModsEntry] {
+private func telewhiteModsEntries(settings: TelewhiteModsSettings, translationSettings: TranslationSettings) -> [TelewhiteModsEntry] {
     var entries: [TelewhiteModsEntry] = []
     let vpnStatus: String
     if settings.vpnSubscription.isEmpty {
@@ -321,19 +361,24 @@ private func telewhiteModsEntries(settings: TelewhiteModsSettings) -> [Telewhite
         vpnStatus = "Configured"
     }
     
+    entries.append(.messengerHeader("Messenger"))
+    entries.append(.preserveDeletedMessages("Keep Deleted Messages", settings.preserveDeletedMessages))
+    entries.append(.translateMessages("Show Translate Button", translationSettings.showTranslate))
+    entries.append(.translateChats("Translate Entire Chats", translationSettings.translateChats))
+    entries.append(.messengerInfo("Deleted cloud messages stay in chat and are dimmed locally. Translation uses Telegram's built-in Translate pipeline."))
+    
+    entries.append(.privacyHeader("Privacy"))
+    entries.append(.ghostMode("Ghost Mode", settings.ghostMode))
+    entries.append(.hideTypingStatus("Hide Typing Status", settings.hideTypingStatus))
+    entries.append(.hideReadReceipts("Hide Read Receipts", settings.hideReadReceipts))
+    entries.append(.privacyInfo("Ghost Mode blocks read receipts and typing activity in private chats."))
+
     entries.append(.vpnHeader("VPN"))
     entries.append(.vpnEnabled("Enable VPN Profile", settings.vpnEnabled))
     entries.append(.vpnSubscription("Subscription URL", settings.vpnSubscription))
     entries.append(.vpnStatus("Status", vpnStatus))
     entries.append(.vpnStart("Start VPN"))
-    entries.append(.vpnInfo("Subscription storage is ready. Real VPN start needs the Packet Tunnel extension that will be wired in the next VPN pass."))
-    
-    entries.append(.privacyHeader("Privacy"))
-    entries.append(.ghostMode("Ghost Mode", settings.ghostMode))
-    entries.append(.preserveDeletedMessages("Preserve Deleted Messages", settings.preserveDeletedMessages))
-    entries.append(.hideTypingStatus("Hide Typing Status", settings.hideTypingStatus))
-    entries.append(.hideReadReceipts("Hide Read Receipts", settings.hideReadReceipts))
-    entries.append(.privacyInfo("Ghost Mode blocks read receipts and typing activity. Preserve Deleted Messages keeps cloud delete updates from removing local history."))
+    entries.append(.vpnInfo("Subscription storage is ready. A real Telegram-only VPN requires an iOS Packet Tunnel extension and the matching entitlement."))
     
     entries.append(.appearanceHeader("Appearance"))
     entries.append(.hideStories("Hide Stories", settings.hideStories))
@@ -365,7 +410,9 @@ public func telewhiteModsController(context: AccountContext) -> ViewController {
     
     var presentControllerImpl: ((ViewController) -> Void)?
     
-    let arguments = TelewhiteModsControllerArguments(updateSettings: updateSettings, startVpn: {
+    let arguments = TelewhiteModsControllerArguments(updateSettings: updateSettings, updateTranslationSettings: { f in
+        let _ = updateTranslationSettingsInteractively(accountManager: context.sharedContext.accountManager, f).start()
+    }, startVpn: {
         let presentationData = context.sharedContext.currentPresentationData.with { $0 }
         let settings = stateValue.with { $0 }
         let text: String
@@ -379,11 +426,16 @@ public func telewhiteModsController(context: AccountContext) -> ViewController {
         ]))
     })
     
-    let signal = combineLatest(context.sharedContext.presentationData, statePromise.get())
+    let translationSettings = context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.translationSettings])
+    |> map { sharedData -> TranslationSettings in
+        return sharedData.entries[ApplicationSpecificSharedDataKeys.translationSettings]?.get(TranslationSettings.self) ?? TranslationSettings.defaultSettings
+    }
+
+    let signal = combineLatest(context.sharedContext.presentationData, statePromise.get(), translationSettings)
     |> deliverOnMainQueue
-    |> map { presentationData, settings -> (ItemListControllerState, (ItemListNodeState, Any)) in
+    |> map { presentationData, settings, translationSettings -> (ItemListControllerState, (ItemListNodeState, Any)) in
         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text("Telewhite Mods"), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back), animateChanges: false)
-        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: telewhiteModsEntries(settings: settings), style: .blocks, animateChanges: false)
+        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: telewhiteModsEntries(settings: settings, translationSettings: translationSettings), style: .blocks, animateChanges: false)
         return (controllerState, (listState, arguments))
     }
     

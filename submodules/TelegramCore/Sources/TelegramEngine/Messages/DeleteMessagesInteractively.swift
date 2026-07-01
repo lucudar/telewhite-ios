@@ -4,6 +4,22 @@ import SwiftSignalKit
 import TelegramApi
 import MtProtoKit
 
+private func telewhitePreserveDeletedMessagesEnabled() -> Bool {
+    return UserDefaults.standard.bool(forKey: "telewhite.mods.preserveDeletedMessages")
+}
+
+func telewhiteMarkMessagesDeleted(transaction: Transaction, ids: [MessageId], timestamp: Int32 = Int32(Date().timeIntervalSince1970)) {
+    for id in ids {
+        transaction.updateMessage(id, update: { currentMessage in
+            if currentMessage.attributes.contains(where: { $0 is TelewhiteDeletedMessageAttribute }) {
+                return .skip
+            }
+            var attributes = currentMessage.attributes
+            attributes.append(TelewhiteDeletedMessageAttribute(timestamp: timestamp))
+            return .update(StoreMessage(id: currentMessage.id, customStableId: nil, globallyUniqueId: currentMessage.globallyUniqueId, groupingKey: currentMessage.groupingKey, threadId: currentMessage.threadId, timestamp: currentMessage.timestamp, flags: StoreMessageFlags(currentMessage.flags), tags: currentMessage.tags, globalTags: currentMessage.globalTags, localTags: currentMessage.localTags, forwardInfo: currentMessage.forwardInfo.flatMap(StoreMessageForwardInfo.init), authorId: currentMessage.author?.id, text: currentMessage.text, attributes: attributes, media: currentMessage.media))
+        })
+    }
+}
 
 func _internal_deleteMessagesInteractively(account: Account, messageIds: [MessageId], type: InteractiveMessagesDeletionType, deleteAllInGroup: Bool = false) -> Signal<Void, NoError> {
     return account.postbox.transaction { transaction -> Void in
@@ -103,9 +119,27 @@ func deleteMessagesInteractively(transaction: Transaction, stateManager: Account
             }
         }
     }
-    _internal_deleteMessages(transaction: transaction, mediaBox: postbox.mediaBox, ids: messageIds.map(\.messageId))
+    let localDeleteIds = messageIds.map(\.messageId)
+    var notifyDeletedIds = localDeleteIds
+    if telewhitePreserveDeletedMessagesEnabled() {
+        let preservableIds = localDeleteIds.filter { id in
+            return id.namespace == Namespaces.Message.Cloud || id.namespace == Namespaces.Message.QuickReplyCloud
+        }
+        let removableIds = localDeleteIds.filter { id in
+            return !preservableIds.contains(id)
+        }
+        notifyDeletedIds = removableIds
+        telewhiteMarkMessagesDeleted(transaction: transaction, ids: preservableIds)
+        if !removableIds.isEmpty {
+            _internal_deleteMessages(transaction: transaction, mediaBox: postbox.mediaBox, ids: removableIds)
+        }
+    } else {
+        _internal_deleteMessages(transaction: transaction, mediaBox: postbox.mediaBox, ids: localDeleteIds)
+    }
     
-    stateManager?.notifyDeletedMessages(messageIds: messageIds.map(\.messageId))
+    if !notifyDeletedIds.isEmpty {
+        stateManager?.notifyDeletedMessages(messageIds: notifyDeletedIds)
+    }
     
     if !uniqueIds.isEmpty && removeIfPossiblyDelivered {
         stateManager?.removePossiblyDeliveredMessages(uniqueIds: uniqueIds)
