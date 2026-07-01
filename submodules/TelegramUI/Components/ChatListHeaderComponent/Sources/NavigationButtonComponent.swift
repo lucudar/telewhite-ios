@@ -17,7 +17,7 @@ private func generateVpnIcon(color: UIColor) -> UIImage? {
         context.setLineWidth(1.6)
         context.setLineCap(.round)
         context.move(to: CGPoint(x: 10.0, y: 19.5))
-        context.addCurve(to: CGPoint(x: 20.0, y: 10.5), controlPoint1: CGPoint(x: 12.8, y: 15.8), controlPoint2: CGPoint(x: 16.0, y: 13.0))
+        context.addCurve(to: CGPoint(x: 20.0, y: 10.5), control1: CGPoint(x: 12.8, y: 15.8), control2: CGPoint(x: 16.0, y: 13.0))
         context.strokePath()
 
         context.setFillColor(color.cgColor)
