@@ -310,7 +310,7 @@ func secondaryRightNavigationButtonForChatInterfaceState(context: AccountContext
         return nil
     }
 
-    if case .standard(.default) = presentationInterfaceState.mode, presentationInterfaceState.subject == nil, case let .user(user) = presentationInterfaceState.renderedPeer?.chatMainPeer, user.id != context.account.peerId, !user.id.isSecretChat, user.isGenericUser {
+    if case .standard(.default) = presentationInterfaceState.mode, presentationInterfaceState.subject == nil, let user = presentationInterfaceState.renderedPeer?.chatMainPeer as? TelegramUser, user.id != context.account.peerId, !user.id.isSecretChat, user.isGenericUser {
         let isEnabled = TelewhiteModsSettings.current.ghostMode
         if currentButton?.action == .toggleGhostMode(isEnabled: isEnabled) {
             return currentButton
