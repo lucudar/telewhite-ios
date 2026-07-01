@@ -10,39 +10,7 @@ import SettingsUI
 
 private func telewhiteGhostModeIcon(theme: PresentationTheme, isEnabled: Bool) -> UIImage? {
     let foregroundColor = isEnabled ? theme.list.itemAccentColor : theme.rootController.navigationBar.buttonColor
-
-    return generateImage(CGSize(width: 30.0, height: 30.0), contextGenerator: { size, context in
-        context.clear(CGRect(origin: CGPoint(), size: size))
-
-        context.setFillColor(foregroundColor.cgColor)
-        let bodyPath = UIBezierPath()
-        bodyPath.move(to: CGPoint(x: 8.0, y: 24.0))
-        bodyPath.addLine(to: CGPoint(x: 8.0, y: 13.8))
-        bodyPath.addCurve(to: CGPoint(x: 15.0, y: 6.5), controlPoint1: CGPoint(x: 8.0, y: 9.5), controlPoint2: CGPoint(x: 10.9, y: 6.5))
-        bodyPath.addCurve(to: CGPoint(x: 22.0, y: 13.8), controlPoint1: CGPoint(x: 19.1, y: 6.5), controlPoint2: CGPoint(x: 22.0, y: 9.5))
-        bodyPath.addLine(to: CGPoint(x: 22.0, y: 24.0))
-        bodyPath.addLine(to: CGPoint(x: 19.2, y: 21.4))
-        bodyPath.addLine(to: CGPoint(x: 16.4, y: 24.0))
-        bodyPath.addLine(to: CGPoint(x: 13.6, y: 21.4))
-        bodyPath.addLine(to: CGPoint(x: 10.8, y: 24.0))
-        bodyPath.close()
-        context.addPath(bodyPath.cgPath)
-        context.fillPath()
-
-        context.setBlendMode(.clear)
-        context.fillEllipse(in: CGRect(x: 11.0, y: 13.2, width: 2.8, height: 3.2))
-        context.fillEllipse(in: CGRect(x: 16.2, y: 13.2, width: 2.8, height: 3.2))
-        context.setBlendMode(.normal)
-
-        if isEnabled {
-            context.setStrokeColor(UIColor.white.withAlphaComponent(0.9).cgColor)
-            context.setLineWidth(1.5)
-            context.setLineCap(.round)
-            context.move(to: CGPoint(x: 9.5, y: 7.5))
-            context.addLine(to: CGPoint(x: 20.5, y: 22.5))
-            context.strokePath()
-        }
-    })
+    return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/EyeLocked"), color: foregroundColor)
 }
 
 func leftNavigationButtonForChatInterfaceState(_ presentationInterfaceState: ChatPresentationInterfaceState, subject: ChatControllerSubject?, strings: PresentationStrings, currentButton: ChatNavigationButton?, target: Any?, selector: Selector?) -> ChatNavigationButton? {
