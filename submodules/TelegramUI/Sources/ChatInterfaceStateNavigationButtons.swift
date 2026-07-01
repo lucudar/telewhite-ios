@@ -1,11 +1,44 @@
 import Foundation
 import UIKit
-import AsyncDisplayKit
 import TelegramCore
 import TelegramPresentationData
 import AccountContext
 import ChatPresentationInterfaceState
 import ChatNavigationButton
+import Display
+import SettingsUI
+
+private func telewhiteGhostModeIcon(theme: PresentationTheme, isEnabled: Bool) -> UIImage? {
+    let backgroundColor = isEnabled ? theme.list.itemAccentColor : theme.rootController.navigationBar.opaqueBackgroundColor
+    let foregroundColor = isEnabled ? UIColor.white : theme.rootController.navigationBar.buttonColor
+
+    return generateImage(CGSize(width: 30.0, height: 30.0), contextGenerator: { size, context in
+        context.clear(CGRect(origin: CGPoint(), size: size))
+
+        context.setFillColor(backgroundColor.cgColor)
+        context.fillEllipse(in: CGRect(x: 3.0, y: 3.0, width: 24.0, height: 24.0))
+
+        let ghostPath = UIBezierPath()
+        ghostPath.move(to: CGPoint(x: 10.0, y: 22.0))
+        ghostPath.addLine(to: CGPoint(x: 10.0, y: 13.5))
+        ghostPath.addCurve(to: CGPoint(x: 15.0, y: 8.5), controlPoint1: CGPoint(x: 10.0, y: 10.7), controlPoint2: CGPoint(x: 12.1, y: 8.5))
+        ghostPath.addCurve(to: CGPoint(x: 20.0, y: 13.5), controlPoint1: CGPoint(x: 17.9, y: 8.5), controlPoint2: CGPoint(x: 20.0, y: 10.7))
+        ghostPath.addLine(to: CGPoint(x: 20.0, y: 22.0))
+        ghostPath.addLine(to: CGPoint(x: 17.9, y: 20.2))
+        ghostPath.addLine(to: CGPoint(x: 15.8, y: 22.0))
+        ghostPath.addLine(to: CGPoint(x: 13.7, y: 20.2))
+        ghostPath.addLine(to: CGPoint(x: 11.7, y: 22.0))
+        ghostPath.close()
+
+        context.setFillColor(foregroundColor.cgColor)
+        context.addPath(ghostPath.cgPath)
+        context.fillPath()
+
+        context.setFillColor(backgroundColor.cgColor)
+        context.fillEllipse(in: CGRect(x: 12.3, y: 13.5, width: 2.0, height: 2.4))
+        context.fillEllipse(in: CGRect(x: 15.8, y: 13.5, width: 2.0, height: 2.4))
+    })
+}
 
 func leftNavigationButtonForChatInterfaceState(_ presentationInterfaceState: ChatPresentationInterfaceState, subject: ChatControllerSubject?, strings: PresentationStrings, currentButton: ChatNavigationButton?, target: Any?, selector: Selector?) -> ChatNavigationButton? {
     if let _ = presentationInterfaceState.interfaceState.selectionState {
@@ -44,7 +77,7 @@ func leftNavigationButtonForChatInterfaceState(_ presentationInterfaceState: Cha
                     canClear = false
                 }
             }
-            
+
             if canClear {
                 let buttonItem = UIBarButtonItem(title: strings.Conversation_ClearAll, style: .plain, target: target, action: selector)
                 buttonItem.accessibilityLabel = title
@@ -57,7 +90,7 @@ func leftNavigationButtonForChatInterfaceState(_ presentationInterfaceState: Cha
             }
         }
     }
-    
+
     if case let .customChatContents(customChatContents) = presentationInterfaceState.subject {
         switch customChatContents.kind {
         case .hashTagSearch:
@@ -72,7 +105,7 @@ func leftNavigationButtonForChatInterfaceState(_ presentationInterfaceState: Cha
             }
         }
     }
-    
+
     return nil
 }
 
@@ -86,7 +119,7 @@ func rightNavigationButtonForChatInterfaceState(context: AccountContext, present
             hasMessages = true
         }
     }
-    
+
     if let _ = presentationInterfaceState.interfaceState.selectionState {
         if case .messageOptions = presentationInterfaceState.subject {
             return nil
@@ -99,10 +132,10 @@ func rightNavigationButtonForChatInterfaceState(context: AccountContext, present
             return ChatNavigationButton(action: .cancelMessageSelection, buttonItem: buttonItem)
         }
     }
-    
+
     if case let .replyThread(message) = presentationInterfaceState.chatLocation, message.peerId == context.account.peerId {
         let isTags = presentationInterfaceState.hasSearchTags
-        
+
         if case .search(isTags) = currentButton?.action {
             return currentButton
         } else {
@@ -111,10 +144,10 @@ func rightNavigationButtonForChatInterfaceState(context: AccountContext, present
             return ChatNavigationButton(action: .search(hasTags: isTags), buttonItem: buttonItem)
         }
     }
-    
+
     if let channel = presentationInterfaceState.renderedPeer?.peer as? TelegramChannel, channel.isMonoForum, case .peer = presentationInterfaceState.chatLocation {
         let displaySearch = hasMessages
-        
+
         if displaySearch {
             if case .search(false) = currentButton?.action {
                 return currentButton
@@ -127,10 +160,10 @@ func rightNavigationButtonForChatInterfaceState(context: AccountContext, present
             return nil
         }
     }
-    
+
     if let user = presentationInterfaceState.renderedPeer?.peer as? TelegramUser, user.isForum, case .peer = presentationInterfaceState.chatLocation {
         let displaySearch = hasMessages
-        
+
         if displaySearch {
             if case .search(false) = currentButton?.action {
                 return currentButton
@@ -143,7 +176,7 @@ func rightNavigationButtonForChatInterfaceState(context: AccountContext, present
             return nil
         }
     }
-    
+
     if let channel = presentationInterfaceState.renderedPeer?.peer as? TelegramChannel, channel.isForumOrMonoForum, let moreInfoNavigationButton = moreInfoNavigationButton {
         if case .replyThread = presentationInterfaceState.chatLocation {
         } else {
@@ -153,22 +186,22 @@ func rightNavigationButtonForChatInterfaceState(context: AccountContext, present
             }
         }
     }
-    
+
     if let user = presentationInterfaceState.renderedPeer?.peer as? TelegramUser, let botInfo = user.botInfo, botInfo.flags.contains(.hasForum), let moreInfoNavigationButton = moreInfoNavigationButton {
         if case .pinnedMessages = presentationInterfaceState.subject {
         } else {
             return moreInfoNavigationButton
         }
     }
-    
+
     if case .messageOptions = presentationInterfaceState.subject {
         return nil
     }
-    
+
     if case .pinnedMessages = presentationInterfaceState.subject {
         return nil
     }
-    
+
     if case let .customChatContents(customChatContents) = presentationInterfaceState.subject {
         switch customChatContents.kind {
         case .hashTagSearch:
@@ -196,7 +229,7 @@ func rightNavigationButtonForChatInterfaceState(context: AccountContext, present
             }
         }
     }
-    
+
     if case .replyThread = presentationInterfaceState.chatLocation {
         if let channel = presentationInterfaceState.renderedPeer?.peer as? TelegramChannel, channel.isForumOrMonoForum {
         } else if hasMessages {
@@ -234,30 +267,30 @@ func rightNavigationButtonForChatInterfaceState(context: AccountContext, present
             }
         }
     }
-    
+
     if case .scheduledMessages = presentationInterfaceState.subject {
         return chatInfoNavigationButton
     }
-    
+
     if case .standard(.previewing) = presentationInterfaceState.mode {
         return chatInfoNavigationButton
     } else if let peerId = presentationInterfaceState.chatLocation.peerId {
         if presentationInterfaceState.accountPeerId == peerId {
             var displaySearchButton = false
-            
+
             if case .replyThread = presentationInterfaceState.chatLocation {
                 displaySearchButton = true
             }
-            
+
             if case .scheduledMessages = presentationInterfaceState.subject {
                 return chatInfoNavigationButton
             } else {
                 displaySearchButton = true
             }
-            
+
             if displaySearchButton {
                 let isTags = presentationInterfaceState.hasSearchTags
-                
+
                 if case .search(isTags) = currentButton?.action {
                     return currentButton
                 } else {
@@ -276,11 +309,23 @@ func secondaryRightNavigationButtonForChatInterfaceState(context: AccountContext
     if presentationInterfaceState.interfaceState.selectionState != nil {
         return nil
     }
+
+    if case .standard(.default) = presentationInterfaceState.mode, presentationInterfaceState.subject == nil, case let .user(user) = presentationInterfaceState.renderedPeer?.chatMainPeer, user.id != context.account.peerId, !user.id.isSecretChat, user.isGenericUser {
+        let isEnabled = TelewhiteModsSettings.current.ghostMode
+        if currentButton?.action == .toggleGhostMode(isEnabled: isEnabled) {
+            return currentButton
+        } else {
+            let buttonItem = UIBarButtonItem(image: telewhiteGhostModeIcon(theme: presentationInterfaceState.theme, isEnabled: isEnabled), style: .plain, target: target, action: selector)
+            buttonItem.accessibilityLabel = isEnabled ? "Disable Ghost Mode" : "Enable Ghost Mode"
+            return ChatNavigationButton(action: .toggleGhostMode(isEnabled: isEnabled), buttonItem: buttonItem)
+        }
+    }
+
     if case .standard(.default) = presentationInterfaceState.mode {
         if case .peer(context.account.peerId) = presentationInterfaceState.chatLocation, presentationInterfaceState.subject != .scheduledMessages, presentationInterfaceState.hasSavedChats {
             return moreInfoNavigationButton
         }
     }
-    
+
     return nil
 }

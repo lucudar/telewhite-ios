@@ -326,14 +326,14 @@ private func telewhiteModsEntries(settings: TelewhiteModsSettings) -> [Telewhite
     entries.append(.vpnSubscription("Subscription URL", settings.vpnSubscription))
     entries.append(.vpnStatus("Status", vpnStatus))
     entries.append(.vpnStart("Start VPN"))
-    entries.append(.vpnInfo("This stores your subscription now. A real connection needs a Packet Tunnel extension and tunnel engine wired in next."))
+    entries.append(.vpnInfo("Subscription storage is ready. Real VPN start needs the Packet Tunnel extension that will be wired in the next VPN pass."))
     
     entries.append(.privacyHeader("Privacy"))
     entries.append(.ghostMode("Ghost Mode", settings.ghostMode))
     entries.append(.preserveDeletedMessages("Preserve Deleted Messages", settings.preserveDeletedMessages))
     entries.append(.hideTypingStatus("Hide Typing Status", settings.hideTypingStatus))
     entries.append(.hideReadReceipts("Hide Read Receipts", settings.hideReadReceipts))
-    entries.append(.privacyInfo("These switches are saved locally. The network and history hooks will be connected feature by feature."))
+    entries.append(.privacyInfo("Ghost Mode blocks read receipts and typing activity. Preserve Deleted Messages keeps cloud delete updates from removing local history."))
     
     entries.append(.appearanceHeader("Appearance"))
     entries.append(.hideStories("Hide Stories", settings.hideStories))
@@ -344,7 +344,7 @@ private func telewhiteModsEntries(settings: TelewhiteModsSettings) -> [Telewhite
     entries.append(.showUserIds("Show User IDs", settings.showUserIds))
     entries.append(.showChatIds("Show Chat IDs", settings.showChatIds))
     entries.append(.showMessageIds("Show Message IDs", settings.showMessageIds))
-    entries.append(.developerInfo("Useful mod ideas to wire next: message filters, session backup, translator shortcuts, streamer mode, and profile ID labels."))
+    entries.append(.developerInfo("IDs are shown in profile/context surfaces when enabled. Message IDs are available from the message context menu."))
     
     return entries
 }

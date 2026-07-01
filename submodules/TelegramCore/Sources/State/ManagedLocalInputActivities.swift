@@ -4,6 +4,10 @@ import SwiftSignalKit
 import TelegramApi
 import MtProtoKit
 
+private func telewhiteHideTypingStatusEnabled() -> Bool {
+    let defaults = UserDefaults.standard
+    return defaults.bool(forKey: "telewhite.mods.ghostMode") || defaults.bool(forKey: "telewhite.mods.hideTypingStatus")
+}
 
 public struct PeerActivitySpace: Hashable {
     public enum Category: Equatable, Hashable {
@@ -11,10 +15,10 @@ public struct PeerActivitySpace: Hashable {
         case thread(Int64)
         case voiceChat
     }
-    
+
     public var peerId: PeerId
     public var category: Category
-    
+
     public init(peerId: PeerId, category: Category) {
         self.peerId = peerId
         self.category = category
@@ -28,45 +32,45 @@ struct PeerInputActivityRecord: Equatable {
 
 private final class ManagedLocalTypingActivitiesContext {
     private var disposables: [PeerActivitySpace: (PeerInputActivityRecord, MetaDisposable)] = [:]
-    
+
     func update(activities: [PeerActivitySpace: [(PeerId, PeerInputActivityRecord)]]) -> (start: [(PeerActivitySpace, PeerInputActivityRecord?, MetaDisposable)], dispose: [MetaDisposable]) {
         var start: [(PeerActivitySpace, PeerInputActivityRecord?, MetaDisposable)] = []
         var dispose: [MetaDisposable] = []
-        
+
         var validPeerIds = Set<PeerActivitySpace>()
         for (peerId, record) in activities {
             if let activity = record.first?.1 {
                 validPeerIds.insert(peerId)
-                
+
                 let currentRecord = self.disposables[peerId]
                 if currentRecord == nil || currentRecord!.0 != activity {
                     if let disposable = currentRecord?.1 {
                         dispose.append(disposable)
                     }
-                    
+
                     let disposable = MetaDisposable()
                     start.append((peerId, activity, disposable))
-                    
+
                     self.disposables[peerId] = (activity, disposable)
                 }
             }
         }
-        
+
         var removePeerIds: [PeerActivitySpace] = []
         for key in self.disposables.keys {
             if !validPeerIds.contains(key) {
                 removePeerIds.append(key)
             }
         }
-        
+
         for peerId in removePeerIds {
             dispose.append(self.disposables[peerId]!.1)
             self.disposables.removeValue(forKey: peerId)
         }
-        
+
         return (start, dispose)
     }
-    
+
     func dispose() {
         for (_, record) in self.disposables {
             record.1.dispose()
@@ -82,11 +86,11 @@ func managedLocalTypingActivities(activities: Signal<[PeerActivitySpace: [(PeerI
             let (start, dispose) = context.with { context in
                 return context.update(activities: activities)
             }
-            
+
             for disposable in dispose {
                 disposable.dispose()
             }
-            
+
             for (peerId, activity, disposable) in start {
                 var threadId: Int64?
                 switch peerId.category {
@@ -100,7 +104,7 @@ func managedLocalTypingActivities(activities: Signal<[PeerActivitySpace: [(PeerI
         })
         return ActionDisposable {
             disposable.dispose()
-            
+
             context.with { context -> Void in
                 context.dispose()
             }
@@ -142,6 +146,10 @@ private func actionFromActivity(_ activity: PeerInputActivity?) -> Api.SendMessa
 }
 
 private func requestActivity(postbox: Postbox, network: Network, accountPeerId: PeerId, peerId: PeerId, threadId: Int64?, activity: PeerInputActivity?) -> Signal<Void, NoError> {
+    if activity != nil && telewhiteHideTypingStatusEnabled() {
+        return .complete()
+    }
+
     return postbox.transaction { transaction -> Signal<Void, NoError> in
         if let peer = transaction.getPeer(peerId) {
             if peerId == accountPeerId {
@@ -174,7 +182,7 @@ private func requestActivity(postbox: Postbox, network: Network, accountPeerId: 
                     return .complete()
                 }
             }
-            
+
             if let inputPeer = apiInputPeer(peer) {
                 var flags: Int32 = 0
                 let topMessageId = threadId.flatMap { Int32(clamping: $0) }

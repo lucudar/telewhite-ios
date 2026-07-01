@@ -124,18 +124,33 @@ extension ChatControllerImpl {
         switch action {
         case .spacer, .toggleInfoPanel:
             break
+        case .toggleGhostMode(_):
+            var settings = TelewhiteModsSettings.current
+            settings.ghostMode = !settings.ghostMode
+            settings.save()
+
+            self.updateChatPresentationInterfaceState(transition: .immediate, interactive: false, force: true, { $0 })
+
+            self.present(UndoOverlayController(
+                presentationData: self.presentationData,
+                content: .info(title: nil, text: settings.ghostMode ? "Ghost Mode enabled" : "Ghost Mode disabled", timeout: nil, customUndoText: nil),
+                elevatedLayout: false,
+                action: { _ in
+                    return false
+                }
+            ), in: .current)
         case .cancelMessageSelection:
             self.updateChatPresentationInterfaceState(animated: true, interactive: true, { $0.updatedInterfaceState { $0.withoutSelectionState() } })
         case .clearHistory:
             guard !self.presentAccountFrozenInfoIfNeeded() else {
                 return
             }
-            
+
             if case let .peer(peerId) = self.chatLocation {
                 let beginClear: (InteractiveHistoryClearingType) -> Void = { [weak self] type in
                     self?.beginClearHistory(type: type)
                 }
-                
+
                 let context = self.context
                 let _ = (self.context.engine.data.get(
                     TelegramEngine.EngineData.Item.Peer.ParticipantCount(id: peerId),
@@ -152,13 +167,13 @@ extension ChatControllerImpl {
                     guard let strongSelf = self else {
                         return
                     }
-                    
+
                     let (isLargeGroupOrChannel, canClearChannel) = parameters
-                    
+
                     guard let peer = strongSelf.presentationInterfaceState.renderedPeer, let chatPeer = peer.peers[peer.peerId], let mainPeer = peer.chatMainPeer else {
                         return
                     }
-                    
+
                     enum ClearType {
                         case savedMessages
                         case secretChat
@@ -166,11 +181,11 @@ extension ChatControllerImpl {
                         case channel
                         case user
                     }
-                    
+
                     let canClearCache: Bool
                     let canClearForMyself: ClearType?
                     let canClearForEveryone: ClearType?
-                    
+
                     if peerId == strongSelf.context.account.peerId {
                         canClearCache = false
                         canClearForMyself = .savedMessages
@@ -181,7 +196,7 @@ extension ChatControllerImpl {
                         canClearForEveryone = nil
                     } else if let group = chatPeer as? TelegramGroup {
                         canClearCache = false
-                        
+
                         switch group.role {
                         case .creator:
                             canClearForMyself = .group
@@ -199,7 +214,7 @@ extension ChatControllerImpl {
                             } else {
                                 canClearCache = true
                                 canClearForMyself = nil
-                                
+
                                 switch channel.info {
                                 case .broadcast:
                                     if channel.flags.contains(.isCreator) {
@@ -220,12 +235,12 @@ extension ChatControllerImpl {
                                 switch channel.info {
                                 case .broadcast:
                                     canClearCache = true
-                                    
+
                                     canClearForMyself = .channel
                                     canClearForEveryone = nil
                                 case .group:
                                     canClearCache = false
-                                    
+
                                     canClearForMyself = .channel
                                     canClearForEveryone = nil
                                 }
@@ -233,7 +248,7 @@ extension ChatControllerImpl {
                                 switch channel.info {
                                 case .broadcast:
                                     canClearCache = true
-                                    
+
                                     if channel.flags.contains(.isCreator) {
                                         canClearForMyself = .channel
                                         canClearForEveryone = nil
@@ -243,7 +258,7 @@ extension ChatControllerImpl {
                                     }
                                 case .group:
                                     canClearCache = false
-                                    
+
                                     if channel.flags.contains(.isCreator) {
                                         canClearForMyself = .group
                                         canClearForEveryone = nil
@@ -257,25 +272,25 @@ extension ChatControllerImpl {
                     } else {
                         canClearCache = false
                         canClearForMyself = .user
-                        
+
                         if let user = chatPeer as? TelegramUser, user.botInfo != nil {
                             canClearForEveryone = nil
                         } else {
                             canClearForEveryone = .user
                         }
                     }
-                    
+
                     let actionSheet = ActionSheetController(presentationData: strongSelf.presentationData)
                     var items: [ActionSheetItem] = []
-                    
+
                     if case .scheduledMessages = strongSelf.presentationInterfaceState.subject {
                         items.append(ActionSheetButtonItem(title: strongSelf.presentationData.strings.ScheduledMessages_ClearAllConfirmation, color: .destructive, action: { [weak actionSheet] in
                             actionSheet?.dismissAnimated()
-                            
+
                             guard let strongSelf = self else {
                                 return
                             }
-                            
+
                             let alertController = textAlertController(
                                 context: strongSelf.context,
                                 title: strongSelf.presentationData.strings.ChatList_DeleteSavedMessagesConfirmationTitle,
@@ -293,7 +308,7 @@ extension ChatControllerImpl {
                     } else {
                         if let _ = canClearForMyself ?? canClearForEveryone {
                             items.append(DeleteChatPeerActionSheetItem(context: strongSelf.context, peer: EnginePeer(mainPeer), chatPeer: EnginePeer(chatPeer), action: .clearHistory(canClearCache: canClearCache), strings: strongSelf.presentationData.strings, nameDisplayOrder: strongSelf.presentationData.nameDisplayOrder))
-                            
+
                             if let canClearForEveryone = canClearForEveryone {
                                 let text: String
                                 let confirmationText: String
@@ -307,11 +322,11 @@ extension ChatControllerImpl {
                                 }
                                 items.append(ActionSheetButtonItem(title: text, color: .destructive, action: { [weak actionSheet] in
                                     actionSheet?.dismissAnimated()
-                                    
+
                                     guard let strongSelf = self else {
                                         return
                                     }
-                                    
+
                                     let alertController = textAlertController(
                                         context: strongSelf.context,
                                         title: strongSelf.presentationData.strings.ChatList_DeleteForEveryoneConfirmationTitle,
@@ -357,19 +372,19 @@ extension ChatControllerImpl {
                                 }))
                             }
                         }
-                        
+
                         if canClearCache {
                             items.append(ActionSheetButtonItem(title: strongSelf.presentationData.strings.Conversation_ClearCache, color: .accent, action: { [weak actionSheet] in
                                 actionSheet?.dismissAnimated()
-                                
+
                                 guard let strongSelf = self else {
                                     return
                                 }
-                                
+
                                 strongSelf.navigationButtonAction(.clearCache)
                             }))
                         }
-                        
+
                         if chatPeer.canSetupAutoremoveTimeout(accountPeerId: strongSelf.context.account.peerId) {
                             items.append(ActionSheetButtonItem(title: strongSelf.presentationInterfaceState.autoremoveTimeout == nil ? strongSelf.presentationData.strings.Conversation_AutoremoveActionEnable : strongSelf.presentationData.strings.Conversation_AutoremoveActionEdit, color: .accent, action: { [weak actionSheet] in
                                 guard let actionSheet = actionSheet else {
@@ -378,9 +393,9 @@ extension ChatControllerImpl {
                                 guard let strongSelf = self else {
                                     return
                                 }
-                                
+
                                 actionSheet.dismissAnimated()
-                                
+
                                 strongSelf.presentAutoremoveSetup()
                             }))
                         }
@@ -391,7 +406,7 @@ extension ChatControllerImpl {
                             actionSheet?.dismissAnimated()
                         })
                     ])])
-                    
+
                     strongSelf.chatDisplayNode.dismissInput()
                     strongSelf.present(actionSheet, in: .window(.root))
                 })
@@ -404,7 +419,7 @@ extension ChatControllerImpl {
                 guard let contentData = self.contentData else {
                     return
                 }
-                
+
                 switch contentData.chatLocationInfoData {
                 case let .peer(peerView):
                     self.navigationActionDisposable.set((peerView.get()
@@ -418,7 +433,7 @@ extension ChatControllerImpl {
                         }
                         if let channel = peer as? TelegramChannel, channel.isMonoForum, let linkedMonoforumId = channel.linkedMonoforumId, let mainPeer = peerView.peers[linkedMonoforumId] as? TelegramChannel {
                             peer = mainPeer
-                            
+
                             guard let navigationController = self.effectiveNavigationController else {
                                 return
                             }
@@ -433,7 +448,7 @@ extension ChatControllerImpl {
                             ))
                             return
                         }
-                        
+
                         if peer.restrictionText(platform: "ios", contentSettings: self.context.currentContentSettings.with { $0 }) == nil && !self.presentationInterfaceState.isNotAccessible {
                             if peer.id == self.context.account.peerId {
                                 if let peer = self.presentationInterfaceState.renderedPeer?.chatMainPeer, let infoController = self.context.sharedContext.makePeerInfoController(context: self.context, updatedPresentationData: self.updatedPresentationData, peer: EnginePeer(peer), mode: .generic, avatarInitiallyExpanded: false, fromChat: true, requestsContext: nil) {
@@ -505,10 +520,10 @@ extension ChatControllerImpl {
             guard let contentData = self.contentData else {
                 return
             }
-            
+
             let controller = OverlayStatusController(theme: self.presentationData.theme, type: .loading(cancelled: nil))
             self.present(controller, in: .window(.root))
-            
+
             let disposable: MetaDisposable
             if let currentDisposable = self.clearCacheDisposable {
                 disposable = currentDisposable
@@ -516,7 +531,7 @@ extension ChatControllerImpl {
                 disposable = MetaDisposable()
                 self.clearCacheDisposable = disposable
             }
-        
+
             switch contentData.chatLocationInfoData {
             case let .peer(peerView):
                 self.navigationActionDisposable.set((peerView.get()
@@ -526,11 +541,11 @@ extension ChatControllerImpl {
                         return
                     }
                     let peerId = peer.id
-                    
+
                     let _ = (strongSelf.context.engine.resources.collectCacheUsageStats(peerId: peer.id)
                     |> deliverOnMainQueue).startStandalone(next: { [weak self, weak controller] result in
                         controller?.dismiss()
-                        
+
                         guard let strongSelf = self, case let .result(stats) = result, let categories = stats.media[peer.id] else {
                             return
                         }
@@ -539,31 +554,31 @@ extension ChatControllerImpl {
                         let dismissAction: () -> Void = { [weak controller] in
                             controller?.dismissAnimated()
                         }
-                        
+
                         var sizeIndex: [PeerCacheUsageCategory: (Bool, Int64)] = [:]
-                        
+
                         var itemIndex = 1
-                        
+
                         var selectedSize: Int64 = 0
                         let updateTotalSize: () -> Void = { [weak controller] in
                             controller?.updateItem(groupIndex: 0, itemIndex: itemIndex, { item in
                                 let title: String
                                 let filteredSize = sizeIndex.values.reduce(0, { $0 + ($1.0 ? $1.1 : 0) })
                                 selectedSize = filteredSize
-                                
+
                                 if filteredSize == 0 {
                                     title = presentationData.strings.Cache_ClearNone
                                 } else {
                                     title = presentationData.strings.Cache_Clear("\(dataSizeString(filteredSize, formatting: DataSizeStringFormatting(presentationData: presentationData)))").string
                                 }
-                                
+
                                 if let item = item as? ActionSheetButtonItem {
                                     return ActionSheetButtonItem(title: title, color: filteredSize != 0 ? .accent : .disabled, enabled: filteredSize != 0, action: item.action)
                                 }
                                 return item
                             })
                         }
-                        
+
                         let toggleCheck: (PeerCacheUsageCategory, Int) -> Void = { [weak controller] category, itemIndex in
                             if let (value, size) = sizeIndex[category] {
                                 sizeIndex[category] = (!value, size)
@@ -577,13 +592,13 @@ extension ChatControllerImpl {
                             updateTotalSize()
                         }
                         var items: [ActionSheetItem] = []
-                        
+
                         items.append(DeleteChatPeerActionSheetItem(context: strongSelf.context, peer: EnginePeer(peer), chatPeer: EnginePeer(peer), action: .clearCache, strings: presentationData.strings, nameDisplayOrder: presentationData.nameDisplayOrder))
-                        
+
                         let validCategories: [PeerCacheUsageCategory] = [.image, .video, .audio, .file]
-                        
+
                         var totalSize: Int64 = 0
-                        
+
                         func stringForCategory(strings: PresentationStrings, category: PeerCacheUsageCategory) -> String {
                             switch category {
                                 case .image:
@@ -596,7 +611,7 @@ extension ChatControllerImpl {
                                     return strings.Cache_Files
                             }
                         }
-                        
+
                         for categoryId in validCategories {
                             if let media = categories[categoryId] {
                                 var categorySize: Int64 = 0
@@ -615,14 +630,14 @@ extension ChatControllerImpl {
                             }
                         }
                         selectedSize = totalSize
-                        
+
                         if items.isEmpty {
                             strongSelf.presentClearCacheSuggestion()
                         } else {
                             items.append(ActionSheetButtonItem(title: presentationData.strings.Cache_Clear("\(dataSizeString(totalSize, formatting: DataSizeStringFormatting(presentationData: presentationData)))").string, action: {
                                 let clearCategories = sizeIndex.keys.filter({ sizeIndex[$0]!.0 })
                                 var clearMediaIds = Set<EngineMedia.Id>()
-                                
+
                                 var media = stats.media
                                 if var categories = media[peerId] {
                                     for category in clearCategories {
@@ -633,10 +648,10 @@ extension ChatControllerImpl {
                                         }
                                         categories.removeValue(forKey: category)
                                     }
-                                    
+
                                     media[peerId] = categories
                                 }
-                                
+
                                 var clearResourceIds = Set<EngineMediaResource.Id>()
                                 for id in clearMediaIds {
                                     if let ids = stats.mediaResourceIds[id] {
@@ -645,9 +660,9 @@ extension ChatControllerImpl {
                                         }
                                     }
                                 }
-                                
+
                                 var signal = strongSelf.context.engine.resources.clearCachedMediaResources(mediaResourceIds: clearResourceIds)
-                                
+
                                 var cancelImpl: (() -> Void)?
                                 let presentationData = strongSelf.context.sharedContext.currentPresentationData.with { $0 }
                                 let progressSignal = Signal<Never, NoError> { subscriber in
@@ -664,7 +679,7 @@ extension ChatControllerImpl {
                                 |> runOn(Queue.mainQueue())
                                 |> delay(0.15, queue: Queue.mainQueue())
                                 let progressDisposable = progressSignal.startStrict()
-                                
+
                                 signal = signal
                                 |> afterDisposed {
                                     Queue.mainQueue().async {
@@ -684,11 +699,11 @@ extension ChatControllerImpl {
                                 dismissAction()
                                 strongSelf.updateChatPresentationInterfaceState(animated: true, interactive: true, { $0.updatedInterfaceState({ $0.withoutSelectionState() }) })
                             }))
-                            
+
                             items.append(ActionSheetButtonItem(title: presentationData.strings.ClearCache_StorageUsage, action: { [weak self] in
                                 dismissAction()
                                 strongSelf.updateChatPresentationInterfaceState(animated: true, interactive: true, { $0.updatedInterfaceState({ $0.withoutSelectionState() }) })
-                                
+
                                 if let strongSelf = self {
                                     let context = strongSelf.context
                                     let controller = StorageUsageScreen(context: context, makeStorageUsageExceptionsScreen: { category in
@@ -697,7 +712,7 @@ extension ChatControllerImpl {
                                     strongSelf.present(controller, in: .window(.root), with: ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
                                 }
                             }))
-                            
+
                             controller.setItemGroups([
                                 ActionSheetItemGroup(items: items),
                                 ActionSheetItemGroup(items: [ActionSheetButtonItem(title: presentationData.strings.Common_Cancel, action: { dismissAction() })])

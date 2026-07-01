@@ -239,7 +239,7 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
     items[.advanced]!.append(PeerInfoScreenDisclosureItem(id: 3, text: presentationData.strings.Settings_Appearance, icon: PresentationResourcesSettings.appearance, action: {
         interaction.openSettings(.appearance)
     }))
-    items[.advanced]!.append(PeerInfoScreenDisclosureItem(id: 7, label: .titleBadge("MOD", presentationData.theme.list.itemAccentColor), text: "Telewhite Mods", icon: PresentationResourcesSettings.settings, action: {
+    items[.extra]!.append(PeerInfoScreenDisclosureItem(id: 10, label: .titleBadge("MOD", presentationData.theme.list.itemAccentColor), text: "Telewhite Mods", icon: PresentationResourcesSettings.settings, action: {
         interaction.openSettings(.telewhiteMods)
     }))
     

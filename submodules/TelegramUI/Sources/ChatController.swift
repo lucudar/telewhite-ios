@@ -5846,26 +5846,6 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
         switch chatLocation {
         case .peer, .replyThread:
             let avatarNode = ChatAvatarNavigationNode()
-            avatarNode.ghostModeToggle = { [weak self, weak avatarNode] in
-                guard let strongSelf = self, let avatarNode else {
-                    return
-                }
-
-                var settings = TelewhiteModsSettings.current
-                settings.ghostMode = !settings.ghostMode
-                settings.save()
-
-                avatarNode.updateGhostModeButton(isVisible: true, isEnabled: settings.ghostMode, theme: strongSelf.presentationData.theme)
-
-                strongSelf.present(UndoOverlayController(
-                    presentationData: strongSelf.presentationData,
-                    content: .info(title: nil, text: settings.ghostMode ? "Ghost Mode enabled" : "Ghost Mode disabled", timeout: nil, customUndoText: nil),
-                    elevatedLayout: false,
-                    action: { _ in
-                        return false
-                    }
-                ), in: .current)
-            }
             avatarNode.contextAction = { [weak self] node, gesture in
                 guard let strongSelf = self, let peer = strongSelf.presentationInterfaceState.renderedPeer?.chatMainPeer else {
                     return
@@ -6836,6 +6816,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
         } |> deliverOnMainQueue).startStrict(next: { [weak self] value in
             if let strongSelf = self {
                 let (baseCanRead, telewhiteSettings) = value
+                let previousTelewhiteSettings = strongSelf.telewhiteModsSettings
                 strongSelf.telewhiteModsSettings = telewhiteSettings
                 if strongSelf.telewhiteDisablesActivity {
                     strongSelf.choosingStickerActivityPromise.set(false)
@@ -6851,8 +6832,8 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                     strongSelf.canReadHistoryValue = canRead
                     strongSelf.raiseToListen?.enabled = canRead
                 }
-                if let avatarNode = strongSelf.avatarNode, let user = strongSelf.presentationInterfaceState.renderedPeer?.chatMainPeer as? TelegramUser {
-                    avatarNode.updateGhostModeButton(isVisible: user.id != strongSelf.context.account.peerId && !user.id.isSecretChat && user.isGenericUser, isEnabled: telewhiteSettings.ghostMode, theme: strongSelf.presentationData.theme)
+                if previousTelewhiteSettings != telewhiteSettings {
+                    strongSelf.updateChatPresentationInterfaceState(transition: .immediate, interactive: false, force: true, { $0 })
                 }
             }
         })
