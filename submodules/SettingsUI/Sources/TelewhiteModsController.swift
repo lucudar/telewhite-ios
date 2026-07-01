@@ -90,12 +90,12 @@ public struct TelewhiteModsSettings: Equatable {
 
 private final class TelewhiteModsControllerArguments {
     let updateSettings: ((TelewhiteModsSettings) -> TelewhiteModsSettings) -> Void
-    let updateTranslationSettings: ((TranslationSettings) -> TranslationSettings) -> Void
+    let updateTranslationSettings: (@escaping (TranslationSettings) -> TranslationSettings) -> Void
     let startVpn: () -> Void
     
     init(
         updateSettings: @escaping ((TelewhiteModsSettings) -> TelewhiteModsSettings) -> Void,
-        updateTranslationSettings: @escaping ((TranslationSettings) -> TranslationSettings) -> Void,
+        updateTranslationSettings: @escaping (@escaping (TranslationSettings) -> TranslationSettings) -> Void,
         startVpn: @escaping () -> Void
     ) {
         self.updateSettings = updateSettings
@@ -436,7 +436,7 @@ public func telewhiteModsController(context: AccountContext) -> ViewController {
     |> map { presentationData, settings, translationSettings -> (ItemListControllerState, (ItemListNodeState, Any)) in
         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text("Telewhite Mods"), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back), animateChanges: false)
         let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: telewhiteModsEntries(settings: settings, translationSettings: translationSettings), style: .blocks, animateChanges: false)
-        return (controllerState, (listState, arguments))
+        return (controllerState, (listState, arguments as Any))
     }
     
     let controller = ItemListController(context: context, state: signal)
