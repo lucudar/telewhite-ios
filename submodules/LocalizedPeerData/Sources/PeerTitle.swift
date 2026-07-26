@@ -2,17 +2,13 @@ import Foundation
 import TelegramCore
 import TelegramPresentationData
 import TelegramUIPreferences
-import PhoneNumberFormat
-
-// Telewhite: "Hide Phone and Username" is a display switch, so it has to be read
-// where titles are built. A nameless contact is shown by phone number in stock
-// Telegram; with the switch on that fallback would put the number back on screen,
-// so the title goes blank instead. With the switch off, stock behaviour stands —
-// previously the fallback was removed outright, which meant nameless contacts stayed
-// blank in the chat list and search even with the switch off.
-private func telewhiteHidesOwnContactInfo() -> Bool {
-    return UserDefaults.standard.bool(forKey: "telewhite.mods.hidePhoneInSettings")
-}
+//import PhoneNumberFormat
+// Keep the import commented out and do not add //submodules/PhoneNumberFormat to this
+// module's deps. Bazel rejects it as a cycle and aborts analysis of //Telegram:Telegram
+// before a single file compiles (that is what broke CI run #145):
+//   AccountContext -> InAppPurchaseManager -> TelegramStringFormatting
+//     -> LocalizedPeerData -> PhoneNumberFormat -> AccountContext
+// A nameless contact therefore stays untitled here, exactly as upstream ships it.
 
 public extension EnginePeer {
     var compactDisplayTitle: String {
@@ -22,8 +18,8 @@ public extension EnginePeer {
                 return firstName
             } else if let lastName = user.lastName, !lastName.isEmpty {
                 return lastName
-            } else if let phone = user.phone {
-                return telewhiteHidesOwnContactInfo() ? "" : formatPhoneNumber("+\(phone)")
+            } else if let _ = user.phone {
+                return "" //formatPhoneNumber("+\(phone)")
             } else {
                 return "Deleted Account"
             }
@@ -55,8 +51,10 @@ public extension EnginePeer {
                 }
             } else if let lastName = user.lastName, !lastName.isEmpty {
                 return lastName
-            } else if let phone = user.phone {
-                return telewhiteHidesOwnContactInfo() ? "" : formatPhoneNumber("+\(phone)")
+            } else if let _ = user.phone {
+                // Telewhite: hide toggle covers phone + username only. Never redact the
+                // NAME with a dash — a nameless user simply shows no title (as stock does).
+                return "" //formatPhoneNumber("+\(phone)")
             } else {
                 return strings.User_DeletedAccount
             }
