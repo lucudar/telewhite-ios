@@ -1,15 +1,16 @@
 import Foundation
 import Postbox
 
+// Telewhite: per-chat local metadata. The hidden-chats flag this used to carry was
+// removed along with the feature; JSONDecoder ignores the leftover key in values
+// already stored on device.
 public struct TelewhiteChatMetadata: Codable, Equatable {
     public var note: String
     public var tags: [String]
-    public var isHidden: Bool
 
-    public init(note: String = "", tags: [String] = [], isHidden: Bool = false) {
+    public init(note: String = "", tags: [String] = []) {
         self.note = note
         self.tags = tags
-        self.isHidden = isHidden
     }
 }
 
@@ -45,7 +46,7 @@ public enum TelewhiteChatFeatures {
         let peerKey = peerId.toInt64()
         var value = values[peerKey] ?? TelewhiteChatMetadata()
         update(&value)
-        if value.note.isEmpty && value.tags.isEmpty && !value.isHidden {
+        if value.note.isEmpty && value.tags.isEmpty {
             values.removeValue(forKey: peerKey)
         } else {
             values[peerKey] = value
@@ -54,9 +55,5 @@ public enum TelewhiteChatFeatures {
             UserDefaults.standard.set(data, forKey: storageKey)
         }
         NotificationCenter.default.post(name: Notification.Name("TelewhiteChatFeaturesChanged"), object: nil)
-    }
-
-    public static func hiddenPeerIds(accountPeerId: PeerId) -> Set<Int64> {
-        return Set(all(accountPeerId: accountPeerId).compactMap { $0.value.isHidden ? $0.key : nil })
     }
 }

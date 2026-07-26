@@ -16,7 +16,6 @@ public struct TelewhiteModsSettings: Equatable {
 
     public var ghostMode: Bool
     public var ghostChatButtonEnabled: Bool
-    public var hiddenChatsEnabled: Bool
     public var preserveDeletedMessages: Bool
     public var hideOnlineStatus: Bool
     public var hideTypingStatus: Bool
@@ -64,7 +63,6 @@ public struct TelewhiteModsSettings: Equatable {
     private enum Key {
         static let ghostMode = "telewhite.mods.ghostMode"
         static let ghostChatButtonEnabled = "telewhite.mods.ghostChatButtonEnabled"
-        static let hiddenChatsEnabled = "telewhite.hiddenChats.enabled"
         static let preserveDeletedMessages = "telewhite.mods.preserveDeletedMessages"
         static let hideOnlineStatus = "telewhite.mods.hideOnlineStatus"
         static let hideTypingStatus = "telewhite.mods.hideTypingStatus"
@@ -117,7 +115,6 @@ public struct TelewhiteModsSettings: Equatable {
             // stealth toggles below are independent and persist on their own keys.
             ghostMode: defaults.bool(forKey: Key.ghostMode),
             ghostChatButtonEnabled: defaults.object(forKey: Key.ghostChatButtonEnabled) as? Bool ?? true,
-            hiddenChatsEnabled: defaults.bool(forKey: Key.hiddenChatsEnabled),
             preserveDeletedMessages: defaults.bool(forKey: Key.preserveDeletedMessages),
             hideOnlineStatus: defaults.bool(forKey: Key.hideOnlineStatus),
             hideTypingStatus: defaults.bool(forKey: Key.hideTypingStatus),
@@ -229,7 +226,6 @@ public struct TelewhiteModsSettings: Equatable {
         let defaults = UserDefaults.standard
         defaults.set(self.ghostMode, forKey: Key.ghostMode)
         defaults.set(self.ghostChatButtonEnabled, forKey: Key.ghostChatButtonEnabled)
-        defaults.set(self.hiddenChatsEnabled, forKey: Key.hiddenChatsEnabled)
         defaults.set(self.preserveDeletedMessages, forKey: Key.preserveDeletedMessages)
         defaults.set(self.hideOnlineStatus, forKey: Key.hideOnlineStatus)
         defaults.set(self.hideTypingStatus, forKey: Key.hideTypingStatus)
@@ -402,7 +398,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case hideOnlineStatus(String, Bool)
     case ghostMode(String, Bool)
     case ghostChatButtonEnabled(String, Bool)
-    case hiddenChatsEnabled(String, Bool)
     case hideTypingStatus(String, Bool)
     case hideReadReceipts(String, Bool)
     case screenshotProtectionBypass(String, Bool)
@@ -466,7 +461,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.menu.rawValue
         case .messengerHeader, .preserveDeletedMessages, .forwardHideNamesByDefault, .showPreviousEditedText, .translateMessages, .translateChats, .autoTranslateEnglish, .translationTargetLanguage, .outgoingTranslateButtonEnabled, .openRouterApiKey, .messengerInfo, .oneTimeMediaUnlimited, .downloadOneTimeMedia, .uploadVoice, .hdPhotos, .translateVoiceMessages, .quickForwardToSaved, .uploadVideoMessage:
             return TelewhiteModsSection.messenger.rawValue
-        case .privacyHeader, .hiddenChatsEnabled, .screenshotProtectionBypass, .contentRestrictionBypass, .hidePhoneInSettings, .showProfileIds, .showUserIds, .showChatIds, .showMessageIds, .privacyInfo:
+        case .privacyHeader, .screenshotProtectionBypass, .contentRestrictionBypass, .hidePhoneInSettings, .showProfileIds, .showUserIds, .showChatIds, .showMessageIds, .privacyInfo:
             return TelewhiteModsSection.privacy.rawValue
         case .stealthHeader, .ghostMode, .hideOnlineStatus, .ghostMessages, .hideReadReceipts, .hideTypingStatus, .ghostChatButtonEnabled, .ghostStories, .clearGhostChats, .stealthInfo:
             return TelewhiteModsSection.stealth.rawValue
@@ -551,8 +546,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 109
         case .privacyInfo:
             return 110
-        case .hiddenChatsEnabled:
-            return 111
         case .stealthHeader:
             return 300
         case .ghostMessages:
@@ -828,10 +821,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
         case let .ghostChatButtonEnabled(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.ghostChatButtonEnabled = value
-            }
-        case let .hiddenChatsEnabled(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.hiddenChatsEnabled = value
             }
         case let .hideTypingStatus(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
@@ -1206,7 +1195,7 @@ private func telewhiteTabTitle(_ tab: TelewhiteModsTab, strings: TelewhiteModsSt
 
 private func telewhiteMenuEntries(strings: TelewhiteModsStrings) -> [TelewhiteModsEntry] {
     return [
-        .menuItem(0, .privacy, telewhiteTabTitle(.privacy, strings: strings), strings.text("Hidden chats, content protection, phone and technical IDs.", "Скрытые чаты, защита контента, номер и технические ID."), .privacy),
+        .menuItem(0, .privacy, telewhiteTabTitle(.privacy, strings: strings), strings.text("Content protection, phone and technical IDs.", "Защита контента, номер и технические ID."), .privacy),
         .menuItem(1, .ghost, telewhiteTabTitle(.stealth, strings: strings), strings.text("Invisible reading and anonymous story viewing.", "Невидимое чтение и анонимный просмотр историй."), .stealth),
         .menuItem(2, .messages, telewhiteTabTitle(.messenger, strings: strings), strings.text("Deleted messages, one-time media, uploads and translation.", "\u{0423}\u{0434}\u{0430}\u{043b}\u{0451}\u{043d}\u{043d}\u{044b}\u{0435} \u{0441}\u{043e}\u{043e}\u{0431}\u{0449}\u{0435}\u{043d}\u{0438}\u{044f}, \u{043e}\u{0434}\u{043d}\u{043e}\u{0440}\u{0430}\u{0437}\u{043e}\u{0432}\u{044b}\u{0435} \u{043c}\u{0435}\u{0434}\u{0438}\u{0430}, \u{0437}\u{0430}\u{0433}\u{0440}\u{0443}\u{0437}\u{043a}\u{0438} \u{0438} \u{043f}\u{0435}\u{0440}\u{0435}\u{0432}\u{043e}\u{0434}."), .messenger),
         .menuItem(3, .groups, telewhiteTabTitle(.channels, strings: strings), strings.text("Channel and group content controls.", "\u{0424}\u{0443}\u{043d}\u{043a}\u{0446}\u{0438}\u{0438} \u{0434}\u{043b}\u{044f} \u{043a}\u{0430}\u{043d}\u{0430}\u{043b}\u{043e}\u{0432} \u{0438} \u{0433}\u{0440}\u{0443}\u{043f}\u{043f}."), .channels),
@@ -1255,8 +1244,6 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
         return text("One switch for full invisibility: hides online, typing/recording, read receipts, voice/video consumption, and story views.", "Один переключатель полной невидимки: скрывает онлайн, набор/запись, прочтение, прослушивание/просмотр и просмотры историй.")
     case .ghostChatButtonEnabled:
         return text("Adds a ghost button to each chat: reads, voice playback and typing in that chat stay invisible. Active ghost chats keep showing the button so you can turn them off.", "Добавляет кнопку невидимки в каждый чат: прочтение, прослушивание и набор текста в этом чате никто не увидит. В чатах с активной невидимкой кнопка остаётся видимой, чтобы её можно было выключить.")
-    case .hiddenChatsEnabled:
-        return text("Enables the Hide Chat action. Hidden chat data stays on this device.", "Включает действие «Скрыть чат». Данные скрытых чатов хранятся только на этом устройстве.")
     case .hideTypingStatus:
         return text("Others won't see when you're typing or recording.", "Другие не увидят, что вы печатаете или записываете.")
     case .hideReadReceipts, .ghostMessages:
@@ -1321,11 +1308,10 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
 
     case .privacy:
         entries.append(.privacyHeader(telewhiteTabTitle(.privacy, strings: strings)))
-        entries.append(.hiddenChatsEnabled(strings.text("Hidden Chats", "Скрытые чаты"), settings.hiddenChatsEnabled))
         entries.append(.screenshotProtectionBypass(strings.text("Screenshot Protection Bypass", "Обход защиты скриншотов"), settings.screenshotProtectionBypass))
         entries.append(.hidePhoneInSettings(strings.text("Hide Phone and Username", "Скрыть номер и юзернейм"), settings.hidePhoneInSettings))
         entries.append(.showProfileIds(strings.text("Show IDs", "Показывать ID"), settings.showUserIds && settings.showChatIds))
-        entries.append(.privacyInfo(strings.text("Hidden chats, content protection and optional technical IDs are managed here.", "Здесь собраны скрытые чаты, защита контента и показ технических ID.")))
+        entries.append(.privacyInfo(strings.text("Content protection and optional technical IDs are managed here.", "Здесь собраны защита контента и показ технических ID.")))
 
     case .stealth:
         entries.append(.stealthHeader(telewhiteTabTitle(.stealth, strings: strings)))

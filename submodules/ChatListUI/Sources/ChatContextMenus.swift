@@ -16,7 +16,6 @@ import TelegramStringFormatting
 import ChatTimerScreen
 import NotificationPeerExceptionController
 import PromptUI
-import LocalAuth
 
 func archiveContextMenuItems(context: AccountContext, group: EngineChatList.Group, chatListController: ChatListControllerImpl?) -> Signal<[ContextMenuItem], NoError> {
     let presentationData = context.sharedContext.currentPresentationData.with({ $0 })
@@ -132,20 +131,6 @@ func chatContextMenuItems(context: AccountContext, peerId: EnginePeer.Id, promoI
                             chatListController?.present(controller, in: .window(.root))
                         })
                     })))
-                    if UserDefaults.standard.bool(forKey: "telewhite.hiddenChats.enabled") || metadata.isHidden {
-                        items.append(.action(ContextMenuActionItem(text: metadata.isHidden ? "Unhide Chat" : "Hide Chat", textColor: metadata.isHidden ? .primary : .destructive, icon: { theme in generateTintedImage(image: UIImage(bundleImageName: metadata.isHidden ? "Chat/Context Menu/Unhide" : "Chat/Context Menu/Hide"), color: metadata.isHidden ? theme.contextMenu.primaryColor : theme.contextMenu.destructiveColor) }, action: { _, f in
-                            if metadata.isHidden {
-                                let _ = LocalAuth.auth(reason: "Unlock hidden chat").start(next: { result in
-                                    if result.0 {
-                                        TelewhiteChatFeatures.update(accountPeerId: context.account.peerId, peerId: peerId) { $0.isHidden = false }
-                                    }
-                                })
-                            } else {
-                                TelewhiteChatFeatures.update(accountPeerId: context.account.peerId, peerId: peerId) { $0.isHidden = true }
-                            }
-                            f(.default)
-                        })))
-                    }
                     items.append(.separator)
 
                     if case let .search(search) = source {

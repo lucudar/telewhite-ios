@@ -677,9 +677,6 @@ func chatListNodeEntriesForView(view: EngineChatList, state: ChatListNodeState, 
         if let savedMessagesPeer = savedMessagesPeer, let peerId = peerId, savedMessagesPeer.id == peerId || foundPeerIds.contains(peerId) {
             continue loop
         }
-        if let peerId, TelewhiteChatFeatures.metadata(accountPeerId: accountPeerId, peerId: peerId).isHidden {
-            continue loop
-        }
         if let peerId = peerId, state.pendingRemovalItemIds.contains(ChatListNodeState.ItemId(peerId: peerId, threadId: threadId)) {
             continue loop
         }
