@@ -3930,20 +3930,27 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         strongSelf.shadowNode.setType(type: backgroundType, hasWallpaper: hasWallpaper, graphics: graphics)
         
         var isTelewhiteDeleted = false
-        for attribute in item.content.firstMessage.attributes {
-            if attribute is TelewhiteDeletedMessageAttribute {
+        // Every message of the item, not just the first: an album is one item, so reading
+        // firstMessage meant deleting any photo other than the leading one showed nothing
+        // at all, and deleting the leading one labelled the whole album.
+        for (message, _) in item.content {
+            if message.attributes.contains(where: { $0 is TelewhiteDeletedMessageAttribute }) {
                 isTelewhiteDeleted = true
                 break
             }
         }
-        // Telewhite: mark deleted-and-preserved messages with an explicit badge plus a
-        // mild fade of the content wrapper. Fading alone never read as "deleted" no
-        // matter how deep it went (0.35 -> 0.5 -> 0.3 over three attempts): a faded
-        // photo still looks like a photo. The badge says it in words, so the fade can
-        // stay light enough to keep the message readable — which is the entire point of
-        // preserving it. Applied unconditionally, including hideBackground media such as
-        // stickers and round video.
-        strongSelf.contentContainersWrapperNode.alpha = isTelewhiteDeleted ? telewhiteDeletedContentAlpha : 1.0
+        // Telewhite: fade the content of a deleted-and-preserved message. This has to be
+        // clippingNode, not contentContainersWrapperNode: content nodes are added to
+        // clippingNode directly (see containerSupernode below), and the wrapper only ever
+        // receives children for an album that contains a document. Fading the wrapper
+        // therefore did nothing at all for text, photos, videos and photo albums — which
+        // is why three rounds of deepening the value (0.35 -> 0.5 -> 0.3) changed nothing
+        // visible and a deleted photo looked exactly like a live one.
+        // clippingNode is the right node: it is an ancestor of every content node and of
+        // the name/reply/forward nodes, but NOT of backgroundNode (so no rectangular
+        // backdrop artifact, which is what stopped mainContainerNode being used) and NOT
+        // of the badge (so the badge stays fully opaque).
+        strongSelf.clippingNode.alpha = isTelewhiteDeleted ? telewhiteDeletedContentAlpha : 1.0
         // containerWidth excludes the safe-area inset (landscape on a notched device put
         // the badge under the rounded corner) and the 42pt the whole bubble slides right
         // in selection mode; the reserved gutter is the 45pt the layout itself already
@@ -3961,7 +3968,10 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
                 strongSelf.mainContextSourceNode.contentNode.insertSubnode(telewhiteDeletedOverlayNode, aboveSubnode: strongSelf.backgroundNode)
                 strongSelf.telewhiteDeletedOverlayNode = telewhiteDeletedOverlayNode
             }
-            telewhiteDeletedOverlayNode.customHighlightColor = UIColor.black.withAlphaComponent(0.72)
+            // Softened from 0.72: the content fade above now actually applies, and two
+            // heavy dimmers stacked on the same bubble left the text barely readable —
+            // the point of preserving a deleted message is being able to read it.
+            telewhiteDeletedOverlayNode.customHighlightColor = UIColor.black.withAlphaComponent(0.45)
             telewhiteDeletedOverlayNode.setType(type: backgroundType, highlighted: true, graphics: graphics, maskMode: true, hasWallpaper: true, transition: .immediate, backgroundNode: nil)
             telewhiteDeletedOverlayNode.frame = backgroundFrame
             telewhiteDeletedOverlayNode.updateLayout(size: backgroundFrame.size, transition: .immediate)
