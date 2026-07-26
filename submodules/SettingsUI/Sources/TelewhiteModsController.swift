@@ -10,6 +10,7 @@ import AlertUI
 import PromptUI
 import TelegramCore
 import TelegramUIPreferences
+import TranslateUI
 
 public struct TelewhiteModsSettings: Equatable {
     public static let didChangeNotification = Notification.Name("TelewhiteModsSettingsDidChange")
@@ -333,6 +334,7 @@ private enum TelewhiteModsSection: Int32 {
     case menu
     case messenger
     case translator
+    case translationLanguage
     case privacy
     case stealth
     case channels
@@ -356,6 +358,9 @@ private enum TelewhiteModsTab: Int32, Equatable {
     // Telewhite: the translation cluster was six of the fourteen rows on the Messages
     // screen; it is one row now, opening here.
     case translator
+    // Telewhite: "Translate Into" used to be a row that displayed a language code and
+    // did nothing when tapped, so the target could never be changed from ru.
+    case translationLanguage
     // Telewhite: sub-screens of the appearance tab. Every colour used to be one row
     // on a single 31-row screen, which meant scrolling past three palettes to reach
     // the radius options.
@@ -398,6 +403,9 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case translateVoiceMessages(String, Bool)
     case openRouterApiKey(String, String)
     case translatorInfo(String)
+
+    case translationLanguageHeader(String)
+    case translationLanguageOption(Int32, String, String, Bool)
 
     case privacyHeader(String)
     // Telewhite: screenshot blocking and copy/forward/save blocking are the same
@@ -463,6 +471,8 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.messenger.rawValue
         case .translatorHeader, .translateMessages, .autoTranslateEnglish, .translationTargetLanguage, .outgoingTranslateButtonEnabled, .translateVoiceMessages, .openRouterApiKey, .translatorInfo:
             return TelewhiteModsSection.translator.rawValue
+        case .translationLanguageHeader, .translationLanguageOption:
+            return TelewhiteModsSection.translationLanguage.rawValue
         case .privacyHeader, .protectionBypass, .hidePhoneInSettings, .showProfileIds, .privacyInfo:
             return TelewhiteModsSection.privacy.rawValue
         case .stealthHeader, .ghost, .ghostChatButtonEnabled, .stealthInfo:
@@ -524,6 +534,10 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 56
         case .translatorInfo:
             return 57
+        case .translationLanguageHeader:
+            return 60
+        case let .translationLanguageOption(index, _, _, _):
+            return 61 + index
         case .privacyHeader:
             return 100
         case .protectionBypass:
@@ -641,8 +655,16 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: telewhiteMenuIcon(icon, color: presentationData.theme.list.itemAccentColor), title: title, titleFont: .bold, label: subtitle, labelStyle: .multilineDetailText, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                 arguments.openTab(tab)
             })
-        case let .messengerHeader(text), let .translatorHeader(text), let .privacyHeader(text), let .stealthHeader(text), let .channelsHeader(text), let .mediaHeader(text), let .appearanceHeader(text), let .developerHeader(text), let .accentColorHeader(text), let .bubbleColorHeader(text), let .backgroundColorHeader(text), let .cornerRadiusHeader(text):
+        case let .messengerHeader(text), let .translatorHeader(text), let .translationLanguageHeader(text), let .privacyHeader(text), let .stealthHeader(text), let .channelsHeader(text), let .mediaHeader(text), let .appearanceHeader(text), let .developerHeader(text), let .accentColorHeader(text), let .bubbleColorHeader(text), let .backgroundColorHeader(text), let .cornerRadiusHeader(text):
             return ItemListSectionHeaderItem(presentationData: presentationData, text: text, sectionId: self.section)
+        case let .translationLanguageOption(_, title, code, selected):
+            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: title, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
+                arguments.updateSettings { current in
+                    var updated = current
+                    updated.translationTargetLanguage = code
+                    return updated
+                }
+            })
         case let .accentColorOption(_, title, value, selected):
             return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, icon: telewhiteColorSwatchImage(value), iconSize: CGSize(width: 22.0, height: 22.0), title: title, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
                 arguments.updateSettings { current in
@@ -775,7 +797,9 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
                 }
             })
         case let .translationTargetLanguage(text, value):
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: value.uppercased(), labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .none, action: nil)
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: telewhiteLanguageDisplayName(value), labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+                arguments.openTab(.translationLanguage)
+            })
         case let .outgoingTranslateButtonEnabled(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.outgoingTranslateButtonEnabled = value
@@ -1057,7 +1081,22 @@ private func telewhiteTabTitle(_ tab: TelewhiteModsTab, strings: TelewhiteModsSt
         return strings.text("Chat Background", "Фон чата")
     case .shape:
         return strings.text("Bubbles and Text", "Пузыри и текст")
+    case .translationLanguage:
+        return strings.text("Translate Into", "Переводить на")
     }
+}
+
+// The language's own name for itself ("Русский", "Deutsch") — a language list that
+// names languages in a language the reader may not know is no use to them.
+private func telewhiteLanguageDisplayName(_ code: String) -> String {
+    // Look the name up by the base code: "pt-BR" has no localized name of its own,
+    // "pt" does.
+    let base = normalizeTranslationLanguage(code)
+    let locale = Locale(identifier: base)
+    if let name = locale.localizedString(forLanguageCode: base), !name.isEmpty {
+        return name.capitalized
+    }
+    return code.uppercased()
 }
 
 private func telewhiteMenuEntries(strings: TelewhiteModsStrings) -> [TelewhiteModsEntry] {
@@ -1159,6 +1198,16 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.translateVoiceMessages(strings.text("Translate Voice Messages", "Переводить голосовые"), settings.translateVoiceMessages))
         entries.append(.openRouterApiKey(strings.text("OpenRouter Key", "Ключ OpenRouter"), settings.openRouterApiKey))
         entries.append(.translatorInfo(strings.text("Translation is free and needs no account. Messages already in your language are never translated.", "Перевод бесплатный и не требует аккаунта. Сообщения, уже написанные на вашем языке, не переводятся.")))
+
+    case .translationLanguage:
+        entries.append(.translationLanguageHeader(telewhiteTabTitle(.translationLanguage, strings: strings)))
+        // Only the popular set (12 codes), not every supported language: the whole
+        // point of this screen is one tap, and stableId 61 + index has to stay clear
+        // of the privacy block at 100.
+        let current = normalizeTranslationLanguage(settings.translationTargetLanguage)
+        for (index, code) in popularTranslationLanguages.enumerated() {
+            entries.append(.translationLanguageOption(Int32(index), telewhiteLanguageDisplayName(code), code, normalizeTranslationLanguage(code) == current))
+        }
 
     case .privacy:
         entries.append(.privacyHeader(telewhiteTabTitle(.privacy, strings: strings)))
