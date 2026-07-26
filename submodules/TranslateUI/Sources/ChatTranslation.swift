@@ -167,22 +167,48 @@ public func telewhiteTranslationTargetLanguage(fallback baseLang: String) -> Str
 @available(iOS 12.0, *)
 private let languageRecognizer = NLLanguageRecognizer()
 
-// Telewhite: skip messages that are already in the target language (e.g. a Russian
-// message when translating to Russian). Per-message detection matters because a
-// mostly-foreign chat still contains Russian messages the user reads fine — sending
-// them to translation only wastes a round-trip and time. Short texts are left in
-// (detection is unreliable and translating them is cheap).
-private func telewhiteIsAlreadyTargetLanguage(_ text: String, toLang: String) -> Bool {
+// Telewhite: a hypothesis for the target language at or above this probability means
+// the text may well already be in a language the user reads, so it is left alone.
+// Deliberately low: between two Cyrillic languages the recognizer is often confident
+// and wrong, and wrongly translating Russian into Russian is far more annoying than
+// occasionally leaving a Ukrainian message untranslated.
+private let telewhiteTargetLanguageHypothesisFloor: Double = 0.15
+
+// Telewhite: below this probability a detection is treated as no detection at all
+// rather than as evidence of a foreign language.
+private let telewhiteLanguageConfidenceFloor: Double = 0.45
+
+// Telewhite: decide whether a message should be left untranslated. Translation must
+// only trigger on text that is confidently NOT in the target language; anything else
+// — target-language text, an unconfident guess, a text too short to judge — is left
+// as it is. The previous rule was the opposite way round: it only skipped a message
+// when the top hypothesis was the target with >= 0.6 confidence, so Russian text
+// mis-read as Ukrainian (or judged with low confidence) was translated into Russian.
+private func telewhiteShouldSkipTranslation(_ text: String, toLang: String) -> Bool {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard trimmed.count >= 4 else {
-        return false
+    guard trimmed.count >= 3 else {
+        return true
     }
     let target = toLang.components(separatedBy: "-").first?.lowercased() ?? toLang.lowercased()
-    languageRecognizer.reset()
-    languageRecognizer.processString(String(trimmed.prefix(200)))
-    let hypotheses = languageRecognizer.languageHypotheses(withMaximum: 1)
-    guard let best = hypotheses.max(by: { $0.value < $1.value }), best.value >= 0.6 else {
-        return false
+
+    // A private recognizer: the shared instance is also used by chat-level detection
+    // on another queue, and NLLanguageRecognizer holds per-instance state.
+    let recognizer = NLLanguageRecognizer()
+    recognizer.processString(String(trimmed.prefix(200)))
+    let hypotheses = recognizer.languageHypotheses(withMaximum: 6)
+
+    var targetProbability: Double = 0.0
+    for (language, probability) in hypotheses {
+        let code = language.rawValue.components(separatedBy: "-").first?.lowercased() ?? ""
+        if code == target {
+            targetProbability = max(targetProbability, probability)
+        }
+    }
+    if targetProbability >= telewhiteTargetLanguageHypothesisFloor {
+        return true
+    }
+    guard let best = hypotheses.max(by: { $0.value < $1.value }), best.value >= telewhiteLanguageConfidenceFloor else {
+        return true
     }
     let detected = best.key.rawValue.components(separatedBy: "-").first?.lowercased() ?? ""
     return detected == target
@@ -213,8 +239,8 @@ public func translateMessageIds(context: AccountContext, messageIds: [EngineMess
                 }
                 
                 if !message.text.isEmpty {
-                    // Telewhite: never translate messages already in the target language.
-                    if telewhiteIsAlreadyTargetLanguage(message.text, toLang: toLang) {
+                    // Telewhite: only translate text that is confidently foreign.
+                    if telewhiteShouldSkipTranslation(message.text, toLang: toLang) {
                         continue
                     }
                     if !messageIdsSet.contains(messageId) {
@@ -401,17 +427,38 @@ public func chatTranslationState(context: AccountContext, peerId: EnginePeer.Id,
                                         }
                                         
                                         languageRecognizer.processString(text)
-                                        let hypotheses = languageRecognizer.languageHypotheses(withMaximum: 4)
+                                        let hypotheses = languageRecognizer.languageHypotheses(withMaximum: 6)
                                         languageRecognizer.reset()
-                                        
+
                                         let filteredLanguages = hypotheses.filter { supportedTranslationLanguages.contains(normalizeTranslationLanguage($0.key.rawValue)) }.sorted(by: { $0.value > $1.value })
-                                        if let language = filteredLanguages.first {
-                                            let fromLang = normalizeTranslationLanguage(language.key.rawValue)
+                                        // Telewhite: attribute this message to the target language whenever the
+                                        // target is a plausible reading of it, before falling back to the top
+                                        // hypothesis. Russian text is regularly mis-read as another Cyrillic
+                                        // language (Ukrainian, Bulgarian, Serbian, Macedonian) with high
+                                        // confidence, and taking the top hypothesis unconditionally made a
+                                        // Russian chat detect as foreign and auto-translate Russian into
+                                        // Russian. A weak-but-present target hypothesis is far better evidence
+                                        // that the user can already read the message than a confident guess
+                                        // between two languages they cannot tell apart.
+                                        let messageLanguage: String?
+                                        if let targetHypothesis = filteredLanguages.first(where: { normalizeTranslationLanguage($0.key.rawValue) == normalizeTranslationLanguage(telewhiteTranslationTargetLanguage(fallback: baseLang)) }), targetHypothesis.value >= telewhiteTargetLanguageHypothesisFloor {
+                                            messageLanguage = normalizeTranslationLanguage(targetHypothesis.key.rawValue)
+                                        } else if let language = filteredLanguages.first, language.value >= telewhiteLanguageConfidenceFloor {
+                                            // Telewhite: an unconfident guess is no evidence at all — skip the
+                                            // message instead of letting it vote.
+                                            messageLanguage = normalizeTranslationLanguage(language.key.rawValue)
+                                        } else {
+                                            messageLanguage = nil
+                                        }
+                                        if let fromLang = messageLanguage {
                                             if loggingEnabled && !["en", "ru"].contains(fromLang) && !dontTranslateLanguages.contains(fromLang) {
                                                 Logger.shared.log("ChatTranslation", "\(text)")
                                                 Logger.shared.log("ChatTranslation", "Recognized as: \(fromLang), other hypotheses: \(hypotheses.map { $0.key.rawValue }.joined(separator: ",")) ")
                                             }
-                                            fromLangs[fromLang] = (fromLangs[fromLang] ?? 0) + message.text.count
+                                            // Telewhite: cap the per-message weight. Weighting purely by text
+                                            // length let a single long mis-detected message outvote several
+                                            // correctly detected ones.
+                                            fromLangs[fromLang] = (fromLangs[fromLang] ?? 0) + min(message.text.count, 100)
                                             count += 1
                                         }
                                     }
@@ -453,8 +500,18 @@ public func chatTranslationState(context: AccountContext, peerId: EnginePeer.Id,
                             // languages are translated automatically (no manual tap);
                             // otherwise the bar is shown but nothing is translated until
                             // the user turns it on for this chat.
+                            // Telewhite: auto-translation needs solid evidence. A winning
+                            // language that holds less than half of the counted weight, or
+                            // a verdict drawn from a single sampled message, is a coin
+                            // flip — leave auto off and let the panel offer a manual
+                            // translation instead.
+                            let totalDetectionWeight = fromLangs.values.reduce(0, +)
+                            var hasDecisiveDetection = false
+                            if let mostFrequent, count >= 2, totalDetectionWeight > 0 {
+                                hasDecisiveDetection = Double(mostFrequent.1) >= Double(totalDetectionWeight) * 0.5
+                            }
                             var isEnabled = cached?.isEnabled ?? false
-                            if telewhiteIncomingTranslationEnabled, !fromLang.isEmpty, normalizeTranslationLanguage(fromLang) != normalizeTranslationLanguage(targetLanguage) {
+                            if telewhiteIncomingTranslationEnabled, !fromLang.isEmpty, hasDecisiveDetection, normalizeTranslationLanguage(fromLang) != normalizeTranslationLanguage(targetLanguage) {
                                 isEnabled = true
                             }
                             // Never translate a chat that is already in the target

@@ -4745,21 +4745,32 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
         }
     }
     
-    private static func telewhiteDetectLanguage(_ text: String) -> String? {
+    // Telewhite: true when the text may already be in `toLang`, so translating it
+    // would be a no-op at best. Asking "is the target a plausible reading?" instead
+    // of "is the target the top guess?" is what keeps Russian text out of a Russian
+    // target: between two Cyrillic languages the recognizer is regularly confident
+    // and wrong, and the top-guess test let those messages through.
+    private static func telewhiteIsProbablyLanguage(_ text: String, _ language: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        // Too short to detect reliably ("ok", "да", emojis) — better to admit
-        // we don't know than to guess wrong.
-        guard trimmed.count >= 4 else {
-            return nil
+        guard trimmed.count >= 3 else {
+            // Too short to judge: leave it alone rather than translate blindly.
+            return true
         }
+        let target = language.components(separatedBy: "-").first?.lowercased() ?? language.lowercased()
         let recognizer = NLLanguageRecognizer()
         recognizer.processString(String(trimmed.prefix(400)))
-        let hypotheses = recognizer.languageHypotheses(withMaximum: 1)
-        guard let best = hypotheses.max(by: { $0.value < $1.value }), best.value >= 0.5 else {
-            return nil
+        let hypotheses = recognizer.languageHypotheses(withMaximum: 6)
+        for (hypothesis, probability) in hypotheses {
+            let code = hypothesis.rawValue.components(separatedBy: "-").first?.lowercased() ?? ""
+            if code == target && probability >= 0.15 {
+                return true
+            }
         }
-        // Normalize e.g. "pt-BR" -> "pt" to match ISO 639-1 target codes.
-        return best.key.rawValue.components(separatedBy: "-").first?.lowercased()
+        // No confident reading at all: treat it as unknown and do not translate.
+        guard let best = hypotheses.max(by: { $0.value < $1.value }), best.value >= 0.45 else {
+            return true
+        }
+        return (best.key.rawValue.components(separatedBy: "-").first?.lowercased() ?? "") == target
     }
     
     private func telewhiteTranslateOutgoingMessagesIfNeeded(_ messages: [EnqueueMessage], _ completion: @escaping ([EnqueueMessage]) -> Void) {
@@ -4783,8 +4794,8 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
             guard case let .message(text, attributes, _, _, _, _, _, _, _, _) = message, !text.isEmpty else {
                 continue
             }
-            // Never touch messages that are already in the target language.
-            if let detected = ChatControllerNode.telewhiteDetectLanguage(text), detected == toLang.lowercased() {
+            // Never touch messages that may already be in the target language.
+            if ChatControllerNode.telewhiteIsProbablyLanguage(text, toLang) {
                 continue
             }
             var entities: [MessageTextEntity] = []
