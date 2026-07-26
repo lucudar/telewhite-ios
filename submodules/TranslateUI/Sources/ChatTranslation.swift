@@ -453,7 +453,7 @@ public func translateMessageIds(context: AccountContext, messageIds: [EngineMess
         }
         return context.engine.messages.translateMessages(messageIds: messageIdsToTranslate, fromLang: fromLang, toLang: toLang, enableLocalIfPossible: enableLocalIfPossible)
         |> afterCompleted {
-            telewhiteTranslationInFlight.modify { current in
+            let _ = telewhiteTranslationInFlight.modify { current in
                 var current = current
                 for id in messageIdsToTranslate {
                     current.remove(id)
@@ -462,7 +462,7 @@ public func translateMessageIds(context: AccountContext, messageIds: [EngineMess
             }
         }
         |> `catch` { error -> Signal<Never, NoError> in
-            telewhiteTranslationInFlight.modify { current in
+            let _ = telewhiteTranslationInFlight.modify { current in
                 var current = current
                 for id in messageIdsToTranslate {
                     current.remove(id)
