@@ -2096,8 +2096,18 @@ final class PeerInfoHeaderNode: ASDisplayNode {
             }
         }
         
-        if !titleSize.width.isZero && !titleSize.height.isZero {
-            if self.navigationTransition != nil {
+        // Telewhite: this zero-size guard used to wrap BOTH branches below, and that is the
+        // white pill over the avatar. Hiding your name by making the title an empty string
+        // makes it measure .zero, so the whole block was skipped — and this block is the
+        // only place that positions the title, subtitle and username containers together
+        // with the premium/status icons and the rating badge inside them. Skipped, they all
+        // kept the frame from the last pass that had a real title and stopped following the
+        // scroll offset, leaving white chrome frozen across the avatar. Only the transition
+        // path actually needs the guard: it divides by titleFrame.height and
+        // subtitleFrame.height, which is NaN when the title is empty. The collapsed path
+        // below has no division and is safe to run with a blank title.
+        if self.navigationTransition != nil {
+            if !titleSize.width.isZero && !titleSize.height.isZero {
                 var neutralTitleScale: CGFloat = 1.0
                 var neutralSubtitleScale: CGFloat = 1.0
                 if self.isAvatarExpanded {
@@ -2144,7 +2154,8 @@ final class PeerInfoHeaderNode: ASDisplayNode {
                     transition.updateFrameAdditive(view: subtitleRatingView, frame: subtitleBadgeFrame)
                     transition.updateAlpha(layer: subtitleRatingView.layer, alpha: subtitleAlpha * (1.0 - transitionFraction))
                 }
-            } else {
+            }
+        } else {
                 let titleScale: CGFloat
                 let subtitleScale: CGFloat
                 var subtitleOffset: CGFloat = 0.0
@@ -2207,9 +2218,8 @@ final class PeerInfoHeaderNode: ASDisplayNode {
                         transition.updateAlpha(layer: subtitleRatingView.layer, alpha: subtitleAlpha)
                     }
                 }
-            }
         }
-        
+
         if displayStandardTitle {
             self.titleNode.isHidden = true
             
