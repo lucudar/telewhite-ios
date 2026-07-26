@@ -36,7 +36,6 @@ public struct TelewhiteModsSettings: Equatable {
     public var translationTargetLanguage: String
     public var oneTimeMediaUnlimited: Bool
     public var downloadOneTimeMedia: Bool
-    public var uploadVoice: Bool
     public var downloadStories: Bool
     public var accentColorOverride: Int64?
     public var bubbleColorOverride: Int64?
@@ -82,7 +81,6 @@ public struct TelewhiteModsSettings: Equatable {
         static let translationTargetLanguage = "telewhite.mods.translationTargetLanguage"
         static let oneTimeMediaUnlimited = "telewhite.mods.oneTimeMediaUnlimited"
         static let downloadOneTimeMedia = "telewhite.mods.downloadOneTimeMedia"
-        static let uploadVoice = "telewhite.mods.uploadVoice"
         static let downloadStories = "telewhite.mods.downloadStories"
         static let accentColor = "telewhite.mods.accentColor"
         static let bubbleColor = "telewhite.mods.bubbleColor"
@@ -133,7 +131,6 @@ public struct TelewhiteModsSettings: Equatable {
             translationTargetLanguage: defaults.string(forKey: Key.translationTargetLanguage) ?? "ru",
             oneTimeMediaUnlimited: defaults.bool(forKey: Key.oneTimeMediaUnlimited),
             downloadOneTimeMedia: defaults.bool(forKey: Key.downloadOneTimeMedia),
-            uploadVoice: defaults.bool(forKey: Key.uploadVoice),
             downloadStories: defaults.bool(forKey: Key.downloadStories),
             accentColorOverride: (defaults.object(forKey: Key.accentColor) as? NSNumber)?.int64Value,
             bubbleColorOverride: (defaults.object(forKey: Key.bubbleColor) as? NSNumber)?.int64Value,
@@ -244,7 +241,6 @@ public struct TelewhiteModsSettings: Equatable {
         defaults.set(self.translationTargetLanguage, forKey: Key.translationTargetLanguage)
         defaults.set(self.oneTimeMediaUnlimited, forKey: Key.oneTimeMediaUnlimited)
         defaults.set(self.downloadOneTimeMedia, forKey: Key.downloadOneTimeMedia)
-        defaults.set(self.uploadVoice, forKey: Key.uploadVoice)
         defaults.set(self.downloadStories, forKey: Key.downloadStories)
         if let value = self.accentColorOverride {
             defaults.set(NSNumber(value: value), forKey: Key.accentColor)
@@ -336,6 +332,7 @@ private final class TelewhiteModsControllerArguments {
 private enum TelewhiteModsSection: Int32 {
     case menu
     case messenger
+    case translator
     case privacy
     case stealth
     case channels
@@ -356,6 +353,9 @@ private enum TelewhiteModsTab: Int32, Equatable {
     case media
     case appearance
     case developer
+    // Telewhite: the translation cluster was six of the fourteen rows on the Messages
+    // screen; it is one row now, opening here.
+    case translator
     // Telewhite: sub-screens of the appearance tab. Every colour used to be one row
     // on a single 31-row screen, which meant scrolling past three palettes to reach
     // the radius options.
@@ -382,43 +382,41 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case preserveDeletedMessages(String, Bool)
     case forwardHideNamesByDefault(String, Bool)
     case showPreviousEditedText(String, Bool)
+    // Telewhite: one row for both halves of the view-once feature — opening without a
+    // limit and saving were two switches for what users think of as one thing.
+    case oneTimeMedia(String, Bool)
+    case hdPhotos(String, Bool)
+    case quickForwardToSaved(String, Bool)
+    case translatorLink(String)
+    case messengerInfo(String)
+
+    case translatorHeader(String)
     case translateMessages(String, Bool)
-    case translateChats(String, Bool)
     case autoTranslateEnglish(String, Bool)
     case translationTargetLanguage(String, String)
     case outgoingTranslateButtonEnabled(String, Bool)
-    case openRouterApiKey(String, String)
-    case messengerInfo(String)
-    case oneTimeMediaUnlimited(String, Bool)
-    case downloadOneTimeMedia(String, Bool)
-    case uploadVoice(String, Bool)
-    case hdPhotos(String, Bool)
     case translateVoiceMessages(String, Bool)
-    case quickForwardToSaved(String, Bool)
+    case openRouterApiKey(String, String)
+    case translatorInfo(String)
 
     case privacyHeader(String)
-    case hideOnlineStatus(String, Bool)
-    case ghostMode(String, Bool)
-    case ghostChatButtonEnabled(String, Bool)
-    case hideTypingStatus(String, Bool)
-    case hideReadReceipts(String, Bool)
-    case screenshotProtectionBypass(String, Bool)
-    case contentRestrictionBypass(String, Bool)
+    // Telewhite: screenshot blocking and copy/forward/save blocking are the same
+    // restriction to a user, so they are lifted by the same switch.
+    case protectionBypass(String, Bool)
     case hidePhoneInSettings(String, Bool)
     case showProfileIds(String, Bool)
     case privacyInfo(String)
-    
+
     case stealthHeader(String)
-    case ghostMessages(String, Bool)
-    case ghostStories(String, Bool)
-    case clearGhostChats(String)
+    // Telewhite: one switch for being invisible, covering messages and stories alike.
+    // It also writes the ghostMode master flag, which had lost its row and so could be
+    // left stuck on with nothing in the UI able to clear it.
+    case ghost(String, Bool)
+    case ghostChatButtonEnabled(String, Bool)
     case stealthInfo(String)
 
     case channelsHeader(String)
-    case channelContentRestrictionBypass(String, Bool)
-    case channelHideReactions(String, Bool)
-    case channelHideComments(String, Bool)
-    case channelHideShareButton(String, Bool)
+    case channelsDeclutter(String, Bool)
     case channelsInfo(String)
 
     case mediaHeader(String)
@@ -445,7 +443,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case bubbleColorCustom(String, Int64?, Bool)
     case backgroundColorHeader(String)
     case backgroundColorOption(Int32, String, Int64?, Bool)
-    case backgroundGradientOption(Int32, String, [Int64], Bool)
     case backgroundColorCustom(String, Int64?, Bool)
     case cornerRadiusHeader(String)
     case cornerRadiusOption(Int32, String, Int32?, Bool)
@@ -453,9 +450,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case appearanceInfo(String)
     
     case developerHeader(String)
-    case showUserIds(String, Bool)
-    case showChatIds(String, Bool)
-    case showMessageIds(String, Bool)
     case pushStatus(String, String)
     case pushToken(String, String)
     case debugMenu(String)
@@ -465,13 +459,15 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
         switch self {
         case .menuItem:
             return TelewhiteModsSection.menu.rawValue
-        case .messengerHeader, .preserveDeletedMessages, .forwardHideNamesByDefault, .showPreviousEditedText, .translateMessages, .translateChats, .autoTranslateEnglish, .translationTargetLanguage, .outgoingTranslateButtonEnabled, .openRouterApiKey, .messengerInfo, .oneTimeMediaUnlimited, .downloadOneTimeMedia, .uploadVoice, .hdPhotos, .translateVoiceMessages, .quickForwardToSaved:
+        case .messengerHeader, .preserveDeletedMessages, .forwardHideNamesByDefault, .showPreviousEditedText, .oneTimeMedia, .hdPhotos, .quickForwardToSaved, .translatorLink, .messengerInfo:
             return TelewhiteModsSection.messenger.rawValue
-        case .privacyHeader, .screenshotProtectionBypass, .contentRestrictionBypass, .hidePhoneInSettings, .showProfileIds, .showUserIds, .showChatIds, .showMessageIds, .privacyInfo:
+        case .translatorHeader, .translateMessages, .autoTranslateEnglish, .translationTargetLanguage, .outgoingTranslateButtonEnabled, .translateVoiceMessages, .openRouterApiKey, .translatorInfo:
+            return TelewhiteModsSection.translator.rawValue
+        case .privacyHeader, .protectionBypass, .hidePhoneInSettings, .showProfileIds, .privacyInfo:
             return TelewhiteModsSection.privacy.rawValue
-        case .stealthHeader, .ghostMode, .hideOnlineStatus, .ghostMessages, .hideReadReceipts, .hideTypingStatus, .ghostChatButtonEnabled, .ghostStories, .clearGhostChats, .stealthInfo:
+        case .stealthHeader, .ghost, .ghostChatButtonEnabled, .stealthInfo:
             return TelewhiteModsSection.stealth.rawValue
-        case .channelsHeader, .channelContentRestrictionBypass, .channelHideReactions, .channelHideComments, .channelHideShareButton, .channelsInfo:
+        case .channelsHeader, .channelsDeclutter, .channelsInfo:
             return TelewhiteModsSection.channels.rawValue
         case .mediaHeader, .downloadStories, .hideStories, .autoCacheCleanup, .cacheLimit, .mediaInfo:
             return TelewhiteModsSection.media.rawValue
@@ -481,7 +477,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.accentColor.rawValue
         case .bubbleColorHeader, .bubbleColorOption, .bubbleColorCustom:
             return TelewhiteModsSection.bubbleColor.rawValue
-        case .backgroundColorHeader, .backgroundColorOption, .backgroundGradientOption, .backgroundColorCustom:
+        case .backgroundColorHeader, .backgroundColorOption, .backgroundColorCustom:
             return TelewhiteModsSection.backgroundColor.rawValue
         case .cornerRadiusHeader, .cornerRadiusOption, .chatFontSizeOption, .appearanceInfo:
             return TelewhiteModsSection.cornerRadius.rawValue
@@ -498,80 +494,60 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 0
         case .preserveDeletedMessages:
             return 1
-        case .oneTimeMediaUnlimited:
+        case .showPreviousEditedText:
             return 2
-        case .downloadOneTimeMedia:
+        case .forwardHideNamesByDefault:
             return 3
-        case .uploadVoice:
+        case .oneTimeMedia:
             return 4
         case .hdPhotos:
-            return 20
-        case .translateVoiceMessages:
-            return 21
+            return 5
         case .quickForwardToSaved:
-            return 22
-        case .translateMessages:
+            return 6
+        case .translatorLink:
             return 7
-        case .translateChats:
-            return 8
-        case .autoTranslateEnglish:
-            return 9
-        case .translationTargetLanguage:
-            return 10
-        case .outgoingTranslateButtonEnabled:
-            return 11
-        case .openRouterApiKey:
-            return 13
         case .messengerInfo:
-            return 17
-        case .forwardHideNamesByDefault:
-            return 18
-        case .showPreviousEditedText:
-            return 19
+            return 8
+        case .translatorHeader:
+            return 50
+        case .autoTranslateEnglish:
+            return 51
+        case .translationTargetLanguage:
+            return 52
+        case .translateMessages:
+            return 53
+        case .outgoingTranslateButtonEnabled:
+            return 54
+        case .translateVoiceMessages:
+            return 55
+        case .openRouterApiKey:
+            return 56
+        case .translatorInfo:
+            return 57
         case .privacyHeader:
             return 100
-        case .hideOnlineStatus:
+        case .protectionBypass:
             return 101
-        case .ghostMode:
-            return 102
-        case .ghostChatButtonEnabled:
-            return 303
-        case .hideTypingStatus:
-            return 104
-        case .hideReadReceipts:
-            return 105
-        case .screenshotProtectionBypass:
-            return 106
-        case .contentRestrictionBypass:
-            return 107
         case .hidePhoneInSettings:
-            return 108
+            return 102
         case .showProfileIds:
-            return 109
+            return 103
         case .privacyInfo:
-            return 110
+            return 104
         case .stealthHeader:
             return 300
-        case .ghostMessages:
+        case .ghost:
             return 301
-        case .ghostStories:
+        case .ghostChatButtonEnabled:
             return 302
-        case .clearGhostChats:
-            return 304
         case .stealthInfo:
-            return 305
+            return 303
         case .channelsHeader:
             return 400
-        case .channelContentRestrictionBypass:
+        case .channelsDeclutter:
             return 401
-        case .channelHideReactions:
-            return 402
-        case .channelHideComments:
-            return 403
-        case .channelHideShareButton:
-            return 404
         case .channelsInfo:
-            return 405
+            return 402
         case .mediaHeader:
             return 500
         case .downloadStories:
@@ -590,6 +566,8 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 702
         case .amoledMode:
             return 703
+        case .chatSplitLandscape:
+            return 704
         case .darkMonoPreset:
             return 705
         case .accentColorLink:
@@ -600,8 +578,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 708
         case .shapeLink:
             return 709
-        case .chatSplitLandscape:
-            return 704
         case .accentColorHeader:
             return 710
         case let .accentColorOption(index, _, _, _):
@@ -618,8 +594,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 750
         case let .backgroundColorOption(index, _, _, _):
             return 751 + index
-        case let .backgroundGradientOption(index, _, _, _):
-            return 761 + index
         case .backgroundColorCustom:
             return 769
         case .cornerRadiusHeader:
@@ -632,12 +606,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 790
         case .developerHeader:
             return 800
-        case .showUserIds:
-            return 801
-        case .showChatIds:
-            return 802
-        case .showMessageIds:
-            return 803
         case .pushStatus:
             return 804
         case .pushToken:
@@ -670,7 +638,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: telewhiteMenuIcon(icon, color: presentationData.theme.list.itemAccentColor), title: title, titleFont: .bold, label: subtitle, labelStyle: .multilineDetailText, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                 arguments.openTab(tab)
             })
-        case let .messengerHeader(text), let .privacyHeader(text), let .stealthHeader(text), let .channelsHeader(text), let .mediaHeader(text), let .appearanceHeader(text), let .developerHeader(text), let .accentColorHeader(text), let .bubbleColorHeader(text), let .backgroundColorHeader(text), let .cornerRadiusHeader(text):
+        case let .messengerHeader(text), let .translatorHeader(text), let .privacyHeader(text), let .stealthHeader(text), let .channelsHeader(text), let .mediaHeader(text), let .appearanceHeader(text), let .developerHeader(text), let .accentColorHeader(text), let .bubbleColorHeader(text), let .backgroundColorHeader(text), let .cornerRadiusHeader(text):
             return ItemListSectionHeaderItem(presentationData: presentationData, text: text, sectionId: self.section)
         case let .accentColorOption(_, title, value, selected):
             return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, icon: telewhiteColorSwatchImage(value), iconSize: CGSize(width: 22.0, height: 22.0), title: title, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
@@ -694,15 +662,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
                     var updated = current
                     updated.chatBackgroundColorOverride = value
                     updated.chatBackgroundGradientOverride = nil
-                    return updated
-                }
-            })
-        case let .backgroundGradientOption(_, title, colors, selected):
-            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, icon: telewhiteGradientSwatchImage(colors), iconSize: CGSize(width: 22.0, height: 22.0), title: title, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
-                arguments.updateSettings { current in
-                    var updated = current
-                    updated.chatBackgroundColorOverride = nil
-                    updated.chatBackgroundGradientOverride = colors
                     return updated
                 }
             })
@@ -734,6 +693,42 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
                     return updated
                 }
             })
+        case let .oneTimeMedia(text, value):
+            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
+                // Telewhite: opening without a limit and saving are one idea to a user.
+                settings.oneTimeMediaUnlimited = value
+                settings.downloadOneTimeMedia = value
+            }
+        case let .protectionBypass(text, value):
+            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
+                settings.screenshotProtectionBypass = value
+                settings.contentRestrictionBypass = value
+            }
+        case let .ghost(text, value):
+            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
+                // Telewhite: ghostMode is the master flag the engine checks alongside each
+                // granular one. Its own row is gone, so this switch owns it — otherwise a
+                // user who once enabled it would have no way left to turn it off.
+                settings.ghostMode = value
+                settings.hideOnlineStatus = value
+                settings.hideTypingStatus = value
+                settings.hideReadReceipts = value
+                settings.ghostStories = value
+            }
+        case let .ghostChatButtonEnabled(text, value):
+            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
+                settings.ghostChatButtonEnabled = value
+            }
+        case let .channelsDeclutter(text, value):
+            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
+                settings.channelHideReactions = value
+                settings.channelHideComments = value
+                settings.channelHideShareButton = value
+            }
+        case let .translatorLink(text):
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: "", labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+                arguments.openTab(.translator)
+            })
         case let .preserveDeletedMessages(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.preserveDeletedMessages = value
@@ -756,21 +751,20 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
                     return updated
                 }
             })
-        case let .translateChats(text, value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: text, text: telewhiteEntryDescription(self, presentationData: presentationData), value: value, maximumNumberOfLines: 3, sectionId: self.section, style: .blocks, updated: { value in
-                arguments.updateTranslationSettings { current in
-                    var updated = current.withUpdatedTranslateChats(value)
-                    if !updated.showTranslate && !updated.translateChats {
-                        updated = updated.withUpdatedIgnoredLanguages(nil)
-                    }
-                    return updated
-                }
-            })
         case let .autoTranslateEnglish(text, value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: text, text: telewhiteEntryDescription(self, presentationData: presentationData), value: value, maximumNumberOfLines: 3, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.updateSettings { current in
                     var updated = current
                     updated.autoTranslateEnglish = value
+                    return updated
+                }
+                // Telewhite: "translate whole chats" was a separate switch for the same
+                // outcome, so this one drives Telegram's setting as well.
+                arguments.updateTranslationSettings { current in
+                    var updated = current.withUpdatedTranslateChats(value)
+                    if !updated.showTranslate && !updated.translateChats {
+                        updated = updated.withUpdatedIgnoredLanguages(nil)
+                    }
                     return updated
                 }
             })
@@ -784,18 +778,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: value.isEmpty ? "" : "•••" + String(value.suffix(4)), labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                 arguments.promptOpenRouterKey()
             })
-        case let .oneTimeMediaUnlimited(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.oneTimeMediaUnlimited = value
-            }
-        case let .downloadOneTimeMedia(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.downloadOneTimeMedia = value
-            }
-        case let .uploadVoice(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.uploadVoice = value
-            }
         case let .hdPhotos(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.hdPhotos = value
@@ -812,40 +794,8 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: "", sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                 arguments.openDebug()
             })
-        case let .messengerInfo(text), let .privacyInfo(text), let .stealthInfo(text), let .channelsInfo(text), let .mediaInfo(text), let .developerInfo(text), let .appearanceInfo(text):
+        case let .messengerInfo(text), let .translatorInfo(text), let .privacyInfo(text), let .stealthInfo(text), let .channelsInfo(text), let .mediaInfo(text), let .developerInfo(text), let .appearanceInfo(text):
             return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
-        case let .hideOnlineStatus(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.hideOnlineStatus = value
-            }
-        case let .ghostMode(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.ghostMode = value
-                settings.hideOnlineStatus = value
-                settings.hideTypingStatus = value
-                settings.hideReadReceipts = value
-                settings.ghostStories = value
-            }
-        case let .ghostChatButtonEnabled(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.ghostChatButtonEnabled = value
-            }
-        case let .hideTypingStatus(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.hideTypingStatus = value
-            }
-        case let .hideReadReceipts(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.hideReadReceipts = value
-            }
-        case let .screenshotProtectionBypass(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.screenshotProtectionBypass = value
-            }
-        case let .contentRestrictionBypass(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.contentRestrictionBypass = value
-            }
         case let .hidePhoneInSettings(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.hidePhoneInSettings = value
@@ -856,18 +806,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
                 settings.showUserIds = value
                 settings.showChatIds = value
                 settings.showMessageIds = value
-            }
-        case let .ghostMessages(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                // Telewhite: the "messages" ghost toggle bundles the full DM stealth
-                // set — hidden online, typing/recording, reads and content receipts.
-                settings.hideOnlineStatus = value
-                settings.hideTypingStatus = value
-                settings.hideReadReceipts = value
-            }
-        case let .ghostStories(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.ghostStories = value
             }
         case let .accentColorLink(text, value):
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: telewhiteColorSwatchImage(value), title: text, label: "", labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
@@ -901,30 +839,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
                     return updated
                 }
             })
-        case let .clearGhostChats(text):
-            return ItemListActionItem(presentationData: presentationData, systemStyle: .glass, title: text, kind: .generic, alignment: .natural, sectionId: self.section, style: .blocks, action: {
-                arguments.updateSettings { current in
-                    var updated = current
-                    updated.ghostPeerIds.removeAll()
-                    return updated
-                }
-            })
-        case let .channelContentRestrictionBypass(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.contentRestrictionBypass = value
-            }
-        case let .channelHideReactions(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.channelHideReactions = value
-            }
-        case let .channelHideComments(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.channelHideComments = value
-            }
-        case let .channelHideShareButton(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.channelHideShareButton = value
-            }
         case let .downloadStories(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.downloadStories = value
@@ -957,18 +871,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
         case let .amoledMode(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.amoledMode = value
-            }
-        case let .showUserIds(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.showUserIds = value
-            }
-        case let .showChatIds(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.showChatIds = value
-            }
-        case let .showMessageIds(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.showMessageIds = value
             }
         case let .pushStatus(text, value):
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: value, labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .none, action: nil)
@@ -1139,6 +1041,8 @@ private func telewhiteTabTitle(_ tab: TelewhiteModsTab, strings: TelewhiteModsSt
         return strings.text("Look", "\u{0412}\u{043d}\u{0435}\u{0448}\u{043d}\u{0438}\u{0439} \u{0432}\u{0438}\u{0434}")
     case .developer:
         return strings.text("Developer", "\u{0420}\u{0430}\u{0437}\u{0440}\u{0430}\u{0431}\u{043e}\u{0442}\u{0447}\u{0438}\u{043a}")
+    case .translator:
+        return strings.text("Translator", "Переводчик")
     case .accentColor:
         return strings.text("Accent Color", "Акцентный цвет")
     case .bubbleColor:
@@ -1152,14 +1056,13 @@ private func telewhiteTabTitle(_ tab: TelewhiteModsTab, strings: TelewhiteModsSt
 
 private func telewhiteMenuEntries(strings: TelewhiteModsStrings) -> [TelewhiteModsEntry] {
     return [
-        .menuItem(0, .privacy, telewhiteTabTitle(.privacy, strings: strings), strings.text("Content protection, phone and technical IDs.", "Защита контента, номер и технические ID."), .privacy),
-        .menuItem(1, .ghost, telewhiteTabTitle(.stealth, strings: strings), strings.text("Invisible reading and anonymous story viewing.", "Невидимое чтение и анонимный просмотр историй."), .stealth),
-        .menuItem(2, .messages, telewhiteTabTitle(.messenger, strings: strings), strings.text("Deleted messages, one-time media, uploads and translation.", "\u{0423}\u{0434}\u{0430}\u{043b}\u{0451}\u{043d}\u{043d}\u{044b}\u{0435} \u{0441}\u{043e}\u{043e}\u{0431}\u{0449}\u{0435}\u{043d}\u{0438}\u{044f}, \u{043e}\u{0434}\u{043d}\u{043e}\u{0440}\u{0430}\u{0437}\u{043e}\u{0432}\u{044b}\u{0435} \u{043c}\u{0435}\u{0434}\u{0438}\u{0430}, \u{0437}\u{0430}\u{0433}\u{0440}\u{0443}\u{0437}\u{043a}\u{0438} \u{0438} \u{043f}\u{0435}\u{0440}\u{0435}\u{0432}\u{043e}\u{0434}."), .messenger),
-        .menuItem(3, .groups, telewhiteTabTitle(.channels, strings: strings), strings.text("Channel and group content controls.", "\u{0424}\u{0443}\u{043d}\u{043a}\u{0446}\u{0438}\u{0438} \u{0434}\u{043b}\u{044f} \u{043a}\u{0430}\u{043d}\u{0430}\u{043b}\u{043e}\u{0432} \u{0438} \u{0433}\u{0440}\u{0443}\u{043f}\u{043f}."), .channels),
-        .menuItem(4, .media, telewhiteTabTitle(.media, strings: strings), strings.text("Stories, downloads and media actions.", "\u{0418}\u{0441}\u{0442}\u{043e}\u{0440}\u{0438}\u{0438}, \u{0441}\u{043a}\u{0430}\u{0447}\u{0438}\u{0432}\u{0430}\u{043d}\u{0438}\u{0435} \u{0438} \u{043c}\u{0435}\u{0434}\u{0438}\u{0430}-\u{0434}\u{0435}\u{0439}\u{0441}\u{0442}\u{0432}\u{0438}\u{044f}."), .media),
-        // Telewhite: Smart Proxy tab and its engine were removed per user request.
-        .menuItem(5, .appearance, telewhiteTabTitle(.appearance, strings: strings), strings.text("Colors, chat list and split view.", "Цвета, список чатов и сплит-режим."), .appearance),
-        .menuItem(6, .developer, telewhiteTabTitle(.developer, strings: strings), strings.text("Push diagnostics and technical tools.", "Диагностика push и технические инструменты."), .developer)
+        .menuItem(0, .privacy, telewhiteTabTitle(.privacy, strings: strings), strings.text("Saving restrictions, your number, numeric IDs.", "Запреты на сохранение, ваш номер, числовые ID."), .privacy),
+        .menuItem(1, .ghost, telewhiteTabTitle(.stealth, strings: strings), strings.text("Read messages and watch stories without being seen.", "Читать сообщения и смотреть истории незаметно."), .stealth),
+        .menuItem(2, .messages, telewhiteTabTitle(.messenger, strings: strings), strings.text("Deleted messages, view-once media, forwarding, translation.", "Удалённые сообщения, одноразовые медиа, пересылка, перевод."), .messenger),
+        .menuItem(3, .groups, telewhiteTabTitle(.channels, strings: strings), strings.text("What is shown under channel posts.", "Что показывать под постами каналов."), .channels),
+        .menuItem(4, .media, telewhiteTabTitle(.media, strings: strings), strings.text("Stories and space taken up on the phone.", "Истории и место, занятое на телефоне."), .media),
+        .menuItem(5, .appearance, telewhiteTabTitle(.appearance, strings: strings), strings.text("Colours, chat list, landscape mode.", "Цвета, список чатов, горизонтальный режим."), .appearance),
+        .menuItem(6, .developer, telewhiteTabTitle(.developer, strings: strings), strings.text("Notification diagnostics and debug tools.", "Диагностика уведомлений и отладка."), .developer)
     ]
 }
 
@@ -1168,69 +1071,59 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
     func text(_ en: String, _ ru: String) -> String {
         return isRussian ? ru : en
     }
+    // Telewhite: every line here is read by someone who just installed the app and has
+    // no idea what the switch does. Say what they will see, not how it is implemented.
     switch entry {
     case .preserveDeletedMessages:
-        return text("Messages deleted by others stay visible on this device.", "Сообщения, удалённые собеседником, остаются видны на этом устройстве.")
-    case .forwardHideNamesByDefault:
-        return text("Forwarded messages are sent without the original author's name by default.", "Пересланные сообщения по умолчанию отправляются без имени исходного автора.")
+        return text("If someone deletes a message, it stays in the chat for you, marked \"Deleted\". Only on this phone — nothing is sent anywhere.", "Если собеседник удалит сообщение, у вас оно останется в чате с пометкой «Удалено». Только на этом телефоне — никуда ничего не отправляется.")
     case .showPreviousEditedText:
-        return text("Shows the immediately previous text below an edited message. Stored only on this device.", "Показывает предыдущий текст прямо под отредактированным сообщением. Хранится только на этом устройстве.")
-    case .translateMessages:
-        return text("Adds a Translate button to the message menu.", "Добавляет кнопку «Перевести» в меню сообщения.")
-    case .translateChats:
-        return text("Shows a translate bar at the top of foreign-language chats.", "Показывает панель перевода сверху в чатах на иностранном языке.")
-    case .autoTranslateEnglish:
-        return text("Automatically translates incoming messages in foreign-language chats into your translation language. Chats already in the target language (e.g. Russian) are never touched.", "Автоматически переводит входящие сообщения в иностранных чатах на ваш язык перевода. Чаты уже на целевом языке (например, русский) не трогаются.")
-    case .outgoingTranslateButtonEnabled:
-        return text("Translator button in private chats: tap to translate your outgoing messages, long press to pick the language.", "Кнопка переводчика в личных чатах: тап — перевод ваших сообщений, долгий тап — выбор языка.")
-    case .openRouterApiKey:
-        return text("Optional free key from openrouter.ai for better AI translation. Without it the standard translator is used.", "Необязательный бесплатный ключ с openrouter.ai для более качественного AI-перевода. Без него — стандартный переводчик.")
-    case .translateVoiceMessages:
-        return text("Adds a translation under the transcript of voice messages when their language differs from yours. Uses a free translation service.", "Добавляет перевод под расшифровкой голосовых, если их язык отличается от вашего. Использует бесплатный переводчик.")
+        return text("When someone edits a message, the old version stays visible in small text underneath.", "Когда сообщение изменят, под ним мелким шрифтом останется прошлый вариант.")
+    case .forwardHideNamesByDefault:
+        return text("Forwarded messages go out without the \"Forwarded from\" line. You can still turn it back on for a single forward.", "Пересланные сообщения уходят без строки «Переслано от». Для конкретной пересылки имя можно вернуть вручную.")
+    case .oneTimeMedia:
+        return text("Photos and videos sent as view-once can be opened as many times as you like, and saved.", "Фото и видео, отправленные с самоудалением после просмотра, можно открывать сколько угодно раз и сохранять себе.")
+    case .hdPhotos:
+        return text("Your photos are sent with much less compression. They look better and use more data.", "Ваши фото отправляются почти без сжатия — выглядят лучше, весят больше.")
     case .quickForwardToSaved:
-        return text("Adds a \"Forward to Saved Messages\" action to the message menu that sends a copy to your Saved Messages instantly, without the chat picker.", "Добавляет в меню сообщения действие «Переслать в Избранное», которое мгновенно отправляет копию в ваши Избранные без выбора чата.")
-    case .oneTimeMediaUnlimited:
-        return text("View-once photos and videos can be opened multiple times.", "Одноразовые фото и видео можно открывать сколько угодно раз.")
-    case .downloadOneTimeMedia:
-        return text("Lets you save view-once photos and videos.", "Позволяет сохранять одноразовые фото и видео.")
-    case .hideOnlineStatus:
-        return text("Others won't see you online.", "Другие не будут видеть вас в сети.")
-    case .ghostMode:
-        return text("One switch for full invisibility: hides online, typing/recording, read receipts, voice/video consumption, and story views.", "Один переключатель полной невидимки: скрывает онлайн, набор/запись, прочтение, прослушивание/просмотр и просмотры историй.")
-    case .ghostChatButtonEnabled:
-        return text("Adds a ghost button to each chat: reads, voice playback and typing in that chat stay invisible. Active ghost chats keep showing the button so you can turn them off.", "Добавляет кнопку невидимки в каждый чат: прочтение, прослушивание и набор текста в этом чате никто не увидит. В чатах с активной невидимкой кнопка остаётся видимой, чтобы её можно было выключить.")
-    case .hideTypingStatus:
-        return text("Others won't see when you're typing or recording.", "Другие не увидят, что вы печатаете или записываете.")
-    case .hideReadReceipts, .ghostMessages:
-        return text("Read messages without sending read-receipt notifications.", "Читайте сообщения без отправки уведомлений о прочтении.")
-    case .ghostStories:
-        return text("Watch stories anonymously. You won't appear in the viewer list.", "Смотрите истории анонимно. Вы не появитесь в списке зрителей.")
-    case .screenshotProtectionBypass:
-        return text("Removes screenshot blocks in protected chats.", "Убирает блокировку скриншотов в защищённых чатах.")
-    case .contentRestrictionBypass, .channelContentRestrictionBypass:
-        return text("Lets you forward, copy and save from protected chats and channels.", "Позволяет пересылать, копировать и сохранять из защищённых чатов и каналов.")
-    case .channelHideReactions:
-        return text("Hides reaction rows under channel posts on this device.", "Скрывает реакции под постами каналов на этом устройстве.")
-    case .channelHideComments:
-        return text("Hides the comments bar under channel posts on this device.", "Скрывает панель комментариев под постами каналов на этом устройстве.")
-    case .channelHideShareButton:
-        return text("Hides the floating share button next to channel posts.", "Скрывает плавающую кнопку «Поделиться» рядом с постами каналов.")
+        return text("Adds \"Forward to Saved Messages\" to the message menu — one tap, no chat picker.", "Добавляет в меню сообщения пункт «Переслать в Избранное» — одно нажатие, без выбора чата.")
+    case .translatorLink:
+        return text("Automatic translation of incoming messages, your own messages and voice messages.", "Автоперевод входящих, перевод ваших сообщений и голосовых.")
+    case .autoTranslateEnglish:
+        return text("Messages in other languages are shown to you already translated. Messages in your own language are left alone.", "Сообщения на других языках сразу показываются переведёнными. Сообщения на вашем языке не трогаются.")
+    case .translationTargetLanguage:
+        return text("The language everything is translated into.", "Язык, на который всё переводится.")
+    case .translateMessages:
+        return text("Adds \"Translate\" to the menu that appears when you hold a message.", "Добавляет пункт «Перевести» в меню, которое открывается долгим нажатием на сообщение.")
+    case .outgoingTranslateButtonEnabled:
+        return text("Puts a translator button at the top of private chats: tap it and your messages are sent translated, hold it to pick the language.", "Ставит кнопку переводчика в шапку личных чатов: нажатие — ваши сообщения уходят переведёнными, долгое нажатие — выбор языка.")
+    case .translateVoiceMessages:
+        return text("Voice messages in other languages get a translation under the transcript.", "Под расшифровкой голосового на чужом языке появляется перевод.")
+    case .openRouterApiKey:
+        return text("Optional. A free key from openrouter.ai gives better translation and voice transcription. Without it the regular translator is used.", "Необязательно. Бесплатный ключ с openrouter.ai даёт более точный перевод и расшифровку голосовых. Без него работает обычный переводчик.")
+    case .protectionBypass:
+        return text("In chats and channels that block saving, you can take screenshots, copy text, forward and save media again.", "В чатах и каналах, где запрещено сохранять, снова работают скриншоты, копирование, пересылка и сохранение медиа.")
     case .hidePhoneInSettings:
-        return text("Hides your phone number and username in Settings and your profile.", "Скрывает ваш номер телефона и юзернейм в настройках и профиле.")
-    case .showProfileIds, .showUserIds, .showChatIds, .showMessageIds:
-        return text("Shows user and chat IDs in profiles. Tap an ID to copy it.", "Показывает ID пользователей и чатов в профилях. Нажмите на ID, чтобы скопировать.")
+        return text("Your phone number and @username stop being shown in Settings and on your own profile, so nobody sees them over your shoulder. Other people still see them as usual.", "Ваш номер и @имя перестают показываться в настройках и в вашем профиле — их не увидят, заглянув в ваш экран. Для других людей ничего не меняется.")
+    case .showProfileIds:
+        return text("Shows the numeric ID in profiles and chats. Tap it to copy. Useful for bots; safe to leave off.", "Показывает числовой ID в профилях и чатах. Нажмите, чтобы скопировать. Нужно для ботов, обычно можно не включать.")
+    case .ghost:
+        return text("Nobody can tell you are there: no read receipts, no \"played\" marks on voice messages, no \"typing\", no online status, and stories are viewed anonymously.", "Никто не видит, что вы здесь: нет галочек о прочтении, отметок о прослушивании голосовых, статусов «печатает» и «в сети», а истории вы смотрите анонимно.")
+    case .ghostChatButtonEnabled:
+        return text("Adds a ghost icon to the top of every chat. It turns invisibility on for that one person, without affecting the rest.", "Добавляет значок-призрак в шапку каждого чата. Он включает невидимку только для этого собеседника, остальных не затрагивает.")
+    case .channelsDeclutter:
+        return text("Hides reactions, the comments bar and the share button under channel posts, leaving just the post.", "Убирает под постами каналов реакции, панель комментариев и кнопку «Поделиться» — остаётся только сам пост.")
     case .downloadStories:
-        return text("Adds a save button to stories.", "Добавляет кнопку сохранения в истории.")
-    case .autoCacheCleanup:
-        return text("Removes the oldest downloaded media when the cache limit is reached. Nothing is deleted from the cloud.", "Удаляет самые старые скачанные медиа при достижении лимита. Из облака ничего не удаляется.")
+        return text("Adds a save button to other people's stories.", "Добавляет кнопку сохранения в чужих историях.")
     case .hideStories:
-        return text("Hides the stories row above the chat list.", "Скрывает ленту историй над списком чатов.")
+        return text("Removes the row of stories above the chat list.", "Убирает ленту историй над списком чатов.")
+    case .autoCacheCleanup:
+        return text("When downloaded photos and videos take up more than the limit, the oldest ones are deleted. Nothing is lost — anything you open again is downloaded from Telegram.", "Когда скачанные фото и видео займут больше лимита, самые старые удаляются. Ничего не теряется — при открытии всё снова скачается из Telegram.")
     case .compactChatList:
-        return text("Makes chat list rows smaller so more chats fit on screen.", "Уменьшает строки чатов — на экране помещается больше.")
+        return text("Chat rows become shorter, so more chats fit on the screen.", "Строки чатов становятся ниже — на экране помещается больше чатов.")
     case .chatSplitLandscape:
-        return text("In landscape, shows the chat list next to the open chat, like on a computer.", "В альбомной ориентации показывает список чатов рядом с открытым чатом — как на компьютере.")
+        return text("Turn the phone sideways and the chat list stays next to the open chat, like on a computer.", "Поверните телефон горизонтально — список чатов останется рядом с открытым чатом, как на компьютере.")
     case .amoledMode:
-        return text("Pure black theme for OLED screens.", "Чисто-чёрная тема для OLED-экранов.")
+        return text("Makes the dark theme pure black. On OLED screens black pixels are switched off, so it also saves battery.", "Делает тёмную тему полностью чёрной. На OLED-экранах чёрные пиксели не светятся, поэтому расходуется меньше заряда.")
     default:
         return nil
     }
@@ -1242,57 +1135,54 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
     switch tab {
     case .messenger:
         entries.append(.messengerHeader(telewhiteTabTitle(.messenger, strings: strings)))
-        entries.append(.preserveDeletedMessages(strings.text("Keep Deleted Messages", "Сохранять удалённые сообщения"), settings.preserveDeletedMessages))
-        entries.append(.forwardHideNamesByDefault(strings.text("Forward Without Author", "Пересылать без имени автора"), settings.forwardHideNamesByDefault))
-        entries.append(.showPreviousEditedText(strings.text("Show Previous Edited Text", "Показывать предыдущую версию"), settings.showPreviousEditedText))
-        entries.append(.oneTimeMediaUnlimited(strings.text("Unlimited One-Time View", "Одноразовый просмотр без ограничений"), settings.oneTimeMediaUnlimited))
-        entries.append(.downloadOneTimeMedia(strings.text("Download One-Time Media", "Скачать одноразовые медиа"), settings.downloadOneTimeMedia))
-        entries.append(.hdPhotos(strings.text("Send Photos in HD", "Отправлять фото в HD"), settings.hdPhotos))
+        entries.append(.preserveDeletedMessages(strings.text("Keep Deleted Messages", "Не терять удалённые сообщения"), settings.preserveDeletedMessages))
+        entries.append(.showPreviousEditedText(strings.text("Show the Text Before an Edit", "Показывать текст до правки"), settings.showPreviousEditedText))
+        entries.append(.forwardHideNamesByDefault(strings.text("Forward Without the Author", "Пересылать без автора"), settings.forwardHideNamesByDefault))
+        entries.append(.oneTimeMedia(strings.text("View-Once Photos and Videos", "Одноразовые фото и видео"), settings.oneTimeMediaUnlimited && settings.downloadOneTimeMedia))
+        entries.append(.hdPhotos(strings.text("Send Photos in High Quality", "Отправлять фото в высоком качестве"), settings.hdPhotos))
+        entries.append(.quickForwardToSaved(strings.text("\"To Saved Messages\" Button", "Кнопка «В Избранное»"), settings.quickForwardToSaved))
+        entries.append(.translatorLink(telewhiteTabTitle(.translator, strings: strings)))
+        entries.append(.messengerInfo(strings.text("Everything here works on this phone only.", "Всё перечисленное работает только на этом телефоне.")))
+
+    case .translator:
+        entries.append(.translatorHeader(telewhiteTabTitle(.translator, strings: strings)))
+        entries.append(.autoTranslateEnglish(strings.text("Translate Incoming Messages", "Переводить входящие"), settings.autoTranslateEnglish))
+        entries.append(.translationTargetLanguage(strings.text("Translate Into", "Переводить на"), settings.translationTargetLanguage))
+        entries.append(.translateMessages(strings.text("\"Translate\" in the Message Menu", "«Перевести» в меню сообщения"), translationSettings.showTranslate))
+        entries.append(.outgoingTranslateButtonEnabled(strings.text("Translate What You Send", "Переводить то, что вы пишете"), settings.outgoingTranslateButtonEnabled))
         entries.append(.translateVoiceMessages(strings.text("Translate Voice Messages", "Переводить голосовые"), settings.translateVoiceMessages))
-        entries.append(.quickForwardToSaved(strings.text("Quick Forward to Saved", "Быстрая пересылка в Избранное"), settings.quickForwardToSaved))
-        entries.append(.translateMessages(strings.text("Show Translate Button", "Показывать кнопку перевода"), translationSettings.showTranslate))
-        entries.append(.translateChats(strings.text("Translate Entire Chats", "Перевод чатов"), translationSettings.translateChats))
-        entries.append(.autoTranslateEnglish(strings.text("Incoming Message Translation", "Перевод входящих сообщений"), settings.autoTranslateEnglish))
-        entries.append(.translationTargetLanguage(strings.text("Translation Language", "Язык перевода"), settings.translationTargetLanguage))
-        entries.append(.outgoingTranslateButtonEnabled(strings.text("Per-Chat Translator Button", "Кнопка переводчика в чатах"), settings.outgoingTranslateButtonEnabled))
-        // Telewhite: "Smart Auto-Translate" removed — outgoing translation is now
-        // strictly manual via the per-chat translator button. Translation uses a
-        // free translation service, so no API key is required.
-        entries.append(.messengerInfo(strings.text("Message features are split here: deleted messages, one-time media, uploads and translation.", "Здесь собраны функции сообщений: удалённые сообщения, одноразовые медиа, загрузка и перевод.")))
+        entries.append(.openRouterApiKey(strings.text("OpenRouter Key", "Ключ OpenRouter"), settings.openRouterApiKey))
+        entries.append(.translatorInfo(strings.text("Translation is free and needs no account. Messages already in your language are never translated.", "Перевод бесплатный и не требует аккаунта. Сообщения, уже написанные на вашем языке, не переводятся.")))
 
     case .privacy:
         entries.append(.privacyHeader(telewhiteTabTitle(.privacy, strings: strings)))
-        entries.append(.screenshotProtectionBypass(strings.text("Screenshot Protection Bypass", "Обход защиты скриншотов"), settings.screenshotProtectionBypass))
-        entries.append(.hidePhoneInSettings(strings.text("Hide Phone and Username", "Скрыть номер и юзернейм"), settings.hidePhoneInSettings))
-        entries.append(.showProfileIds(strings.text("Show IDs", "Показывать ID"), settings.showUserIds && settings.showChatIds))
-        entries.append(.privacyInfo(strings.text("Content protection and optional technical IDs are managed here.", "Здесь собраны защита контента и показ технических ID.")))
+        entries.append(.protectionBypass(strings.text("Allow Saving Everywhere", "Разрешить сохранять везде"), settings.screenshotProtectionBypass && settings.contentRestrictionBypass))
+        entries.append(.hidePhoneInSettings(strings.text("Hide My Number and Username", "Скрыть свой номер и юзернейм"), settings.hidePhoneInSettings))
+        entries.append(.showProfileIds(strings.text("Show Numeric IDs", "Показывать числовые ID"), settings.showUserIds && settings.showChatIds))
+        entries.append(.privacyInfo(strings.text("These switches change what this phone shows and allows. They do not change your Telegram privacy settings.", "Эти переключатели меняют то, что показывает и разрешает этот телефон. Настройки приватности в самом Telegram они не трогают.")))
 
     case .stealth:
         entries.append(.stealthHeader(telewhiteTabTitle(.stealth, strings: strings)))
-        entries.append(.ghostMessages(strings.text("Ghost Mode (Messages)", "Режим невидимки (сообщения)"), settings.hideReadReceipts))
-        entries.append(.ghostStories(strings.text("Ghost Mode (Stories)", "Режим невидимки (истории)"), settings.ghostStories))
-        entries.append(.ghostChatButtonEnabled(strings.text("Per-Chat Ghost Button", "Кнопка невидимки в чате"), settings.ghostChatButtonEnabled))
-        entries.append(.stealthInfo(strings.text("Read messages without sending read-receipt notifications, and view stories anonymously — you won't appear in the viewer list. The per-chat ghost button adds a header icon in every chat so you can toggle ghost mode for a single conversation.", "Читайте сообщения без отправки уведомлений о прочтении и смотрите истории анонимно — вы не появитесь в списке зрителей. Кнопка невидимки в чате добавляет иконку в шапку каждого чата, чтобы включать невидимку для отдельного диалога.")))
+        entries.append(.ghost(strings.text("Invisible Mode", "Невидимка"), settings.hideReadReceipts && settings.ghostStories))
+        entries.append(.ghostChatButtonEnabled(strings.text("Ghost Button in Chats", "Кнопка невидимки в чате"), settings.ghostChatButtonEnabled))
+        entries.append(.stealthInfo(strings.text("While you are invisible, Telegram will not show other people's read receipts to you either.", "Пока вы невидимы, Telegram и вам не показывает чужие отметки о прочтении.")))
 
     case .channels:
         entries.append(.channelsHeader(telewhiteTabTitle(.channels, strings: strings)))
-        entries.append(.channelContentRestrictionBypass(strings.text("Content Restriction Bypass", "Обход ограничений контента"), settings.contentRestrictionBypass))
-        entries.append(.channelHideReactions(strings.text("Hide Reactions in Channels", "Скрыть реакции в каналах"), settings.channelHideReactions))
-        entries.append(.channelHideComments(strings.text("Hide Comments in Channels", "Скрыть комментарии в каналах"), settings.channelHideComments))
-        entries.append(.channelHideShareButton(strings.text("Hide Share Button in Channels", "Скрыть кнопку «Поделиться» в каналах"), settings.channelHideShareButton))
-        entries.append(.channelsInfo(strings.text("Channel and group restrictions are controlled here. Hiding reactions, comments and the share button only affects channel posts on this device.", "Здесь управляются ограничения каналов и групп. Скрытие реакций, комментариев и кнопки «Поделиться» действует только на посты каналов и только на этом устройстве.")))
+        entries.append(.channelsDeclutter(strings.text("Clean Up Posts", "Убрать лишнее под постами"), settings.channelHideReactions && settings.channelHideComments && settings.channelHideShareButton))
+        entries.append(.channelsInfo(strings.text("Only changes how posts look on this phone. Nobody else is affected.", "Меняет только то, как посты выглядят на этом телефоне. Для остальных ничего не меняется.")))
 
     case .media:
         entries.append(.mediaHeader(telewhiteTabTitle(.media, strings: strings)))
-        entries.append(.downloadStories(strings.text("Download Stories", "Скачать истории"), settings.downloadStories))
-        entries.append(.hideStories(strings.text("Hide Stories Row", "Скрыть блок историй"), settings.hideStories))
-        entries.append(.autoCacheCleanup(strings.text("Automatic Cache Cleanup", "Автоматическая очистка кэша"), settings.autoCacheCleanup))
+        entries.append(.downloadStories(strings.text("Save Other People's Stories", "Сохранять чужие истории"), settings.downloadStories))
+        entries.append(.hideStories(strings.text("Hide the Stories Row", "Скрыть ленту историй"), settings.hideStories))
+        entries.append(.autoCacheCleanup(strings.text("Clear Space Automatically", "Освобождать место автоматически"), settings.autoCacheCleanup))
         if settings.autoCacheCleanup {
             for (index, limit) in [Int32(1), 2, 5, 10].enumerated() {
-                entries.append(.cacheLimit(Int32(index), strings.text("Up to \(limit) GB", "До \(limit) ГБ"), limit, settings.cacheLimitGigabytes == limit))
+                entries.append(.cacheLimit(Int32(index), strings.text("Keep up to \(limit) GB", "Хранить до \(limit) ГБ"), limit, settings.cacheLimitGigabytes == limit))
             }
         }
-        entries.append(.mediaInfo(strings.text("Old local media is removed automatically at the selected limit. Cloud messages and files stay available.", "Старые локальные медиа удаляются автоматически при выбранном лимите. Сообщения и облачные файлы остаются доступными.")))
+        entries.append(.mediaInfo(strings.text("Your messages and files in the cloud are never deleted — only the copies downloaded to this phone.", "Ваши сообщения и файлы в облаке не удаляются — стираются только копии, скачанные на этот телефон.")))
 
     case .appearance:
         entries.append(.appearanceHeader(telewhiteTabTitle(.appearance, strings: strings)))
