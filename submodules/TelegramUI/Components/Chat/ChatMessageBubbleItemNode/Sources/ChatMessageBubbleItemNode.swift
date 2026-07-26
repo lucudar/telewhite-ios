@@ -689,6 +689,9 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
     private let backgroundNode: ChatMessageBackground
     private var backgroundHighlightNode: ChatMessageBackground?
     private var telewhiteDeletedOverlayNode: ChatMessageBackground?
+    private var telewhiteDeletedBadgeNode: ASImageNode?
+    private var telewhiteDeletedBadgeIsIncoming: Bool = false
+    private var telewhiteDeletedBadgeContainerWidth: CGFloat = 0.0
     private let shadowNode: ChatMessageShadowNode
     private var clippingNode: ChatMessageBubbleClippingNode
     
@@ -3741,6 +3744,41 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         })
     }
     
+    // Telewhite: badge for deleted-and-preserved messages. It lives in
+    // mainContextSourceNode.contentNode rather than in contentContainersWrapperNode, so
+    // the wrapper's fade does not dim the badge itself, and it is positioned as a
+    // free-floating overlay that never joins the measured layout.
+    private func updateTelewhiteDeletedBadge(isDeleted: Bool, contentFrame: CGRect, containerWidth: CGFloat, isIncoming: Bool, isRussian: Bool) {
+        if isDeleted {
+            let badgeNode: ASImageNode
+            if let current = self.telewhiteDeletedBadgeNode {
+                badgeNode = current
+            } else {
+                badgeNode = ASImageNode()
+                badgeNode.isUserInteractionEnabled = false
+                badgeNode.displaysAsynchronously = false
+                self.mainContextSourceNode.contentNode.addSubnode(badgeNode)
+                self.telewhiteDeletedBadgeNode = badgeNode
+            }
+            self.telewhiteDeletedBadgeIsIncoming = isIncoming
+            self.telewhiteDeletedBadgeContainerWidth = containerWidth
+            badgeNode.image = telewhiteDeletedBadgeImage(text: telewhiteDeletedBadgeTitle(isRussian: isRussian))
+            self.updateTelewhiteDeletedBadgeFrame(contentFrame: contentFrame)
+        } else if let badgeNode = self.telewhiteDeletedBadgeNode {
+            self.telewhiteDeletedBadgeNode = nil
+            badgeNode.removeFromSupernode()
+        }
+    }
+
+    // Called from every site that repositions the bubble background, so the badge
+    // follows the bubble through layout animations.
+    private func updateTelewhiteDeletedBadgeFrame(contentFrame: CGRect) {
+        guard let badgeNode = self.telewhiteDeletedBadgeNode, let image = badgeNode.image else {
+            return
+        }
+        badgeNode.frame = telewhiteDeletedBadgeFrame(badgeSize: image.size, contentFrame: contentFrame, containerWidth: self.telewhiteDeletedBadgeContainerWidth, isIncoming: self.telewhiteDeletedBadgeIsIncoming)
+    }
+
     private static func applyLayout(selfReference: Weak<ChatMessageBubbleItemNode>,
         _ animation: ListViewItemUpdateAnimation,
         _ synchronousLoads: Bool,
@@ -3896,13 +3934,15 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
                 break
             }
         }
-        // Telewhite: fade the whole content wrapper for deleted-and-preserved messages.
-        // The bubble-shaped overlay below only tints text bubbles; opaque photos/videos
-        // covered it, so dim the content itself to make deleted media visibly faded too.
-        // Applied unconditionally (also for hideBackground media like stickers/round video).
-        // 0.3 (not 0.5): a translucent photo over a black/AMOLED chat wallpaper still read
-        // as "normal" at 0.5 — a deeper fade makes deletion obvious on any background.
-        strongSelf.contentContainersWrapperNode.alpha = isTelewhiteDeleted ? 0.3 : 1.0
+        // Telewhite: mark deleted-and-preserved messages with an explicit badge plus a
+        // mild fade of the content wrapper. Fading alone never read as "deleted" no
+        // matter how deep it went (0.35 -> 0.5 -> 0.3 over three attempts): a faded
+        // photo still looks like a photo. The badge says it in words, so the fade can
+        // stay light enough to keep the message readable — which is the entire point of
+        // preserving it. Applied unconditionally, including hideBackground media such as
+        // stickers and round video.
+        strongSelf.contentContainersWrapperNode.alpha = isTelewhiteDeleted ? telewhiteDeletedContentAlpha : 1.0
+        strongSelf.updateTelewhiteDeletedBadge(isDeleted: isTelewhiteDeleted, contentFrame: backgroundFrame, containerWidth: params.width, isIncoming: incoming, isRussian: item.presentationData.strings.baseLanguageCode.lowercased().hasPrefix("ru"))
         if isTelewhiteDeleted, !hideBackground {
             let telewhiteDeletedOverlayNode: ChatMessageBackground
             if let current = strongSelf.telewhiteDeletedOverlayNode {
@@ -5328,6 +5368,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
                     animation.animator.updateFrame(layer: telewhiteDeletedOverlayNode.layer, frame: backgroundFrame, completion: nil)
                     telewhiteDeletedOverlayNode.updateLayout(size: backgroundFrame.size, transition: animation)
                 }
+                strongSelf.updateTelewhiteDeletedBadgeFrame(contentFrame: backgroundFrame)
                 animation.animator.updatePosition(layer: strongSelf.clippingNode.layer, position: backgroundFrame.center, completion: nil)
                 strongSelf.clippingNode.clipsToBounds = shouldClipOnTransitions
                 animation.animator.updateBounds(layer: strongSelf.clippingNode.layer, bounds: CGRect(origin: CGPoint(x: backgroundFrame.minX, y: backgroundFrame.minY), size: backgroundFrame.size), completion: { [weak strongSelf] _ in
@@ -5469,6 +5510,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
                     legacyTransition.updateFrame(node: telewhiteDeletedOverlayNode, frame: backgroundFrame, completion: nil)
                     telewhiteDeletedOverlayNode.updateLayout(size: backgroundFrame.size, transition: legacyTransition)
                 }
+                strongSelf.updateTelewhiteDeletedBadgeFrame(contentFrame: backgroundFrame)
 
                 legacyTransition.updateFrame(node: strongSelf.clippingNode, frame: backgroundFrame)
                 legacyTransition.updateBounds(node: strongSelf.clippingNode, bounds: CGRect(origin: CGPoint(x: backgroundFrame.minX, y: backgroundFrame.minY), size: backgroundFrame.size))
@@ -5486,6 +5528,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
                     telewhiteDeletedOverlayNode.frame = backgroundFrame
                     telewhiteDeletedOverlayNode.updateLayout(size: backgroundFrame.size, transition: .immediate)
                 }
+                strongSelf.updateTelewhiteDeletedBadgeFrame(contentFrame: backgroundFrame)
                 
                 strongSelf.clippingNode.frame = backgroundFrame
                 strongSelf.clippingNode.bounds = CGRect(origin: CGPoint(x: backgroundFrame.minX, y: backgroundFrame.minY), size: backgroundFrame.size)

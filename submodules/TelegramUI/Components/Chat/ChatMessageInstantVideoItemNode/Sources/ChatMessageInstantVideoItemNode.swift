@@ -44,6 +44,10 @@ public class ChatMessageInstantVideoItemNode: ChatMessageItemView, ASGestureReco
     
     public var swipeToReplyNode: ChatMessageSwipeToReplyNode?
     public var swipeToReplyFeedback: HapticFeedback?
+
+    // Telewhite: "Deleted" badge for preserved-deleted video notes. Kept out of
+    // contextSourceNode so the content fade below does not dim the badge too.
+    private var telewhiteDeletedBadgeNode: ASImageNode?
     
     public var appliedParams: ListViewItemLayoutParams?
     public var appliedItem: ChatMessageItem?
@@ -657,9 +661,11 @@ public class ChatMessageInstantVideoItemNode: ChatMessageItemView, ASGestureReco
                     strongSelf.contextSourceNode.contentNode.frame = CGRect(origin: CGPoint(), size: layoutSize)
                     strongSelf.messageAccessibilityArea.frame = CGRect(origin: CGPoint(), size: layoutSize)
 
-                    // Telewhite: fade deleted-and-preserved video notes (кружки). This node
-                    // is separate from the message bubble, so the bubble's deleted overlay
-                    // never covers it — dim its content directly to signal deletion.
+                    // Telewhite: mark deleted-and-preserved video notes (кружки). This node
+                    // is separate from the message bubble, so neither the bubble's deleted
+                    // overlay nor its badge reaches it — it needs its own pair. The badge
+                    // states the deletion outright, so the fade stays mild enough to keep
+                    // the video watchable.
                     var isTelewhiteDeleted = false
                     for attribute in item.message.attributes {
                         if attribute is TelewhiteDeletedMessageAttribute {
@@ -667,7 +673,28 @@ public class ChatMessageInstantVideoItemNode: ChatMessageItemView, ASGestureReco
                             break
                         }
                     }
-                    strongSelf.contextSourceNode.contentNode.alpha = isTelewhiteDeleted ? 0.3 : 1.0
+                    strongSelf.contextSourceNode.contentNode.alpha = isTelewhiteDeleted ? telewhiteDeletedContentAlpha : 1.0
+                    if isTelewhiteDeleted {
+                        let badgeNode: ASImageNode
+                        if let current = strongSelf.telewhiteDeletedBadgeNode {
+                            badgeNode = current
+                        } else {
+                            badgeNode = ASImageNode()
+                            badgeNode.isUserInteractionEnabled = false
+                            badgeNode.displaysAsynchronously = false
+                            strongSelf.addSubnode(badgeNode)
+                            strongSelf.telewhiteDeletedBadgeNode = badgeNode
+                        }
+                        let isRussian = item.presentationData.strings.baseLanguageCode.lowercased().hasPrefix("ru")
+                        let badgeImage = telewhiteDeletedBadgeImage(text: telewhiteDeletedBadgeTitle(isRussian: isRussian))
+                        badgeNode.image = badgeImage
+                        if let badgeImage {
+                            badgeNode.frame = telewhiteDeletedBadgeFrame(badgeSize: badgeImage.size, contentFrame: videoFrame, containerWidth: params.width, isIncoming: incoming)
+                        }
+                    } else if let badgeNode = strongSelf.telewhiteDeletedBadgeNode {
+                        strongSelf.telewhiteDeletedBadgeNode = nil
+                        badgeNode.removeFromSupernode()
+                    }
 
                     strongSelf.appliedParams = params
                     strongSelf.appliedItem = item
