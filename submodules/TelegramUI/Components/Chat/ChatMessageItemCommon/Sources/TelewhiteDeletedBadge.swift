@@ -112,25 +112,45 @@ public func telewhiteDeletedBadgeImage(text: String) -> UIImage? {
 }
 
 /// Places a badge of `badgeSize` in the free gutter beside `contentFrame` — right of
-/// incoming content, left of outgoing — so it does not cover the message. When the
-/// gutter is too narrow to hold it, the badge falls back to overlaying the content's
-/// leading corner: a badge on top of a corner still reads, an off-screen one does not.
-public func telewhiteDeletedBadgeFrame(badgeSize: CGSize, contentFrame: CGRect, containerWidth: CGFloat, isIncoming: Bool) -> CGRect {
+/// incoming content, left of outgoing — so it does not cover the message.
+///
+/// `containerWidth` must already have the safe-area inset taken off, and
+/// `reservedGutterWidth` the width of anything the layout puts in that gutter (the share
+/// and summarize buttons, a video note's reply/forward header). Otherwise the badge is
+/// drawn under the rounded corner in landscape, or the share button lands on top of it.
+///
+/// When the gutter cannot hold the badge it moves inside the content, to the **bottom**
+/// leading corner. Not the top one: that corner holds the sender's name, the forward and
+/// reply headers and the media duration pill, so the badge covered exactly the
+/// information that says whose deleted message this was. Bottom-leading is the one inside
+/// corner Telegram leaves free — the timestamp and delivery ticks sit bottom-trailing.
+/// `preferInsideBottom` skips the gutter entirely. Video notes pass it when the message
+/// carries a reply or forward header: those headers are right-aligned into the very gutter
+/// the badge wants, and a round video's bounding-box corner is transparent anyway, so
+/// inside-bottom is free space there rather than a compromise.
+public func telewhiteDeletedBadgeFrame(badgeSize: CGSize, contentFrame: CGRect, containerWidth: CGFloat, isIncoming: Bool, reservedGutterWidth: CGFloat = 0.0, preferInsideBottom: Bool = false) -> CGRect {
     let spacing: CGFloat = 6.0
     let edgeInset: CGFloat = 4.0
-    let y = contentFrame.minY + 4.0
 
-    var x: CGFloat
+    let insideBottom = CGPoint(
+        x: isIncoming ? contentFrame.minX + spacing : contentFrame.maxX - spacing - badgeSize.width,
+        y: contentFrame.maxY - 4.0 - badgeSize.height
+    )
+    if preferInsideBottom {
+        return CGRect(origin: insideBottom, size: badgeSize)
+    }
+
+    var origin = CGPoint(x: 0.0, y: contentFrame.minY + 4.0)
     if isIncoming {
-        x = contentFrame.maxX + spacing
-        if x + badgeSize.width > containerWidth - edgeInset {
-            x = contentFrame.minX + spacing
+        origin.x = contentFrame.maxX + spacing + reservedGutterWidth
+        if origin.x + badgeSize.width > containerWidth - edgeInset {
+            origin = insideBottom
         }
     } else {
-        x = contentFrame.minX - spacing - badgeSize.width
-        if x < edgeInset {
-            x = contentFrame.maxX - spacing - badgeSize.width
+        origin.x = contentFrame.minX - spacing - reservedGutterWidth - badgeSize.width
+        if origin.x < edgeInset {
+            origin = insideBottom
         }
     }
-    return CGRect(origin: CGPoint(x: x, y: y), size: badgeSize)
+    return CGRect(origin: origin, size: badgeSize)
 }

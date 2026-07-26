@@ -48,6 +48,7 @@ public class ChatMessageInstantVideoItemNode: ChatMessageItemView, ASGestureReco
     // Telewhite: "Deleted" badge for preserved-deleted video notes. Kept out of
     // contextSourceNode so the content fade below does not dim the badge too.
     private var telewhiteDeletedBadgeNode: ASImageNode?
+    private var telewhiteDeletedBadgeAvoidsHeader: Bool = false
     
     public var appliedParams: ListViewItemLayoutParams?
     public var appliedItem: ChatMessageItem?
@@ -673,7 +674,16 @@ public class ChatMessageInstantVideoItemNode: ChatMessageItemView, ASGestureReco
                             break
                         }
                     }
-                    strongSelf.contextSourceNode.contentNode.alpha = isTelewhiteDeleted ? telewhiteDeletedContentAlpha : 1.0
+                    // A reply or forward header is right-aligned into the same gutter the
+                    // badge wants, and it loses the z-order fight, so the badge would hide
+                    // the reply preview. When one is present the badge goes inside instead.
+                    strongSelf.telewhiteDeletedBadgeAvoidsHeader = item.message.forwardInfo != nil || item.message.attributes.contains(where: { $0 is ReplyMessageAttribute })
+                    // The fade goes on the video itself, not on contentNode: contentNode is
+                    // what the context menu lifts out of the list, and the badge has to live
+                    // inside it to be lifted too. Badging a sibling of contentNode left the
+                    // pill behind in the dimmed list while the кружок floated up without it.
+                    strongSelf.contextSourceNode.contentNode.alpha = 1.0
+                    strongSelf.interactiveVideoNode.alpha = isTelewhiteDeleted ? telewhiteDeletedContentAlpha : 1.0
                     if isTelewhiteDeleted {
                         let badgeNode: ASImageNode
                         if let current = strongSelf.telewhiteDeletedBadgeNode {
@@ -682,14 +692,14 @@ public class ChatMessageInstantVideoItemNode: ChatMessageItemView, ASGestureReco
                             badgeNode = ASImageNode()
                             badgeNode.isUserInteractionEnabled = false
                             badgeNode.displaysAsynchronously = false
-                            strongSelf.addSubnode(badgeNode)
+                            strongSelf.contextSourceNode.contentNode.addSubnode(badgeNode)
                             strongSelf.telewhiteDeletedBadgeNode = badgeNode
                         }
                         let isRussian = item.presentationData.strings.baseLanguageCode.lowercased().hasPrefix("ru")
                         let badgeImage = telewhiteDeletedBadgeImage(text: telewhiteDeletedBadgeTitle(isRussian: isRussian))
                         badgeNode.image = badgeImage
                         if let badgeImage {
-                            badgeNode.frame = telewhiteDeletedBadgeFrame(badgeSize: badgeImage.size, contentFrame: videoFrame, containerWidth: params.width, isIncoming: incoming)
+                            badgeNode.frame = telewhiteDeletedBadgeFrame(badgeSize: badgeImage.size, contentFrame: videoFrame, containerWidth: params.width - params.rightInset, isIncoming: incoming, preferInsideBottom: strongSelf.telewhiteDeletedBadgeAvoidsHeader)
                         }
                     } else if let badgeNode = strongSelf.telewhiteDeletedBadgeNode {
                         strongSelf.telewhiteDeletedBadgeNode = nil
@@ -1444,7 +1454,7 @@ public class ChatMessageInstantVideoItemNode: ChatMessageItemView, ASGestureReco
         // follow the frame this transition just recomputed — otherwise it keeps the
         // position from the last full layout pass while the note itself moves.
         if let badgeNode = self.telewhiteDeletedBadgeNode, let badgeImage = badgeNode.image {
-            badgeNode.frame = telewhiteDeletedBadgeFrame(badgeSize: badgeImage.size, contentFrame: videoFrame, containerWidth: params.width, isIncoming: incoming)
+            badgeNode.frame = telewhiteDeletedBadgeFrame(badgeSize: badgeImage.size, contentFrame: videoFrame, containerWidth: params.width - params.rightInset, isIncoming: incoming, preferInsideBottom: self.telewhiteDeletedBadgeAvoidsHeader)
         }
 
         if let shareButtonNode = self.shareButtonNode {

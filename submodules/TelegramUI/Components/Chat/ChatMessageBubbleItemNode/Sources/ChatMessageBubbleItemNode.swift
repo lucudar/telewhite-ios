@@ -692,6 +692,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
     private var telewhiteDeletedBadgeNode: ASImageNode?
     private var telewhiteDeletedBadgeIsIncoming: Bool = false
     private var telewhiteDeletedBadgeContainerWidth: CGFloat = 0.0
+    private var telewhiteDeletedBadgeReservedGutterWidth: CGFloat = 0.0
     private let shadowNode: ChatMessageShadowNode
     private var clippingNode: ChatMessageBubbleClippingNode
     
@@ -3748,7 +3749,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
     // mainContextSourceNode.contentNode rather than in contentContainersWrapperNode, so
     // the wrapper's fade does not dim the badge itself, and it is positioned as a
     // free-floating overlay that never joins the measured layout.
-    private func updateTelewhiteDeletedBadge(isDeleted: Bool, contentFrame: CGRect, containerWidth: CGFloat, isIncoming: Bool, isRussian: Bool) {
+    private func updateTelewhiteDeletedBadge(isDeleted: Bool, contentFrame: CGRect, containerWidth: CGFloat, isIncoming: Bool, isRussian: Bool, reservedGutterWidth: CGFloat) {
         if isDeleted {
             let badgeNode: ASImageNode
             if let current = self.telewhiteDeletedBadgeNode {
@@ -3762,6 +3763,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             }
             self.telewhiteDeletedBadgeIsIncoming = isIncoming
             self.telewhiteDeletedBadgeContainerWidth = containerWidth
+            self.telewhiteDeletedBadgeReservedGutterWidth = reservedGutterWidth
             badgeNode.image = telewhiteDeletedBadgeImage(text: telewhiteDeletedBadgeTitle(isRussian: isRussian))
             self.updateTelewhiteDeletedBadgeFrame(contentFrame: contentFrame)
         } else if let badgeNode = self.telewhiteDeletedBadgeNode {
@@ -3776,7 +3778,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         guard let badgeNode = self.telewhiteDeletedBadgeNode, let image = badgeNode.image else {
             return
         }
-        badgeNode.frame = telewhiteDeletedBadgeFrame(badgeSize: image.size, contentFrame: contentFrame, containerWidth: self.telewhiteDeletedBadgeContainerWidth, isIncoming: self.telewhiteDeletedBadgeIsIncoming)
+        badgeNode.frame = telewhiteDeletedBadgeFrame(badgeSize: image.size, contentFrame: contentFrame, containerWidth: self.telewhiteDeletedBadgeContainerWidth, isIncoming: self.telewhiteDeletedBadgeIsIncoming, reservedGutterWidth: self.telewhiteDeletedBadgeReservedGutterWidth)
     }
 
     private static func applyLayout(selfReference: Weak<ChatMessageBubbleItemNode>,
@@ -3942,7 +3944,13 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         // preserving it. Applied unconditionally, including hideBackground media such as
         // stickers and round video.
         strongSelf.contentContainersWrapperNode.alpha = isTelewhiteDeleted ? telewhiteDeletedContentAlpha : 1.0
-        strongSelf.updateTelewhiteDeletedBadge(isDeleted: isTelewhiteDeleted, contentFrame: backgroundFrame, containerWidth: params.width, isIncoming: incoming, isRussian: item.presentationData.strings.baseLanguageCode.lowercased().hasPrefix("ru"))
+        // containerWidth excludes the safe-area inset (landscape on a notched device put
+        // the badge under the rounded corner) and the 42pt the whole bubble slides right
+        // in selection mode; the reserved gutter is the 45pt the layout itself already
+        // sets aside for the share/summarize button, which lives in the same gutter and
+        // draws above the badge.
+        let telewhiteBadgeSelectionOffset: CGFloat = (item.controllerInteraction.selectionState != nil && incoming) ? 42.0 : 0.0
+        strongSelf.updateTelewhiteDeletedBadge(isDeleted: isTelewhiteDeleted, contentFrame: backgroundFrame, containerWidth: params.width - params.rightInset - telewhiteBadgeSelectionOffset, isIncoming: incoming, isRussian: item.presentationData.strings.baseLanguageCode.lowercased().hasPrefix("ru"), reservedGutterWidth: (needsShareButton || needsSummarizeButton) ? 45.0 : 0.0)
         if isTelewhiteDeleted, !hideBackground {
             let telewhiteDeletedOverlayNode: ChatMessageBackground
             if let current = strongSelf.telewhiteDeletedOverlayNode {
