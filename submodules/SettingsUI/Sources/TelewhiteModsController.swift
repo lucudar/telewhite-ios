@@ -360,6 +360,13 @@ private enum TelewhiteModsTab: Int32, Equatable {
     case media
     case appearance
     case developer
+    // Telewhite: sub-screens of the appearance tab. Every colour used to be one row
+    // on a single 31-row screen, which meant scrolling past three palettes to reach
+    // the radius options.
+    case accentColor
+    case bubbleColor
+    case background
+    case shape
 }
 
 private enum TelewhiteModsMenuIcon: Int32, Equatable {
@@ -427,6 +434,10 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case mediaInfo(String)
 
     case appearanceHeader(String)
+    case accentColorLink(String, Int64?)
+    case bubbleColorLink(String, Int64?)
+    case backgroundColorLink(String, Int64?, [Int64]?)
+    case shapeLink(String)
     case compactChatList(String, Bool)
     case chatSplitLandscape(String, Bool)
     case amoledMode(String, Bool)
@@ -469,7 +480,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.channels.rawValue
         case .mediaHeader, .downloadStories, .hideStories, .autoCacheCleanup, .cacheLimit, .mediaInfo:
             return TelewhiteModsSection.media.rawValue
-        case .appearanceHeader, .compactChatList, .chatSplitLandscape, .amoledMode, .darkMonoPreset:
+        case .appearanceHeader, .compactChatList, .chatSplitLandscape, .amoledMode, .darkMonoPreset, .accentColorLink, .bubbleColorLink, .backgroundColorLink, .shapeLink:
             return TelewhiteModsSection.appearance.rawValue
         case .accentColorHeader, .accentColorOption, .accentColorCustom:
             return TelewhiteModsSection.accentColor.rawValue
@@ -588,6 +599,14 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 703
         case .darkMonoPreset:
             return 705
+        case .accentColorLink:
+            return 706
+        case .bubbleColorLink:
+            return 707
+        case .backgroundColorLink:
+            return 708
+        case .shapeLink:
+            return 709
         case .chatSplitLandscape:
             return 704
         case .accentColorHeader:
@@ -861,6 +880,22 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.ghostStories = value
             }
+        case let .accentColorLink(text, value):
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: telewhiteColorSwatchImage(value), title: text, label: "", labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+                arguments.openTab(.accentColor)
+            })
+        case let .bubbleColorLink(text, value):
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: telewhiteColorSwatchImage(value), title: text, label: "", labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+                arguments.openTab(.bubbleColor)
+            })
+        case let .backgroundColorLink(text, value, gradient):
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: gradient.flatMap(telewhiteGradientSwatchImage) ?? telewhiteColorSwatchImage(value), title: text, label: "", labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+                arguments.openTab(.background)
+            })
+        case let .shapeLink(text):
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: "", labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+                arguments.openTab(.shape)
+            })
         case let .darkMonoPreset(text):
             return ItemListActionItem(presentationData: presentationData, systemStyle: .glass, title: text, kind: .generic, alignment: .natural, sectionId: self.section, style: .blocks, action: {
                 // Telewhite: one-tap dark monochrome theme (matches the reference look):
@@ -1039,136 +1074,61 @@ private func telewhiteColorSwatchImage(_ value: Int64?) -> UIImage? {
 
 private var telewhiteMenuIconCache: [String: UIImage] = [:]
 
+// Telewhite: glyphs for the Mods menu rows. These were hand-drawn bezier paths that
+// read as approximations — a lock that looked like a bag, a "wave" for media — and
+// several did not match their section at all. SF Symbols keep the same monochrome
+// line-art style at a consistent weight while actually depicting each section. Every
+// entry lists a fallback: all primaries ship in iOS 13, the app's minimum, and the
+// fallback covers a symbol being renamed out from under us.
+private func telewhiteMenuIconSymbolNames(_ icon: TelewhiteModsMenuIcon) -> [String] {
+    switch icon {
+    case .privacy:
+        return ["lock.shield", "lock"]
+    case .ghost:
+        return ["eye.slash", "eye"]
+    case .messages:
+        return ["bubble.left.and.bubble.right", "bubble.left"]
+    case .groups:
+        return ["person.2", "person"]
+    case .media:
+        return ["photo.on.rectangle", "photo"]
+    case .appearance:
+        return ["paintbrush", "circle.lefthalf.fill"]
+    case .developer:
+        return ["hammer", "wrench"]
+    }
+}
+
 private func telewhiteMenuIcon(_ icon: TelewhiteModsMenuIcon, color: UIColor) -> UIImage? {
     let cacheKey = "\(icon.rawValue)-\(color.argb)"
     if let cached = telewhiteMenuIconCache[cacheKey] {
         return cached
     }
-    
+
+    let configuration = UIImage.SymbolConfiguration(pointSize: 19.0, weight: .regular)
+    var symbol: UIImage?
+    for name in telewhiteMenuIconSymbolNames(icon) {
+        if let candidate = UIImage(systemName: name, withConfiguration: configuration) {
+            symbol = candidate
+            break
+        }
+    }
+    guard let symbol else {
+        return nil
+    }
+
+    // Centre the glyph on a fixed canvas: symbol widths differ, and the rows must
+    // still line up with each other.
     let size = CGSize(width: 29.0, height: 29.0)
-    let lineWidth: CGFloat = 1.7
     let renderer = UIGraphicsImageRenderer(size: size)
     let image = renderer.image { _ in
-        color.setStroke()
-        color.setFill()
-        
-        switch icon {
-        case .privacy:
-            // Lock: rounded body + shackle
-            let body = UIBezierPath(roundedRect: CGRect(x: 7.5, y: 13.0, width: 14.0, height: 10.5), cornerRadius: 3.0)
-            body.lineWidth = lineWidth
-            body.stroke()
-            let shackle = UIBezierPath(arcCenter: CGPoint(x: 14.5, y: 13.0), radius: 4.5, startAngle: .pi, endAngle: 0.0, clockwise: true)
-            shackle.lineWidth = lineWidth
-            shackle.stroke()
-            let keyhole = UIBezierPath(ovalIn: CGRect(x: 13.3, y: 16.8, width: 2.4, height: 2.4))
-            keyhole.fill()
-        case .ghost:
-            // Ghost (TeleDark style): rounded dome, gentle scalloped bottom, two vertical oval eyes
-            let ghostLineWidth: CGFloat = 2.0
-            let ghost = UIBezierPath()
-            ghost.move(to: CGPoint(x: 7.0, y: 22.5))
-            ghost.addLine(to: CGPoint(x: 7.0, y: 13.5))
-            ghost.addArc(withCenter: CGPoint(x: 14.5, y: 13.5), radius: 7.5, startAngle: .pi, endAngle: 0.0, clockwise: true)
-            ghost.addLine(to: CGPoint(x: 22.0, y: 22.5))
-            // Gentle scalloped bottom: three soft rounded bumps
-            ghost.addCurve(to: CGPoint(x: 17.5, y: 22.5), controlPoint1: CGPoint(x: 21.0, y: 24.2), controlPoint2: CGPoint(x: 18.5, y: 24.2))
-            ghost.addCurve(to: CGPoint(x: 11.5, y: 22.5), controlPoint1: CGPoint(x: 16.3, y: 21.2), controlPoint2: CGPoint(x: 12.7, y: 21.2))
-            ghost.addCurve(to: CGPoint(x: 7.0, y: 22.5), controlPoint1: CGPoint(x: 10.5, y: 24.2), controlPoint2: CGPoint(x: 8.0, y: 24.2))
-            ghost.lineWidth = ghostLineWidth
-            ghost.lineJoinStyle = .round
-            ghost.lineCapStyle = .round
-            ghost.stroke()
-            // Vertical oval eyes
-            UIBezierPath(ovalIn: CGRect(x: 10.7, y: 11.0, width: 2.4, height: 4.2)).fill()
-            UIBezierPath(ovalIn: CGRect(x: 15.9, y: 11.0, width: 2.4, height: 4.2)).fill()
-        case .messages:
-            // Messenger-style speech bubble: rounded bubble with a tail at the
-            // bottom-left and three typing dots inside
-            let bubble = UIBezierPath()
-            // Rounded rectangle bubble
-            bubble.move(to: CGPoint(x: 10.5, y: 6.5))
-            bubble.addLine(to: CGPoint(x: 18.5, y: 6.5))
-            bubble.addArc(withCenter: CGPoint(x: 18.5, y: 11.0), radius: 4.5, startAngle: -.pi / 2.0, endAngle: 0.0, clockwise: true)
-            bubble.addLine(to: CGPoint(x: 23.0, y: 14.5))
-            bubble.addArc(withCenter: CGPoint(x: 18.5, y: 14.5), radius: 4.5, startAngle: 0.0, endAngle: .pi / 2.0, clockwise: true)
-            // Bottom edge going left, then the tail
-            bubble.addLine(to: CGPoint(x: 13.0, y: 19.0))
-            bubble.addLine(to: CGPoint(x: 8.5, y: 23.0))
-            bubble.addLine(to: CGPoint(x: 8.5, y: 19.0))
-            bubble.addArc(withCenter: CGPoint(x: 10.5, y: 14.5), radius: 4.5, startAngle: .pi / 2.0, endAngle: .pi, clockwise: true)
-            bubble.addLine(to: CGPoint(x: 6.0, y: 11.0))
-            bubble.addArc(withCenter: CGPoint(x: 10.5, y: 11.0), radius: 4.5, startAngle: .pi, endAngle: -.pi / 2.0, clockwise: true)
-            bubble.close()
-            bubble.lineWidth = lineWidth
-            bubble.lineJoinStyle = .round
-            bubble.stroke()
-            // Three typing dots
-            UIBezierPath(ovalIn: CGRect(x: 9.4, y: 11.7, width: 2.0, height: 2.0)).fill()
-            UIBezierPath(ovalIn: CGRect(x: 13.5, y: 11.7, width: 2.0, height: 2.0)).fill()
-            UIBezierPath(ovalIn: CGRect(x: 17.6, y: 11.7, width: 2.0, height: 2.0)).fill()
-        case .groups:
-            // Megaphone
-            let horn = UIBezierPath()
-            horn.move(to: CGPoint(x: 7.0, y: 12.5))
-            horn.addLine(to: CGPoint(x: 15.0, y: 8.0))
-            horn.addLine(to: CGPoint(x: 21.5, y: 5.5))
-            horn.addLine(to: CGPoint(x: 21.5, y: 20.5))
-            horn.addLine(to: CGPoint(x: 15.0, y: 18.0))
-            horn.addLine(to: CGPoint(x: 7.0, y: 17.5))
-            horn.close()
-            horn.lineWidth = lineWidth
-            horn.lineJoinStyle = .round
-            horn.stroke()
-            let handle = UIBezierPath()
-            handle.move(to: CGPoint(x: 9.5, y: 17.8))
-            handle.addLine(to: CGPoint(x: 11.5, y: 24.0))
-            handle.addLine(to: CGPoint(x: 14.5, y: 24.0))
-            handle.addLine(to: CGPoint(x: 12.8, y: 18.0))
-            handle.lineWidth = lineWidth
-            handle.lineJoinStyle = .round
-            handle.stroke()
-        case .media:
-            // Circle with a wave through it
-            let circle = UIBezierPath(ovalIn: CGRect(x: 6.0, y: 6.0, width: 17.0, height: 17.0))
-            circle.lineWidth = lineWidth
-            circle.stroke()
-            let wave = UIBezierPath()
-            wave.move(to: CGPoint(x: 7.0, y: 16.5))
-            wave.addCurve(to: CGPoint(x: 14.5, y: 15.0), controlPoint1: CGPoint(x: 9.5, y: 12.5), controlPoint2: CGPoint(x: 12.0, y: 12.5))
-            wave.addCurve(to: CGPoint(x: 22.0, y: 13.5), controlPoint1: CGPoint(x: 17.0, y: 17.5), controlPoint2: CGPoint(x: 19.5, y: 17.5))
-            wave.lineWidth = lineWidth
-            wave.stroke()
-        case .appearance:
-            // Circle half-filled (contrast/appearance)
-            let circle = UIBezierPath(ovalIn: CGRect(x: 6.0, y: 6.0, width: 17.0, height: 17.0))
-            circle.lineWidth = lineWidth
-            circle.stroke()
-            let half = UIBezierPath(arcCenter: CGPoint(x: 14.5, y: 14.5), radius: 6.5, startAngle: -.pi / 2.0, endAngle: .pi / 2.0, clockwise: true)
-            half.close()
-            half.fill()
-        case .developer:
-            // Angle brackets </> 
-            let left = UIBezierPath()
-            left.move(to: CGPoint(x: 10.0, y: 9.5))
-            left.addLine(to: CGPoint(x: 5.5, y: 14.5))
-            left.addLine(to: CGPoint(x: 10.0, y: 19.5))
-            left.lineWidth = lineWidth
-            left.lineJoinStyle = .round
-            left.stroke()
-            let right = UIBezierPath()
-            right.move(to: CGPoint(x: 19.0, y: 9.5))
-            right.addLine(to: CGPoint(x: 23.5, y: 14.5))
-            right.addLine(to: CGPoint(x: 19.0, y: 19.5))
-            right.lineWidth = lineWidth
-            right.lineJoinStyle = .round
-            right.stroke()
-            let slash = UIBezierPath()
-            slash.move(to: CGPoint(x: 16.3, y: 8.0))
-            slash.addLine(to: CGPoint(x: 12.7, y: 21.0))
-            slash.lineWidth = lineWidth
-            slash.stroke()
-        }
+        let tinted = symbol.withTintColor(color, renderingMode: .alwaysOriginal)
+        tinted.draw(in: CGRect(
+            x: floor((size.width - tinted.size.width) * 0.5),
+            y: floor((size.height - tinted.size.height) * 0.5),
+            width: tinted.size.width,
+            height: tinted.size.height
+        ))
     }
     telewhiteMenuIconCache[cacheKey] = image
     return image
@@ -1190,6 +1150,14 @@ private func telewhiteTabTitle(_ tab: TelewhiteModsTab, strings: TelewhiteModsSt
         return strings.text("Look", "\u{0412}\u{043d}\u{0435}\u{0448}\u{043d}\u{0438}\u{0439} \u{0432}\u{0438}\u{0434}")
     case .developer:
         return strings.text("Developer", "\u{0420}\u{0430}\u{0437}\u{0440}\u{0430}\u{0431}\u{043e}\u{0442}\u{0447}\u{0438}\u{043a}")
+    case .accentColor:
+        return strings.text("Accent Color", "Акцентный цвет")
+    case .bubbleColor:
+        return strings.text("Outgoing Bubble Color", "Цвет исходящих")
+    case .background:
+        return strings.text("Chat Background", "Фон чата")
+    case .shape:
+        return strings.text("Bubbles and Text", "Пузыри и текст")
     }
 }
 
@@ -1346,7 +1314,15 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.chatSplitLandscape(strings.text("Split View in Landscape", "Сплит чатов (альбомная)"), settings.chatSplitLandscape))
         entries.append(.amoledMode(strings.text("AMOLED Mode", "AMOLED режим"), settings.amoledMode))
         entries.append(.darkMonoPreset(strings.text("Dark Mono Theme", "Тёмная моно-тема")))
+        // Telewhite: the three palettes and the shape options live on their own
+        // screens. Each row shows the colour currently in effect as its swatch, so the
+        // overview still answers "what is set?" without opening anything.
+        entries.append(.accentColorLink(strings.text("Accent Color", "Акцентный цвет"), settings.accentColorOverride))
+        entries.append(.bubbleColorLink(strings.text("Outgoing Bubble Color", "Цвет исходящих сообщений"), settings.bubbleColorOverride))
+        entries.append(.backgroundColorLink(strings.text("Chat Background", "Фон чата"), settings.chatBackgroundColorOverride, settings.chatBackgroundGradientOverride))
+        entries.append(.shapeLink(strings.text("Bubbles and Text", "Пузыри и текст")))
 
+    case .accentColor:
         let accentPresets: [(String, Int64?)] = [
             (strings.text("Default", "По умолчанию"), nil),
             (strings.text("Blue", "Синий"), 0x007aff),
@@ -1362,6 +1338,7 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         let accentIsCustom = settings.accentColorOverride != nil && !accentPresets.contains(where: { $0.1 == settings.accentColorOverride })
         entries.append(.accentColorCustom(telewhiteCustomColorTitle(strings: strings, value: accentIsCustom ? settings.accentColorOverride : nil), settings.accentColorOverride, accentIsCustom))
 
+    case .bubbleColor:
         let bubblePresets: [(String, Int64?)] = [
             (strings.text("Default", "По умолчанию"), nil),
             (strings.text("Blue", "Синий"), 0x007aff),
@@ -1376,6 +1353,7 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         let bubbleIsCustom = settings.bubbleColorOverride != nil && !bubblePresets.contains(where: { $0.1 == settings.bubbleColorOverride })
         entries.append(.bubbleColorCustom(telewhiteCustomColorTitle(strings: strings, value: bubbleIsCustom ? settings.bubbleColorOverride : nil), settings.bubbleColorOverride, bubbleIsCustom))
 
+    case .background:
         let backgroundPresets: [(String, Int64?)] = [
             (strings.text("Default", "По умолчанию"), nil),
             (strings.text("Black", "Чёрный"), 0x000000),
@@ -1388,10 +1366,10 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
             let selected = settings.chatBackgroundGradientOverride == nil && settings.chatBackgroundColorOverride == preset.1
             entries.append(.backgroundColorOption(Int32(index), preset.0, preset.1, selected))
         }
-
         let backgroundIsCustom = settings.chatBackgroundGradientOverride == nil && settings.chatBackgroundColorOverride != nil && !backgroundPresets.contains(where: { $0.1 == settings.chatBackgroundColorOverride })
         entries.append(.backgroundColorCustom(telewhiteCustomColorTitle(strings: strings, value: backgroundIsCustom ? settings.chatBackgroundColorOverride : nil), settings.chatBackgroundColorOverride, backgroundIsCustom))
 
+    case .shape:
         let radiusPresets: [(String, Int32?)] = [
             (strings.text("Default", "По умолчанию"), nil),
             (strings.text("Small", "Маленькое"), 8),
@@ -1405,7 +1383,6 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.chatFontSizeOption(0, strings.text("Chat Text: Default", "Текст чата: по умолчанию"), 0, settings.chatFontSizeOverride == 0))
         entries.append(.chatFontSizeOption(1, strings.text("Chat Text: Small", "Текст чата: меньше"), PresentationFontSize.small.rawValue, settings.chatFontSizeOverride == PresentationFontSize.small.rawValue))
         entries.append(.chatFontSizeOption(2, strings.text("Chat Text: Large", "Текст чата: больше"), PresentationFontSize.large.rawValue, settings.chatFontSizeOverride == PresentationFontSize.large.rawValue))
-
         entries.append(.appearanceInfo(strings.text("Color, radius and chat text overrides apply on top of the selected Telegram theme and update instantly.", "Настройки цвета, скругления и текста чата применяются поверх выбранной темы Telegram и обновляются мгновенно.")))
 
     case .developer:
@@ -1488,6 +1465,10 @@ private func telewhiteModsSectionController(context: AccountContext, tab: Telewh
 
     let arguments = TelewhiteModsControllerArguments(updateSettings: updateSettings, updateTranslationSettings: { f in
         let _ = updateTranslationSettingsInteractively(accountManager: context.sharedContext.accountManager, f).start()
+    }, openTab: { tab in
+        // Telewhite: appearance sub-screens are pushed from this screen, so a section
+        // controller has to be able to open another section controller.
+        pushControllerImpl?(telewhiteModsSectionController(context: context, tab: tab, statePromise: statePromise, stateValue: stateValue, updateSettings: updateSettings))
     }, promptCustomColor: { target in
         let presentationData = context.sharedContext.currentPresentationData.with { $0 }
         let strings = TelewhiteModsStrings(presentationData: presentationData)
