@@ -522,7 +522,16 @@ public final class ChatMessageInteractiveFileNode: ASDisplayNode {
                             let engine = arguments.context.engine
                             let translateVoice = UserDefaults.standard.bool(forKey: "telewhite.mods.translateVoiceMessages")
                             if translateVoice && result.isFinal {
-                                let toLang = presentationData.strings.baseLanguageCode.components(separatedBy: "-").first ?? "en"
+                                // Telewhite: the transcript is translated into the language chosen in
+                                // "Translate Into", falling back to the interface language. Reading the
+                                // interface language alone meant the setting had no effect here — an
+                                // English-interface user asking for Russian got English transcripts.
+                                // The key is read directly, like translateVoiceMessages above, because
+                                // this module does not depend on TranslateUI.
+                                var toLang = presentationData.strings.baseLanguageCode.components(separatedBy: "-").first ?? "en"
+                                if let storedTarget = UserDefaults.standard.string(forKey: "telewhite.mods.translationTargetLanguage"), !storedTarget.isEmpty {
+                                    toLang = storedTarget
+                                }
                                 ChatMessageInteractiveFileNode.telewhiteTranslateTranscript(result.text, toLang: toLang) { translated in
                                     let finalText: String
                                     if let translated = translated {

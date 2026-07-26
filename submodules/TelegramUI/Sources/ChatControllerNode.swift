@@ -4745,32 +4745,40 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
         }
     }
     
-    // Telewhite: true when the text may already be in `toLang`, so translating it
-    // would be a no-op at best. Asking "is the target a plausible reading?" instead
-    // of "is the target the top guess?" is what keeps Russian text out of a Russian
-    // target: between two Cyrillic languages the recognizer is regularly confident
-    // and wrong, and the top-guess test let those messages through.
+    // Telewhite: true when the outgoing text is already in `toLang`, so translating it
+    // would be a no-op. The burden of proof is the opposite of the incoming case: the
+    // user turned this on for this chat and picked the language, so an unreadable or
+    // unrecognisable message is SENT TRANSLATED, not silently sent as typed. Skipping on
+    // "no confident reading" meant a Ukrainian target with Russian input dropped every
+    // message from the translation batch while the navigation bar still said "Translating".
     private static func telewhiteIsProbablyLanguage(_ text: String, _ language: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 3 else {
-            // Too short to judge: leave it alone rather than translate blindly.
-            return true
+            return false
         }
-        let target = language.components(separatedBy: "-").first?.lowercased() ?? language.lowercased()
+        // Fold to the translator's own codes: NLLanguage.norwegian is "nb" while the
+        // translation language is "no", so a raw comparison sent Norwegian off to be
+        // translated into Norwegian.
+        let target = ChatControllerNode.telewhiteBaseLanguageCode(language)
         let recognizer = NLLanguageRecognizer()
         recognizer.processString(String(trimmed.prefix(400)))
         let hypotheses = recognizer.languageHypotheses(withMaximum: 6)
-        for (hypothesis, probability) in hypotheses {
-            let code = hypothesis.rawValue.components(separatedBy: "-").first?.lowercased() ?? ""
-            if code == target && probability >= 0.15 {
-                return true
-            }
+        guard let best = hypotheses.max(by: { $0.value < $1.value }) else {
+            return false
         }
-        // No confident reading at all: treat it as unknown and do not translate.
-        guard let best = hypotheses.max(by: { $0.value < $1.value }), best.value >= 0.45 else {
-            return true
+        // Only a confident top hypothesis counts as "already in the target language".
+        return best.value >= 0.5 && ChatControllerNode.telewhiteBaseLanguageCode(best.key.rawValue) == target
+    }
+
+    // The same folding TranslateUI's normalizeTranslationLanguage does — region stripped,
+    // nb folded to no — kept local because this file does not depend on TranslateUI. Keep
+    // the two in step if that one ever learns another mapping.
+    private static func telewhiteBaseLanguageCode(_ code: String) -> String {
+        var result = code.components(separatedBy: "-").first?.lowercased() ?? code.lowercased()
+        if result == "nb" {
+            result = "no"
         }
-        return (best.key.rawValue.components(separatedBy: "-").first?.lowercased() ?? "") == target
+        return result
     }
     
     private func telewhiteTranslateOutgoingMessagesIfNeeded(_ messages: [EnqueueMessage], _ completion: @escaping ([EnqueueMessage]) -> Void) {
