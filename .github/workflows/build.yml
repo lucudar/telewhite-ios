@@ -112,9 +112,13 @@ jobs:
           BAZEL_USER_ROOT="/private/var/tmp/_bazel_telegram_ios"
 
           python3 build-system/Make/ImportCertificates.py --path build-input/generated-codesigning/certs
+          # --continueOnError forwards bazel's --keep_going: one run reports every
+          # broken target instead of stopping at the first. Harmless on a green tree
+          # (the IPA is still produced); drop it if runs get too slow.
           python3 -u build-system/Make/Make.py \
             --bazelUserRoot="$BAZEL_USER_ROOT" \
             build \
+            --continueOnError \
             --configurationPath=build-input/fork-configuration.json \
             --codesigningInformationPath=build-input/generated-codesigning \
             --configuration=release_arm64 \
