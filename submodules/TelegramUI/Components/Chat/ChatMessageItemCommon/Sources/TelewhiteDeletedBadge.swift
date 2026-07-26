@@ -111,9 +111,10 @@ public func telewhiteDeletedBadgeImage(text: String) -> UIImage? {
     }
 }
 
-/// Places a badge of `size` next to `contentFrame` without covering it: in the free
-/// gutter beside the bubble (right of incoming, left of outgoing), falling back to
-/// the content's leading corner when the gutter is too narrow to fit it.
+/// Places a badge of `badgeSize` in the free gutter beside `contentFrame` — right of
+/// incoming content, left of outgoing — so it does not cover the message. When the
+/// gutter is too narrow to hold it, the badge falls back to overlaying the content's
+/// leading corner: a badge on top of a corner still reads, an off-screen one does not.
 public func telewhiteDeletedBadgeFrame(badgeSize: CGSize, contentFrame: CGRect, containerWidth: CGFloat, isIncoming: Bool) -> CGRect {
     let spacing: CGFloat = 6.0
     let edgeInset: CGFloat = 4.0

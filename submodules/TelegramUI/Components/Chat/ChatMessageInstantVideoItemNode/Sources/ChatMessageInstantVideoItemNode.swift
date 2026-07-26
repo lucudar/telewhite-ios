@@ -1439,7 +1439,14 @@ public class ChatMessageInstantVideoItemNode: ChatMessageItemView, ASGestureReco
             videoLayoutData = .constrained(left: max(0.0, availableContentWidth - videoFrame.width), right: 0.0)
         }
         videoApply(videoLayoutData, .None)
-        
+
+        // Telewhite: the badge sits in the gutter beside the video note, so it has to
+        // follow the frame this transition just recomputed — otherwise it keeps the
+        // position from the last full layout pass while the note itself moves.
+        if let badgeNode = self.telewhiteDeletedBadgeNode, let badgeImage = badgeNode.image {
+            badgeNode.frame = telewhiteDeletedBadgeFrame(badgeSize: badgeImage.size, contentFrame: videoFrame, containerWidth: params.width, isIncoming: incoming)
+        }
+
         if let shareButtonNode = self.shareButtonNode {
             let buttonSize = shareButtonNode.frame.size
             shareButtonNode.frame = CGRect(origin: CGPoint(x: min(params.width - buttonSize.width - 8.0, videoFrame.maxX - 7.0), y: videoFrame.maxY - 24.0 - buttonSize.height), size: buttonSize)

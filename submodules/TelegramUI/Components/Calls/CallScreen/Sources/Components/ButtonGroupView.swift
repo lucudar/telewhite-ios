@@ -91,7 +91,7 @@ final class ButtonGroupView: OverlayMaskContainerView {
         
         let buttonSize: CGFloat = 56.0
         var buttonSpacing: CGFloat = 36.0
-        // Telewhite: shrink spacing so extra buttons (e.g. the record button) still fit narrow screens.
+        // Telewhite: shrink spacing so a full row of buttons still fits a narrow screen.
         let availableButtonWidth = size.width - insets.left - insets.right - 16.0 * 2.0
         if buttons.count > 1 {
             let requiredWidth = buttonSize * CGFloat(buttons.count) + buttonSpacing * CGFloat(buttons.count - 1)
