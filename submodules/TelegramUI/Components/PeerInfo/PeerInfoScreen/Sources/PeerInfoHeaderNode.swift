@@ -1221,12 +1221,18 @@ final class PeerInfoHeaderNode: ASDisplayNode {
             if title.replacingOccurrences(of: "\u{fe0e}", with: "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 title = "" //"\u{00A0}"
             }
+            // Telewhite: "Hide Phone and Username" is about YOUR OWN contact details, so
+            // it only applies on your own screens — Settings and My Profile. It used to be
+            // checked as `isSettings` alone, which left My Profile falling through to the
+            // "—" placeholder below; on an expanded header that placeholder is drawn in
+            // white over the avatar, so it read as a bar painted across the profile
+            // picture. It also used to suppress the phone fallback on other people's
+            // profiles, which the switch was never about.
+            let hideOwnContactInfo = (self.isSettings || self.isMyProfile) && TelewhiteModsSettings.current.hidePhoneInSettings
             if title.isEmpty {
-                if self.isSettings && TelewhiteModsSettings.current.hidePhoneInSettings {
-                    // Telewhite: hide phone + username only — never paint a "—" bar over
-                    // the avatar/name. A nameless account simply shows a blank title.
+                if hideOwnContactInfo {
                     title = ""
-                } else if case let .user(user) = peer, let phone = user.phone, !TelewhiteModsSettings.current.hidePhoneInSettings {
+                } else if case let .user(user) = peer, let phone = user.phone {
                     title = formatPhoneNumber(context: self.context, number: phone)
                 } else if let addressName = peer.addressName {
                     title = "@\(addressName)"
@@ -1235,10 +1241,10 @@ final class PeerInfoHeaderNode: ASDisplayNode {
                 }
             }
 
-            // Telewhite: for a nameless user with hide-phone on, displayTitle falls back
-            // to the phone or a "—" placeholder (non-empty, so the block above is skipped).
+            // Telewhite: for a nameless user with hiding on, displayTitle falls back to the
+            // phone or a "—" placeholder (non-empty, so the block above is skipped).
             // Force the profile title blank in that case — real first/last names are kept.
-            if self.isSettings, TelewhiteModsSettings.current.hidePhoneInSettings, case let .user(hideUser) = peer, (hideUser.firstName ?? "").isEmpty, (hideUser.lastName ?? "").isEmpty {
+            if hideOwnContactInfo, case let .user(hideUser) = peer, (hideUser.firstName ?? "").isEmpty, (hideUser.lastName ?? "").isEmpty {
                 title = ""
             }
 

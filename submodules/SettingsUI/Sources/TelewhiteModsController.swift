@@ -37,7 +37,6 @@ public struct TelewhiteModsSettings: Equatable {
     public var oneTimeMediaUnlimited: Bool
     public var downloadOneTimeMedia: Bool
     public var uploadVoice: Bool
-    public var uploadVideoMessage: Bool
     public var downloadStories: Bool
     public var accentColorOverride: Int64?
     public var bubbleColorOverride: Int64?
@@ -84,7 +83,6 @@ public struct TelewhiteModsSettings: Equatable {
         static let oneTimeMediaUnlimited = "telewhite.mods.oneTimeMediaUnlimited"
         static let downloadOneTimeMedia = "telewhite.mods.downloadOneTimeMedia"
         static let uploadVoice = "telewhite.mods.uploadVoice"
-        static let uploadVideoMessage = "telewhite.mods.uploadVideoMessage"
         static let downloadStories = "telewhite.mods.downloadStories"
         static let accentColor = "telewhite.mods.accentColor"
         static let bubbleColor = "telewhite.mods.bubbleColor"
@@ -136,7 +134,6 @@ public struct TelewhiteModsSettings: Equatable {
             oneTimeMediaUnlimited: defaults.bool(forKey: Key.oneTimeMediaUnlimited),
             downloadOneTimeMedia: defaults.bool(forKey: Key.downloadOneTimeMedia),
             uploadVoice: defaults.bool(forKey: Key.uploadVoice),
-            uploadVideoMessage: defaults.bool(forKey: Key.uploadVideoMessage),
             downloadStories: defaults.bool(forKey: Key.downloadStories),
             accentColorOverride: (defaults.object(forKey: Key.accentColor) as? NSNumber)?.int64Value,
             bubbleColorOverride: (defaults.object(forKey: Key.bubbleColor) as? NSNumber)?.int64Value,
@@ -248,7 +245,6 @@ public struct TelewhiteModsSettings: Equatable {
         defaults.set(self.oneTimeMediaUnlimited, forKey: Key.oneTimeMediaUnlimited)
         defaults.set(self.downloadOneTimeMedia, forKey: Key.downloadOneTimeMedia)
         defaults.set(self.uploadVoice, forKey: Key.uploadVoice)
-        defaults.set(self.uploadVideoMessage, forKey: Key.uploadVideoMessage)
         defaults.set(self.downloadStories, forKey: Key.downloadStories)
         if let value = self.accentColorOverride {
             defaults.set(NSNumber(value: value), forKey: Key.accentColor)
@@ -399,7 +395,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case hdPhotos(String, Bool)
     case translateVoiceMessages(String, Bool)
     case quickForwardToSaved(String, Bool)
-    case uploadVideoMessage(String, Bool)
 
     case privacyHeader(String)
     case hideOnlineStatus(String, Bool)
@@ -470,7 +465,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
         switch self {
         case .menuItem:
             return TelewhiteModsSection.menu.rawValue
-        case .messengerHeader, .preserveDeletedMessages, .forwardHideNamesByDefault, .showPreviousEditedText, .translateMessages, .translateChats, .autoTranslateEnglish, .translationTargetLanguage, .outgoingTranslateButtonEnabled, .openRouterApiKey, .messengerInfo, .oneTimeMediaUnlimited, .downloadOneTimeMedia, .uploadVoice, .hdPhotos, .translateVoiceMessages, .quickForwardToSaved, .uploadVideoMessage:
+        case .messengerHeader, .preserveDeletedMessages, .forwardHideNamesByDefault, .showPreviousEditedText, .translateMessages, .translateChats, .autoTranslateEnglish, .translationTargetLanguage, .outgoingTranslateButtonEnabled, .openRouterApiKey, .messengerInfo, .oneTimeMediaUnlimited, .downloadOneTimeMedia, .uploadVoice, .hdPhotos, .translateVoiceMessages, .quickForwardToSaved:
             return TelewhiteModsSection.messenger.rawValue
         case .privacyHeader, .screenshotProtectionBypass, .contentRestrictionBypass, .hidePhoneInSettings, .showProfileIds, .showUserIds, .showChatIds, .showMessageIds, .privacyInfo:
             return TelewhiteModsSection.privacy.rawValue
@@ -515,8 +510,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 21
         case .quickForwardToSaved:
             return 22
-        case .uploadVideoMessage:
-            return 6
         case .translateMessages:
             return 7
         case .translateChats:
@@ -814,10 +807,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
         case let .quickForwardToSaved(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.quickForwardToSaved = value
-            }
-        case let .uploadVideoMessage(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.uploadVideoMessage = value
             }
         case let .debugMenu(text):
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: "", sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
@@ -1196,8 +1185,6 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
         return text("Translator button in private chats: tap to translate your outgoing messages, long press to pick the language.", "Кнопка переводчика в личных чатах: тап — перевод ваших сообщений, долгий тап — выбор языка.")
     case .openRouterApiKey:
         return text("Optional free key from openrouter.ai for better AI translation. Without it the standard translator is used.", "Необязательный бесплатный ключ с openrouter.ai для более качественного AI-перевода. Без него — стандартный переводчик.")
-    case .uploadVideoMessage:
-        return text("Videos from the gallery are sent as round video messages.", "Видео из галереи отправляются как круглые видеосообщения.")
     case .translateVoiceMessages:
         return text("Adds a translation under the transcript of voice messages when their language differs from yours. Uses a free translation service.", "Добавляет перевод под расшифровкой голосовых, если их язык отличается от вашего. Использует бесплатный переводчик.")
     case .quickForwardToSaved:
@@ -1260,7 +1247,6 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.showPreviousEditedText(strings.text("Show Previous Edited Text", "Показывать предыдущую версию"), settings.showPreviousEditedText))
         entries.append(.oneTimeMediaUnlimited(strings.text("Unlimited One-Time View", "Одноразовый просмотр без ограничений"), settings.oneTimeMediaUnlimited))
         entries.append(.downloadOneTimeMedia(strings.text("Download One-Time Media", "Скачать одноразовые медиа"), settings.downloadOneTimeMedia))
-        entries.append(.uploadVideoMessage(strings.text("Upload Video Message", "Загрузить видеосообщение"), settings.uploadVideoMessage))
         entries.append(.hdPhotos(strings.text("Send Photos in HD", "Отправлять фото в HD"), settings.hdPhotos))
         entries.append(.translateVoiceMessages(strings.text("Translate Voice Messages", "Переводить голосовые"), settings.translateVoiceMessages))
         entries.append(.quickForwardToSaved(strings.text("Quick Forward to Saved", "Быстрая пересылка в Избранное"), settings.quickForwardToSaved))
