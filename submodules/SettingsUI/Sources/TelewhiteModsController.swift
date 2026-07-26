@@ -104,10 +104,23 @@ public struct TelewhiteModsSettings: Equatable {
         static let translateVoiceMessages = "telewhite.mods.translateVoiceMessages"
         static let quickForwardToSaved = "telewhite.mods.quickForwardToSaved"
     }
-    
+
+    // The language the phone is set to, which is the only sensible guess for "translate
+    // into" before the user has said otherwise. Falls back to Russian, the audience this
+    // fork is built for, when the system language is not one the translator supports.
+    private static func telewhiteDefaultTranslationTargetLanguage() -> String {
+        for language in Locale.preferredLanguages {
+            let code = normalizeTranslationLanguage(language.components(separatedBy: "-").first?.lowercased() ?? language)
+            if supportedTranslationLanguages.contains(code) {
+                return code
+            }
+        }
+        return "ru"
+    }
+
     public static var current: TelewhiteModsSettings {
         let defaults = UserDefaults.standard
-        return TelewhiteModsSettings(
+        var settings = TelewhiteModsSettings(
             // Telewhite: global Ghost Mode is an optional master switch; the granular
             // stealth toggles below are independent and persist on their own keys.
             ghostMode: defaults.bool(forKey: Key.ghostMode),
@@ -129,7 +142,10 @@ public struct TelewhiteModsSettings: Equatable {
             showMessageIds: defaults.bool(forKey: Key.showMessageIds),
             ghostPeerIds: Set((defaults.array(forKey: Key.ghostPeerIds) as? [NSNumber] ?? []).map { $0.int64Value }),
             autoTranslateEnglish: defaults.object(forKey: Key.autoTranslateEnglish) as? Bool ?? true,
-            translationTargetLanguage: defaults.string(forKey: Key.translationTargetLanguage) ?? "ru",
+            // Not hardcoded "ru": the first save writes this value out for good, so an
+            // English-interface user who merely flipped some other switch would have had
+            // every foreign chat translated into Russian from then on.
+            translationTargetLanguage: defaults.string(forKey: Key.translationTargetLanguage) ?? telewhiteDefaultTranslationTargetLanguage(),
             oneTimeMediaUnlimited: defaults.bool(forKey: Key.oneTimeMediaUnlimited),
             downloadOneTimeMedia: defaults.bool(forKey: Key.downloadOneTimeMedia),
             downloadStories: defaults.bool(forKey: Key.downloadStories),
@@ -164,6 +180,25 @@ public struct TelewhiteModsSettings: Equatable {
             translateVoiceMessages: defaults.bool(forKey: Key.translateVoiceMessages),
             quickForwardToSaved: defaults.bool(forKey: Key.quickForwardToSaved)
         )
+
+        // Telewhite: the five stealth flags are one switch now, but older builds wrote
+        // them separately, so half-on states exist on real devices. Every engine consumer
+        // gates on `ghostMode || <its own flag>`, so half-on means "partly invisible" —
+        // and a single row cannot honestly display that. Normalise it once, upward: the
+        // user asked to be hidden, so finish hiding them rather than silently exposing
+        // what they had already turned on. Idempotent — after this the branch is dead.
+        let anyStealth = settings.ghostMode || settings.hideOnlineStatus || settings.hideTypingStatus || settings.hideReadReceipts || settings.ghostStories
+        let allStealth = settings.ghostMode && settings.hideOnlineStatus && settings.hideTypingStatus && settings.hideReadReceipts && settings.ghostStories
+        if anyStealth && !allStealth {
+            settings.ghostMode = true
+            settings.hideOnlineStatus = true
+            settings.hideTypingStatus = true
+            settings.hideReadReceipts = true
+            settings.ghostStories = true
+            settings.save()
+        }
+
+        return settings
     }
 
     public func isGhostEnabled(for peerId: EnginePeer.Id?) -> Bool {
@@ -1183,7 +1218,11 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.preserveDeletedMessages(strings.text("Keep Deleted Messages", "Не терять удалённые сообщения"), settings.preserveDeletedMessages))
         entries.append(.showPreviousEditedText(strings.text("Show the Text Before an Edit", "Показывать текст до правки"), settings.showPreviousEditedText))
         entries.append(.forwardHideNamesByDefault(strings.text("Forward Without the Author", "Пересылать без автора"), settings.forwardHideNamesByDefault))
-        entries.append(.oneTimeMedia(strings.text("View-Once Photos and Videos", "Одноразовые фото и видео"), settings.oneTimeMediaUnlimited && settings.downloadOneTimeMedia))
+        // Rows that write several fields at once read them with OR. Each of these was two
+        // or three separate switches in an older build, so a half-on state is something
+        // users actually have — and with AND the row showed OFF while the behaviour was
+        // still on, which is both a lie and impossible to undo in one tap.
+        entries.append(.oneTimeMedia(strings.text("View-Once Photos and Videos", "Одноразовые фото и видео"), settings.oneTimeMediaUnlimited || settings.downloadOneTimeMedia))
         entries.append(.hdPhotos(strings.text("Send Photos in High Quality", "Отправлять фото в высоком качестве"), settings.hdPhotos))
         entries.append(.quickForwardToSaved(strings.text("\"To Saved Messages\" Button", "Кнопка «В Избранное»"), settings.quickForwardToSaved))
         entries.append(.translatorLink(telewhiteTabTitle(.translator, strings: strings)))
@@ -1191,7 +1230,10 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
 
     case .translator:
         entries.append(.translatorHeader(telewhiteTabTitle(.translator, strings: strings)))
-        entries.append(.autoTranslateEnglish(strings.text("Translate Incoming Messages", "Переводить входящие"), settings.autoTranslateEnglish))
+        // Also OR: this row absorbed the stock "Translate Entire Chats" switch, whose
+        // setting defaults to true and is still written from Settings → Language. Reading
+        // only our own flag showed OFF while the translation panel kept appearing.
+        entries.append(.autoTranslateEnglish(strings.text("Translate Incoming Messages", "Переводить входящие"), settings.autoTranslateEnglish || translationSettings.translateChats))
         entries.append(.translationTargetLanguage(strings.text("Translate Into", "Переводить на"), settings.translationTargetLanguage))
         entries.append(.translateMessages(strings.text("\"Translate\" in the Message Menu", "«Перевести» в меню сообщения"), translationSettings.showTranslate))
         entries.append(.outgoingTranslateButtonEnabled(strings.text("Translate What You Send", "Переводить то, что вы пишете"), settings.outgoingTranslateButtonEnabled))
@@ -1211,9 +1253,9 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
 
     case .privacy:
         entries.append(.privacyHeader(telewhiteTabTitle(.privacy, strings: strings)))
-        entries.append(.protectionBypass(strings.text("Allow Saving Everywhere", "Разрешить сохранять везде"), settings.screenshotProtectionBypass && settings.contentRestrictionBypass))
+        entries.append(.protectionBypass(strings.text("Allow Saving Everywhere", "Разрешить сохранять везде"), settings.screenshotProtectionBypass || settings.contentRestrictionBypass))
         entries.append(.hidePhoneInSettings(strings.text("Hide My Number and Username", "Скрыть свой номер и юзернейм"), settings.hidePhoneInSettings))
-        entries.append(.showProfileIds(strings.text("Show Numeric IDs", "Показывать числовые ID"), settings.showUserIds && settings.showChatIds))
+        entries.append(.showProfileIds(strings.text("Show Numeric IDs", "Показывать числовые ID"), settings.showUserIds || settings.showChatIds || settings.showMessageIds))
         entries.append(.privacyInfo(strings.text("These switches change what this phone shows and allows. They do not change your Telegram privacy settings.", "Эти переключатели меняют то, что показывает и разрешает этот телефон. Настройки приватности в самом Telegram они не трогают.")))
 
     case .stealth:
@@ -1228,7 +1270,7 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
 
     case .channels:
         entries.append(.channelsHeader(telewhiteTabTitle(.channels, strings: strings)))
-        entries.append(.channelsDeclutter(strings.text("Clean Up Posts", "Убрать лишнее под постами"), settings.channelHideReactions && settings.channelHideComments && settings.channelHideShareButton))
+        entries.append(.channelsDeclutter(strings.text("Clean Up Posts", "Убрать лишнее под постами"), settings.channelHideReactions || settings.channelHideComments || settings.channelHideShareButton))
         entries.append(.channelsInfo(strings.text("Only changes how posts look on this phone. Nobody else is affected.", "Меняет только то, как посты выглядят на этом телефоне. Для остальных ничего не меняется.")))
 
     case .media:
@@ -1349,13 +1391,21 @@ public func telewhiteModsController(context: AccountContext) -> ViewController {
     let statePromise = ValuePromise(initialSettings, ignoreRepeated: true)
 
     let updateSettings: ((TelewhiteModsSettings) -> TelewhiteModsSettings) -> Void = { f in
-        let updated = stateValue.modify { current in
-            let updated = f(current)
+        let updated = stateValue.modify { _ in
+            // Mutate the LIVE settings, not this screen's snapshot. The screen stays alive
+            // on the Settings tab while chats write the same struct (the per-chat ghost
+            // button writes ghostPeerIds, the chat translator writes
+            // outgoingTranslationPeerIds/Languages), so flipping any switch here used to
+            // save a stale copy over them and silently wipe the per-chat state.
+            let updated = f(TelewhiteModsSettings.current)
             updated.save()
             return updated
         }
-        // Telewhite: one global Ghost Mode switch is the only presence control.
-        context.account.shouldKeepOnlinePresence.set(.single(!updated.ghostMode))
+        // Telewhite: presence is suppressed by the master flag, by the granular online
+        // switch, or by a single per-chat ghost — computed the same way the chat header
+        // computes it, so saving an unrelated setting cannot put the account back online.
+        let keepOnline = !(updated.ghostMode || updated.hideOnlineStatus || !updated.ghostPeerIds.isEmpty)
+        context.account.shouldKeepOnlinePresence.set(.single(keepOnline))
         let cacheLimit = updated.autoCacheCleanup ? updated.cacheLimitGigabytes : Int32.max
         let _ = updateCacheStorageSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
             var current = current
