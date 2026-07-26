@@ -552,21 +552,24 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 500
         case .downloadStories:
             return 501
-        case .mediaInfo:
+        case .hideStories:
             return 502
         case .autoCacheCleanup:
             return 503
         case let .cacheLimit(index, _, _, _):
             return 504 + index
+        // Telewhite: stableId must rise in the order rows are appended — ItemListUI
+        // asserts it (ItemListControllerNode.swift:449) and its row diff assumes it.
+        // The trailing info row therefore sits at the end of the media block, not at 502.
+        case .mediaInfo:
+            return 599
         case .appearanceHeader:
             return 700
-        case .hideStories:
-            return 701
         case .compactChatList:
             return 702
-        case .amoledMode:
-            return 703
         case .chatSplitLandscape:
+            return 703
+        case .amoledMode:
             return 704
         case .darkMonoPreset:
             return 705
@@ -726,7 +729,10 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
                 settings.channelHideShareButton = value
             }
         case let .translatorLink(text):
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: "", labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+            // The disclosure item never asks for telewhiteEntryDescription the way
+            // switchItem does, so the explanation has to be handed to it as the label —
+            // same shape as .menuItem above.
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: telewhiteEntryDescription(self, presentationData: presentationData) ?? "", labelStyle: .multilineDetailText, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                 arguments.openTab(.translator)
             })
         case let .preserveDeletedMessages(text, value):
@@ -1163,7 +1169,11 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
 
     case .stealth:
         entries.append(.stealthHeader(telewhiteTabTitle(.stealth, strings: strings)))
-        entries.append(.ghost(strings.text("Invisible Mode", "Невидимка"), settings.hideReadReceipts && settings.ghostStories))
+        // Read with OR, not AND: the row writes all five flags at once, so a half-on
+        // state can only come from an older build. Showing OFF while the engine still
+        // treats the user as invisible is exactly the trap this row exists to undo —
+        // ghostMode alone already suppresses the online presence.
+        entries.append(.ghost(strings.text("Invisible Mode", "Невидимка"), settings.ghostMode || settings.hideOnlineStatus || settings.hideTypingStatus || settings.hideReadReceipts || settings.ghostStories))
         entries.append(.ghostChatButtonEnabled(strings.text("Ghost Button in Chats", "Кнопка невидимки в чате"), settings.ghostChatButtonEnabled))
         entries.append(.stealthInfo(strings.text("While you are invisible, Telegram will not show other people's read receipts to you either.", "Пока вы невидимы, Telegram и вам не показывает чужие отметки о прочтении.")))
 
@@ -1313,7 +1323,11 @@ public func telewhiteModsController(context: AccountContext) -> ViewController {
 
     var pushControllerImpl: ((ViewController) -> Void)?
 
-    let arguments = TelewhiteModsControllerArguments(updateSettings: updateSettings, updateTranslationSettings: { _ in
+    let arguments = TelewhiteModsControllerArguments(updateSettings: updateSettings, updateTranslationSettings: { f in
+        // The root screen is menu rows only today, so nothing here needs it — but a
+        // silent no-op would make any translation row moved to the root stop working
+        // without a trace. It costs one line to keep it honest.
+        let _ = updateTranslationSettingsInteractively(accountManager: context.sharedContext.accountManager, f).start()
     }, openTab: { tab in
         pushControllerImpl?(telewhiteModsSectionController(context: context, tab: tab, statePromise: statePromise, stateValue: stateValue, updateSettings: updateSettings))
     })
