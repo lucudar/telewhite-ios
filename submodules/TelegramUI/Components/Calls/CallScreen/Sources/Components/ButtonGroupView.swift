@@ -13,7 +13,6 @@ final class ButtonGroupView: OverlayMaskContainerView {
                 case flipCamera
                 case video
                 case microphone
-                case record
                 case end
             }
             
@@ -21,7 +20,6 @@ final class ButtonGroupView: OverlayMaskContainerView {
             case flipCamera
             case video(isActive: Bool)
             case microphone(isMuted: Bool)
-            case record(isActive: Bool)
             case end
             
             var key: Key {
@@ -34,8 +32,6 @@ final class ButtonGroupView: OverlayMaskContainerView {
                     return .video
                 case .microphone:
                     return .microphone
-                case .record:
-                    return .record
                 case .end:
                     return .end
                 }
@@ -64,14 +60,6 @@ final class ButtonGroupView: OverlayMaskContainerView {
             self.text = text
         }
     }
-    
-    private static let telewhiteRecordIcon: UIImage? = generateImage(CGSize(width: 36.0, height: 36.0), rotatedContext: { size, context in
-        context.clear(CGRect(origin: CGPoint(), size: size))
-        context.setFillColor(UIColor.white.cgColor)
-        let diameter: CGFloat = 22.0
-        let rect = CGRect(x: floor((size.width - diameter) * 0.5), y: floor((size.height - diameter) * 0.5), width: diameter, height: diameter)
-        context.fillEllipse(in: rect)
-    })
     
     private var buttons: [Button]?
     private var buttonViews: [Button.Content.Key: ContentOverlayButton] = [:]
@@ -286,11 +274,6 @@ final class ButtonGroupView: OverlayMaskContainerView {
                 title = strings.Call_Mute
                 image = UIImage(bundleImageName: "Call/Mute")
                 isActive = isActiveValue
-            case let .record(isActiveValue):
-                title = isActiveValue ? "Stop" : "Record"
-                image = ButtonGroupView.telewhiteRecordIcon
-                isActive = isActiveValue
-                isDestructive = isActiveValue
             case .end:
                 title = strings.Call_End
                 image = UIImage(bundleImageName: "Call/End")

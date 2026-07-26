@@ -2,7 +2,8 @@ name: iOS IPA
 
 on:
   push:
-    branches: [master, project-status-update, russian-translation-issues]
+    # master is the live branch; other branches build on demand via workflow_dispatch.
+    branches: [master]
   workflow_dispatch:
     inputs:
       app_name:

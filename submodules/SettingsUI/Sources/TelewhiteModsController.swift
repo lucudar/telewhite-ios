@@ -10,8 +10,6 @@ import AlertUI
 import PromptUI
 import TelegramCore
 import TelegramUIPreferences
-import LegacyMediaPickerUI
-import UndoUI
 
 public struct TelewhiteModsSettings: Equatable {
     public static let didChangeNotification = Notification.Name("TelewhiteModsSettingsDidChange")
@@ -42,8 +40,6 @@ public struct TelewhiteModsSettings: Equatable {
     public var uploadVoice: Bool
     public var uploadVideoMessage: Bool
     public var downloadStories: Bool
-    public var autoRecordCalls: Bool
-    public var callRecordButton: Bool
     public var accentColorOverride: Int64?
     public var bubbleColorOverride: Int64?
     public var chatBackgroundColorOverride: Int64?
@@ -55,9 +51,6 @@ public struct TelewhiteModsSettings: Equatable {
     public var outgoingTranslationLanguages: [Int64: String]
     public var openRouterApiKey: String
     public var outgoingTranslationAutoEnabled: Bool
-    public var messageFiltersEnabled: Bool
-    public var messageFiltersUseRegex: Bool
-    public var messageFilterRules: String
     public var forwardHideNamesByDefault: Bool
     public var showPreviousEditedText: Bool
     public var autoCacheCleanup: Bool
@@ -68,11 +61,6 @@ public struct TelewhiteModsSettings: Equatable {
     public var hdPhotos: Bool
     public var translateVoiceMessages: Bool
     public var quickForwardToSaved: Bool
-    public var preciseLastSeen: Bool
-    public var voiceChangerEnabled: Bool
-    public var voiceChangerPitchShift: Int32
-    public var voiceChangerHubertInstalled: Bool
-    public var voiceChangerSelectedVoiceName: String
 
     private enum Key {
         static let ghostMode = "telewhite.mods.ghostMode"
@@ -101,8 +89,6 @@ public struct TelewhiteModsSettings: Equatable {
         static let uploadVoice = "telewhite.mods.uploadVoice"
         static let uploadVideoMessage = "telewhite.mods.uploadVideoMessage"
         static let downloadStories = "telewhite.mods.downloadStories"
-        static let autoRecordCalls = "telewhite.mods.autoRecordCalls"
-        static let callRecordButton = "telewhite.mods.callRecordButton"
         static let accentColor = "telewhite.mods.accentColor"
         static let bubbleColor = "telewhite.mods.bubbleColor"
         static let chatBackgroundColor = "telewhite.mods.chatBackgroundColor"
@@ -114,9 +100,6 @@ public struct TelewhiteModsSettings: Equatable {
         static let outgoingTranslationLanguages = "telewhite.mods.outgoingTranslationLanguages"
         static let openRouterApiKey = "telewhite.mods.openRouterApiKey"
         static let outgoingTranslationAutoEnabled = "telewhite.mods.outgoingTranslationAutoEnabled"
-        static let messageFiltersEnabled = "telewhite.mods.messageFiltersEnabled"
-        static let messageFiltersUseRegex = "telewhite.mods.messageFiltersUseRegex"
-        static let messageFilterRules = "telewhite.mods.messageFilterRules"
         static let forwardHideNamesByDefault = "telewhite.mods.forwardHideNamesByDefault"
         static let showPreviousEditedText = "telewhite.mods.showPreviousEditedText"
         static let autoCacheCleanup = "telewhite.mods.autoCacheCleanup"
@@ -127,11 +110,6 @@ public struct TelewhiteModsSettings: Equatable {
         static let hdPhotos = "telewhite.mods.hdPhotos"
         static let translateVoiceMessages = "telewhite.mods.translateVoiceMessages"
         static let quickForwardToSaved = "telewhite.mods.quickForwardToSaved"
-        static let preciseLastSeen = "telewhite.mods.preciseLastSeen"
-        static let voiceChangerEnabled = "telewhite.mods.voiceChangerEnabled"
-        static let voiceChangerPitchShift = "telewhite.mods.voiceChangerPitchShift"
-        static let voiceChangerHubertInstalled = "telewhite.mods.voiceChangerHubertInstalled"
-        static let voiceChangerSelectedVoiceName = "telewhite.mods.voiceChangerSelectedVoiceName"
     }
     
     public static var current: TelewhiteModsSettings {
@@ -165,8 +143,6 @@ public struct TelewhiteModsSettings: Equatable {
             uploadVoice: defaults.bool(forKey: Key.uploadVoice),
             uploadVideoMessage: defaults.bool(forKey: Key.uploadVideoMessage),
             downloadStories: defaults.bool(forKey: Key.downloadStories),
-            autoRecordCalls: defaults.bool(forKey: Key.autoRecordCalls),
-            callRecordButton: defaults.object(forKey: Key.callRecordButton) as? Bool ?? true,
             accentColorOverride: (defaults.object(forKey: Key.accentColor) as? NSNumber)?.int64Value,
             bubbleColorOverride: (defaults.object(forKey: Key.bubbleColor) as? NSNumber)?.int64Value,
             chatBackgroundColorOverride: (defaults.object(forKey: Key.chatBackgroundColor) as? NSNumber)?.int64Value,
@@ -188,9 +164,6 @@ public struct TelewhiteModsSettings: Equatable {
             }(),
             openRouterApiKey: defaults.string(forKey: Key.openRouterApiKey) ?? "",
             outgoingTranslationAutoEnabled: defaults.bool(forKey: Key.outgoingTranslationAutoEnabled),
-            messageFiltersEnabled: defaults.bool(forKey: Key.messageFiltersEnabled),
-            messageFiltersUseRegex: defaults.bool(forKey: Key.messageFiltersUseRegex),
-            messageFilterRules: defaults.string(forKey: Key.messageFilterRules) ?? "",
             forwardHideNamesByDefault: defaults.bool(forKey: Key.forwardHideNamesByDefault),
             showPreviousEditedText: defaults.object(forKey: Key.showPreviousEditedText) as? Bool ?? true,
             autoCacheCleanup: defaults.bool(forKey: Key.autoCacheCleanup),
@@ -200,12 +173,7 @@ public struct TelewhiteModsSettings: Equatable {
             channelHideShareButton: defaults.bool(forKey: Key.channelHideShareButton),
             hdPhotos: defaults.object(forKey: Key.hdPhotos) as? Bool ?? false,
             translateVoiceMessages: defaults.bool(forKey: Key.translateVoiceMessages),
-            quickForwardToSaved: defaults.bool(forKey: Key.quickForwardToSaved),
-            preciseLastSeen: defaults.bool(forKey: Key.preciseLastSeen),
-            voiceChangerEnabled: defaults.bool(forKey: Key.voiceChangerEnabled),
-            voiceChangerPitchShift: (defaults.object(forKey: Key.voiceChangerPitchShift) as? NSNumber)?.int32Value ?? 0,
-            voiceChangerHubertInstalled: defaults.bool(forKey: Key.voiceChangerHubertInstalled),
-            voiceChangerSelectedVoiceName: defaults.string(forKey: Key.voiceChangerSelectedVoiceName) ?? ""
+            quickForwardToSaved: defaults.bool(forKey: Key.quickForwardToSaved)
         )
     }
 
@@ -289,8 +257,6 @@ public struct TelewhiteModsSettings: Equatable {
         defaults.set(self.uploadVoice, forKey: Key.uploadVoice)
         defaults.set(self.uploadVideoMessage, forKey: Key.uploadVideoMessage)
         defaults.set(self.downloadStories, forKey: Key.downloadStories)
-        defaults.set(self.autoRecordCalls, forKey: Key.autoRecordCalls)
-        defaults.set(self.callRecordButton, forKey: Key.callRecordButton)
         if let value = self.accentColorOverride {
             defaults.set(NSNumber(value: value), forKey: Key.accentColor)
         } else {
@@ -322,9 +288,6 @@ public struct TelewhiteModsSettings: Equatable {
         defaults.set(Dictionary(uniqueKeysWithValues: self.outgoingTranslationLanguages.map { (String($0.key), $0.value) }), forKey: Key.outgoingTranslationLanguages)
         defaults.set(self.openRouterApiKey, forKey: Key.openRouterApiKey)
         defaults.set(self.outgoingTranslationAutoEnabled, forKey: Key.outgoingTranslationAutoEnabled)
-        defaults.set(self.messageFiltersEnabled, forKey: Key.messageFiltersEnabled)
-        defaults.set(self.messageFiltersUseRegex, forKey: Key.messageFiltersUseRegex)
-        defaults.set(self.messageFilterRules, forKey: Key.messageFilterRules)
         defaults.set(self.forwardHideNamesByDefault, forKey: Key.forwardHideNamesByDefault)
         defaults.set(self.showPreviousEditedText, forKey: Key.showPreviousEditedText)
         defaults.set(self.autoCacheCleanup, forKey: Key.autoCacheCleanup)
@@ -335,11 +298,6 @@ public struct TelewhiteModsSettings: Equatable {
         defaults.set(self.hdPhotos, forKey: Key.hdPhotos)
         defaults.set(self.translateVoiceMessages, forKey: Key.translateVoiceMessages)
         defaults.set(self.quickForwardToSaved, forKey: Key.quickForwardToSaved)
-        defaults.set(self.preciseLastSeen, forKey: Key.preciseLastSeen)
-        defaults.set(self.voiceChangerEnabled, forKey: Key.voiceChangerEnabled)
-        defaults.set(NSNumber(value: self.voiceChangerPitchShift), forKey: Key.voiceChangerPitchShift)
-        defaults.set(self.voiceChangerHubertInstalled, forKey: Key.voiceChangerHubertInstalled)
-        defaults.set(self.voiceChangerSelectedVoiceName, forKey: Key.voiceChangerSelectedVoiceName)
         NotificationCenter.default.post(name: TelewhiteModsSettings.didChangeNotification, object: nil)
     }
 
@@ -369,9 +327,6 @@ private final class TelewhiteModsControllerArguments {
     let promptCustomColor: (TelewhiteCustomColorTarget) -> Void
     let openDebug: () -> Void
     let promptOpenRouterKey: () -> Void
-    let promptMessageFilterRules: () -> Void
-    let promptGroupEventLog: () -> Void
-    let importVoiceChangerModel: (Bool) -> Void
 
     init(
         updateSettings: @escaping ((TelewhiteModsSettings) -> TelewhiteModsSettings) -> Void,
@@ -379,10 +334,7 @@ private final class TelewhiteModsControllerArguments {
         openTab: @escaping (TelewhiteModsTab) -> Void = { _ in },
         promptCustomColor: @escaping (TelewhiteCustomColorTarget) -> Void = { _ in },
         openDebug: @escaping () -> Void = {},
-        promptOpenRouterKey: @escaping () -> Void = {},
-        promptMessageFilterRules: @escaping () -> Void = {},
-        promptGroupEventLog: @escaping () -> Void = {},
-        importVoiceChangerModel: @escaping (Bool) -> Void = { _ in }
+        promptOpenRouterKey: @escaping () -> Void = {}
     ) {
         self.updateSettings = updateSettings
         self.updateTranslationSettings = updateTranslationSettings
@@ -390,9 +342,6 @@ private final class TelewhiteModsControllerArguments {
         self.promptCustomColor = promptCustomColor
         self.openDebug = openDebug
         self.promptOpenRouterKey = promptOpenRouterKey
-        self.promptMessageFilterRules = promptMessageFilterRules
-        self.promptGroupEventLog = promptGroupEventLog
-        self.importVoiceChangerModel = importVoiceChangerModel
     }
 }
 
@@ -403,8 +352,6 @@ private enum TelewhiteModsSection: Int32 {
     case stealth
     case channels
     case media
-    case calls
-    case vpn
     case appearance
     case accentColor
     case bubbleColor
@@ -419,7 +366,6 @@ private enum TelewhiteModsTab: Int32, Equatable {
     case stealth
     case channels
     case media
-    case calls
     case appearance
     case developer
 }
@@ -430,7 +376,6 @@ private enum TelewhiteModsMenuIcon: Int32, Equatable {
     case messages
     case groups
     case media
-    case calls
     case appearance
     case developer
 }
@@ -449,9 +394,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case outgoingTranslateButtonEnabled(String, Bool)
     case outgoingTranslationAutoEnabled(String, Bool)
     case openRouterApiKey(String, String)
-    case messageFiltersEnabled(String, Bool)
-    case messageFiltersUseRegex(String, Bool)
-    case messageFilterRules(String, String)
     case messengerInfo(String)
     case oneTimeMediaUnlimited(String, Bool)
     case downloadOneTimeMedia(String, Bool)
@@ -459,8 +401,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case hdPhotos(String, Bool)
     case translateVoiceMessages(String, Bool)
     case quickForwardToSaved(String, Bool)
-    case preciseLastSeen(String, Bool)
-    case voiceChangeSettings(String)
     case uploadVideoMessage(String, Bool)
 
     case privacyHeader(String)
@@ -473,7 +413,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case screenshotProtectionBypass(String, Bool)
     case contentRestrictionBypass(String, Bool)
     case hidePhoneInSettings(String, Bool)
-    case groupEventLog(String, String)
     case showProfileIds(String, Bool)
     case privacyInfo(String)
     
@@ -496,15 +435,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case autoCacheCleanup(String, Bool)
     case cacheLimit(Int32, String, Int32, Bool)
     case mediaInfo(String)
-
-
-    case callsHeader(String)
-    case autoRecordCalls(String, Bool)
-    case callRecordButton(String, Bool)
-    case voiceChangerEnabled(String, Bool)
-    case importHubertModel(String, Bool)
-    case importVoiceModel(String, String)
-    case callsInfo(String)
 
     case appearanceHeader(String)
     case compactChatList(String, Bool)
@@ -539,9 +469,9 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
         switch self {
         case .menuItem:
             return TelewhiteModsSection.menu.rawValue
-        case .messengerHeader, .preserveDeletedMessages, .forwardHideNamesByDefault, .showPreviousEditedText, .translateMessages, .translateChats, .autoTranslateEnglish, .translationTargetLanguage, .outgoingTranslateButtonEnabled, .outgoingTranslationAutoEnabled, .openRouterApiKey, .messageFiltersEnabled, .messageFiltersUseRegex, .messageFilterRules, .messengerInfo, .oneTimeMediaUnlimited, .downloadOneTimeMedia, .uploadVoice, .hdPhotos, .translateVoiceMessages, .quickForwardToSaved, .voiceChangeSettings, .uploadVideoMessage:
+        case .messengerHeader, .preserveDeletedMessages, .forwardHideNamesByDefault, .showPreviousEditedText, .translateMessages, .translateChats, .autoTranslateEnglish, .translationTargetLanguage, .outgoingTranslateButtonEnabled, .outgoingTranslationAutoEnabled, .openRouterApiKey, .messengerInfo, .oneTimeMediaUnlimited, .downloadOneTimeMedia, .uploadVoice, .hdPhotos, .translateVoiceMessages, .quickForwardToSaved, .uploadVideoMessage:
             return TelewhiteModsSection.messenger.rawValue
-        case .privacyHeader, .hiddenChatsEnabled, .screenshotProtectionBypass, .contentRestrictionBypass, .hidePhoneInSettings, .groupEventLog, .showProfileIds, .showUserIds, .showChatIds, .showMessageIds, .preciseLastSeen, .privacyInfo:
+        case .privacyHeader, .hiddenChatsEnabled, .screenshotProtectionBypass, .contentRestrictionBypass, .hidePhoneInSettings, .showProfileIds, .showUserIds, .showChatIds, .showMessageIds, .privacyInfo:
             return TelewhiteModsSection.privacy.rawValue
         case .stealthHeader, .ghostMode, .hideOnlineStatus, .ghostMessages, .hideReadReceipts, .hideTypingStatus, .ghostChatButtonEnabled, .ghostStories, .clearGhostChats, .stealthInfo:
             return TelewhiteModsSection.stealth.rawValue
@@ -549,8 +479,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.channels.rawValue
         case .mediaHeader, .downloadStories, .hideStories, .autoCacheCleanup, .cacheLimit, .mediaInfo:
             return TelewhiteModsSection.media.rawValue
-        case .callsHeader, .autoRecordCalls, .callRecordButton, .voiceChangerEnabled, .importHubertModel, .importVoiceModel, .callsInfo:
-            return TelewhiteModsSection.calls.rawValue
         case .appearanceHeader, .compactChatList, .chatSplitLandscape, .amoledMode, .darkMonoPreset:
             return TelewhiteModsSection.appearance.rawValue
         case .accentColorHeader, .accentColorOption, .accentColorCustom:
@@ -586,8 +514,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 21
         case .quickForwardToSaved:
             return 22
-        case .voiceChangeSettings:
-            return 5
         case .uploadVideoMessage:
             return 6
         case .translateMessages:
@@ -604,12 +530,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 12
         case .openRouterApiKey:
             return 13
-        case .messageFiltersEnabled:
-            return 14
-        case .messageFiltersUseRegex:
-            return 15
-        case .messageFilterRules:
-            return 16
         case .messengerInfo:
             return 17
         case .forwardHideNamesByDefault:
@@ -640,10 +560,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 110
         case .hiddenChatsEnabled:
             return 111
-        case .groupEventLog:
-            return 112
-        case .preciseLastSeen:
-            return 113
         case .stealthHeader:
             return 300
         case .ghostMessages:
@@ -676,20 +592,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 503
         case let .cacheLimit(index, _, _, _):
             return 504 + index
-        case .callsHeader:
-            return 600
-        case .autoRecordCalls:
-            return 601
-        case .callRecordButton:
-            return 602
-        case .voiceChangerEnabled:
-            return 603
-        case .importHubertModel:
-            return 604
-        case .importVoiceModel:
-            return 605
-        case .callsInfo:
-            return 606
         case .appearanceHeader:
             return 700
         case .hideStories:
@@ -770,7 +672,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: telewhiteMenuIcon(icon, color: presentationData.theme.list.itemAccentColor), title: title, titleFont: .bold, label: subtitle, labelStyle: .multilineDetailText, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                 arguments.openTab(tab)
             })
-        case let .messengerHeader(text), let .privacyHeader(text), let .stealthHeader(text), let .channelsHeader(text), let .mediaHeader(text), let .callsHeader(text), let .appearanceHeader(text), let .developerHeader(text), let .accentColorHeader(text), let .bubbleColorHeader(text), let .backgroundColorHeader(text), let .cornerRadiusHeader(text):
+        case let .messengerHeader(text), let .privacyHeader(text), let .stealthHeader(text), let .channelsHeader(text), let .mediaHeader(text), let .appearanceHeader(text), let .developerHeader(text), let .accentColorHeader(text), let .bubbleColorHeader(text), let .backgroundColorHeader(text), let .cornerRadiusHeader(text):
             return ItemListSectionHeaderItem(presentationData: presentationData, text: text, sectionId: self.section)
         case let .accentColorOption(_, title, value, selected):
             return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, icon: telewhiteColorSwatchImage(value), iconSize: CGSize(width: 22.0, height: 22.0), title: title, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
@@ -888,20 +790,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: value.isEmpty ? "" : "•••" + String(value.suffix(4)), labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                 arguments.promptOpenRouterKey()
             })
-        case let .messageFiltersEnabled(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.messageFiltersEnabled = value
-            }
-        case let .messageFiltersUseRegex(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.messageFiltersUseRegex = value
-            }
-        case let .messageFilterRules(text, value):
-            let count = TelewhiteMessageFilters.parsedRules(from: value).count
-            let label = count == 0 ? "" : "\(count)"
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: label, labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
-                arguments.promptMessageFilterRules()
-            })
         case let .oneTimeMediaUnlimited(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.oneTimeMediaUnlimited = value
@@ -926,12 +814,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.quickForwardToSaved = value
             }
-        case let .preciseLastSeen(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.preciseLastSeen = value
-            }
-        case let .voiceChangeSettings(text):
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: "", labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: nil)
         case let .uploadVideoMessage(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.uploadVideoMessage = value
@@ -940,11 +822,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: "", sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                 arguments.openDebug()
             })
-        case let .groupEventLog(text, label):
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: label, labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
-                arguments.promptGroupEventLog()
-            })
-        case let .messengerInfo(text), let .privacyInfo(text), let .stealthInfo(text), let .channelsInfo(text), let .mediaInfo(text), let .callsInfo(text), let .developerInfo(text), let .appearanceInfo(text):
+        case let .messengerInfo(text), let .privacyInfo(text), let .stealthInfo(text), let .channelsInfo(text), let .mediaInfo(text), let .developerInfo(text), let .appearanceInfo(text):
             return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
         case let .hideOnlineStatus(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
@@ -1061,26 +939,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
                     updated.autoCacheCleanup = true
                     return updated
                 }
-            })
-        case let .autoRecordCalls(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.autoRecordCalls = value
-            }
-        case let .callRecordButton(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.callRecordButton = value
-            }
-        case let .voiceChangerEnabled(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.voiceChangerEnabled = value
-            }
-        case let .importHubertModel(text, installed):
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: installed ? "✓" : "", labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
-                arguments.importVoiceChangerModel(true)
-            })
-        case let .importVoiceModel(text, selectedName):
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: selectedName.isEmpty ? "" : selectedName, labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
-                arguments.importVoiceChangerModel(false)
             })
         case let .hideStories(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
@@ -1303,21 +1161,6 @@ private func telewhiteMenuIcon(_ icon: TelewhiteModsMenuIcon, color: UIColor) ->
             wave.addCurve(to: CGPoint(x: 22.0, y: 13.5), controlPoint1: CGPoint(x: 17.0, y: 17.5), controlPoint2: CGPoint(x: 19.5, y: 17.5))
             wave.lineWidth = lineWidth
             wave.stroke()
-        case .calls:
-            // Phone handset
-            let handset = UIBezierPath()
-            handset.move(to: CGPoint(x: 8.0, y: 7.5))
-            handset.addCurve(to: CGPoint(x: 12.5, y: 12.0), controlPoint1: CGPoint(x: 11.0, y: 7.0), controlPoint2: CGPoint(x: 12.5, y: 9.0))
-            handset.addCurve(to: CGPoint(x: 11.5, y: 15.5), controlPoint1: CGPoint(x: 12.5, y: 13.5), controlPoint2: CGPoint(x: 11.5, y: 14.0))
-            handset.addCurve(to: CGPoint(x: 13.5, y: 18.5), controlPoint1: CGPoint(x: 11.8, y: 16.5), controlPoint2: CGPoint(x: 12.5, y: 17.5))
-            handset.addCurve(to: CGPoint(x: 17.0, y: 17.5), controlPoint1: CGPoint(x: 15.0, y: 17.5), controlPoint2: CGPoint(x: 15.5, y: 16.5))
-            handset.addCurve(to: CGPoint(x: 21.5, y: 21.0), controlPoint1: CGPoint(x: 20.0, y: 16.5), controlPoint2: CGPoint(x: 22.0, y: 18.0))
-            handset.addCurve(to: CGPoint(x: 17.0, y: 24.0), controlPoint1: CGPoint(x: 21.0, y: 23.0), controlPoint2: CGPoint(x: 19.5, y: 24.0))
-            handset.addCurve(to: CGPoint(x: 8.0, y: 16.0), controlPoint1: CGPoint(x: 13.0, y: 23.5), controlPoint2: CGPoint(x: 8.5, y: 20.0))
-            handset.addCurve(to: CGPoint(x: 8.0, y: 7.5), controlPoint1: CGPoint(x: 7.5, y: 13.0), controlPoint2: CGPoint(x: 6.5, y: 9.0))
-            handset.lineWidth = lineWidth
-            handset.lineJoinStyle = .round
-            handset.stroke()
         case .appearance:
             // Circle half-filled (contrast/appearance)
             let circle = UIBezierPath(ovalIn: CGRect(x: 6.0, y: 6.0, width: 17.0, height: 17.0))
@@ -1365,8 +1208,6 @@ private func telewhiteTabTitle(_ tab: TelewhiteModsTab, strings: TelewhiteModsSt
         return strings.text("Channels and Groups", "\u{041a}\u{0430}\u{043d}\u{0430}\u{043b}\u{044b} \u{0438} \u{0433}\u{0440}\u{0443}\u{043f}\u{043f}\u{044b}")
     case .media:
         return strings.text("Media and Stories", "\u{041c}\u{0435}\u{0434}\u{0438}\u{0430} \u{0438} \u{0438}\u{0441}\u{0442}\u{043e}\u{0440}\u{0438}\u{0438}")
-    case .calls:
-        return strings.text("Calls", "\u{0417}\u{0432}\u{043e}\u{043d}\u{043a}\u{0438}")
     case .appearance:
         return strings.text("Look", "\u{0412}\u{043d}\u{0435}\u{0448}\u{043d}\u{0438}\u{0439} \u{0432}\u{0438}\u{0434}")
     case .developer:
@@ -1411,20 +1252,12 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
         return text("Automatically translates outgoing messages when your language differs from the chat partner's language (detected from their recent messages). No need to toggle translation manually per chat. Messages already in the target language are never touched.", "Автоматически переводит исходящие, когда ваш язык отличается от языка собеседника (определяется по его последним сообщениям). Не нужно вручную включать перевод в каждом чате. Сообщения уже на целевом языке не трогаются.")
     case .openRouterApiKey:
         return text("Optional free key from openrouter.ai for better AI translation. Without it the standard translator is used.", "Необязательный бесплатный ключ с openrouter.ai для более качественного AI-перевода. Без него — стандартный переводчик.")
-    case .messageFiltersEnabled:
-        return text("Hides incoming messages that match your local keyword or regex rules.", "Скрывает входящие сообщения, совпадающие с локальными правилами keyword или regex.")
-    case .messageFiltersUseRegex:
-        return text("Treats every message filter rule as a regular expression. Invalid regex rules are ignored.", "Считает каждое правило фильтра регулярным выражением. Неверные regex-правила игнорируются.")
-    case .messageFilterRules:
-        return text("Separate rules with commas. In keyword mode matching is case-insensitive.", "Разделяйте правила запятыми. В режиме ключевых слов регистр не учитывается.")
     case .uploadVideoMessage:
         return text("Videos from the gallery are sent as round video messages.", "Видео из галереи отправляются как круглые видеосообщения.")
     case .translateVoiceMessages:
         return text("Adds a translation under the transcript of voice messages when their language differs from yours. Uses a free translation service.", "Добавляет перевод под расшифровкой голосовых, если их язык отличается от вашего. Использует бесплатный переводчик.")
     case .quickForwardToSaved:
         return text("Adds a \"Forward to Saved Messages\" action to the message menu that sends a copy to your Saved Messages instantly, without the chat picker.", "Добавляет в меню сообщения действие «Переслать в Избранное», которое мгновенно отправляет копию в ваши Избранные без выбора чата.")
-    case .preciseLastSeen:
-        return text("Shows the exact seconds in \"last seen\" statuses (e.g. \"last seen 12 seconds ago\") instead of \"last seen just now\".", "Показывает точные секунды в статусе «был(а) в сети» (например «был 12 секунд назад») вместо «был только что».")
     case .oneTimeMediaUnlimited:
         return text("View-once photos and videos can be opened multiple times.", "Одноразовые фото и видео можно открывать сколько угодно раз.")
     case .downloadOneTimeMedia:
@@ -1533,15 +1366,6 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
             }
         }
         entries.append(.mediaInfo(strings.text("Old local media is removed automatically at the selected limit. Cloud messages and files stay available.", "Старые локальные медиа удаляются автоматически при выбранном лимите. Сообщения и облачные файлы остаются доступными.")))
-
-    case .calls:
-        entries.append(.callsHeader(telewhiteTabTitle(.calls, strings: strings)))
-        entries.append(.autoRecordCalls(strings.text("Auto-Record Calls", "Автозапись звонков"), settings.autoRecordCalls))
-        entries.append(.callRecordButton(strings.text("Record Button on Call Screen", "Кнопка записи на экране звонка"), settings.callRecordButton))
-        entries.append(.voiceChangerEnabled(strings.text("AI Voice Changer", "AI-изменение голоса"), settings.voiceChangerEnabled))
-        entries.append(.importHubertModel(strings.text("Import Pronunciation Model (.onnx)", "Импорт модели произношения (.onnx)"), settings.voiceChangerHubertInstalled))
-        entries.append(.importVoiceModel(strings.text("Import Voice (.onnx)", "Импорт голоса (.onnx)"), settings.voiceChangerSelectedVoiceName))
-        entries.append(.callsInfo(strings.text("Recordings are saved to your Saved Messages. When the record button is on, it appears on the call screen so you can start and stop recording manually. The voice changer needs both a shared pronunciation model and a target voice imported as .onnx files; it replaces your voice with the imported voice during calls.", "Записи сохраняются в «Избранное». Если кнопка записи включена, она появляется на экране звонка — можно начинать и останавливать запись вручную. Для изменения голоса нужны обе модели: общая модель произношения и целевой голос, импортированные как .onnx файлы; во время звонка ваш голос заменяется на импортированный.")))
 
     case .appearance:
         entries.append(.appearanceHeader(telewhiteTabTitle(.appearance, strings: strings)))
@@ -1759,53 +1583,7 @@ private func telewhiteModsSectionController(context: AccountContext, tab: Telewh
             }
         )
         presentControllerImpl?(prompt)
-    }, promptMessageFilterRules: {
-        let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-        let strings = TelewhiteModsStrings(presentationData: presentationData)
-        let settings = stateValue.with { $0 }
-        let prompt = promptController(
-            context: context,
-            text: strings.text("Filter Rules", "Правила фильтра"),
-            subtitle: strings.text("Separate keywords or regex rules with commas. Matching applies only on this device.", "Разделяйте ключевые слова или regex-правила запятыми. Фильтр работает только на этом устройстве."),
-            value: settings.messageFilterRules,
-            placeholder: strings.text("spam, casino, ads", "спам, казино, реклама"),
-            characterLimit: 4096,
-            apply: { value in
-                guard let value = value else {
-                    return
-                }
-                updateSettings { current in
-                    var updated = current
-                    updated.messageFilterRules = value.trimmingCharacters(in: .whitespacesAndNewlines)
-                    return updated
-                }
-            }
-        )
-        presentControllerImpl?(prompt)
-    }, promptGroupEventLog: {
-        let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-        let strings = TelewhiteModsStrings(presentationData: presentationData)
-        let entries = TelewhiteGroupEventLog.entries
-        let formattedEntries = entries.map { entry -> String in
-            let parts = entry.split(separator: ":")
-            if parts.count == 3, parts[0] == "removed", let timestamp = TimeInterval(String(parts[2])) {
-                let date = DateFormatter.localizedString(from: Date(timeIntervalSince1970: timestamp), dateStyle: .short, timeStyle: .short)
-                return strings.text("Removed from group \(parts[1]) • \(date)", "Удаление из группы \(parts[1]) • \(date)")
-            }
-            return entry
-        }
-        let value = formattedEntries.isEmpty ? strings.text("No removal events recorded on this device yet.", "На этом устройстве пока нет записей об удалении из групп.") : formattedEntries.joined(separator: "\n")
-        let prompt = promptController(
-            context: context,
-            text: strings.text("Group Removal Log", "Журнал удалений из групп"),
-            subtitle: strings.text("Local events only. Telegram updates for basic groups do not include the admin who removed you.", "Только локальные события. Обновления Telegram для базовых групп не содержат администратора, который удалил вас."),
-            value: value,
-            placeholder: "",
-            characterLimit: 4096,
-            apply: { _ in }
-        )
-        presentControllerImpl?(prompt)
-    }, importVoiceChangerModel: { _ in })
+    })
 
     let translationSettings = context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.translationSettings])
     |> map { sharedData -> TranslationSettings in
