@@ -610,7 +610,12 @@ public final class ChatHistoryListNodeImpl: ListViewImpl, ChatHistoryNode, ChatH
     private let messageMentionProcessingManager = ChatMessageThrottledProcessingManager(delay: 0.2)
     private let unseenReactionsProcessingManager = ChatMessageThrottledProcessingManager(delay: 0.2, submitInterval: 0.0)
     private let extendedMediaProcessingManager = ChatMessageVisibleThrottledProcessingManager(interval: 5.0)
-    private let translationProcessingManager = ChatMessageThrottledProcessingManager(submitInterval: 1.0)
+    // Telewhite: 1.0 re-admitted every still-untranslated id once a second — including ids
+    // whose request was still in flight and ids deliberately skipped — which is how the
+    // account earned its rate limit. translateMessageIds now tracks both sets itself, so
+    // this interval only needs to be slow enough to stop the storm while still retrying a
+    // message whose request genuinely failed.
+    private let translationProcessingManager = ChatMessageThrottledProcessingManager(submitInterval: 5.0)
     private let refreshStoriesProcessingManager = ChatMessageThrottledProcessingManager()
     private let factCheckProcessingManager = ChatMessageThrottledProcessingManager(submitInterval: 1.0)
     private let inlineGroupCallsProcessingManager = ChatMessageThrottledProcessingManager(submitInterval: 1.0)
@@ -2874,7 +2879,11 @@ public final class ChatHistoryListNodeImpl: ListViewImpl, ChatHistoryNode, ChatH
             var messageIdsToTranslate: [MessageId] = []
             var messageIdsToFactCheck: [MessageId] = []
             if let translateToLanguage {
-                let extendedRange: Int = 2
+                // Telewhite: a screenful, not two rows either side. One translateText
+                // request covering 25 messages costs the same as one covering 8, so the
+                // narrow window bought nothing and made the screen fill in visible-range
+                // slices — which is what "it translates three and then I wait" looks like.
+                let extendedRange: Int = 20
                 var wideIndexRange = (historyView.filteredEntries.count - 1 - visible.lastIndex - extendedRange, historyView.filteredEntries.count - 1 - visible.firstIndex + extendedRange)
                 wideIndexRange = (max(0, min(historyView.filteredEntries.count - 1, wideIndexRange.0)), max(0, min(historyView.filteredEntries.count - 1, wideIndexRange.1)))
                 if wideIndexRange.0 > wideIndexRange.1 {

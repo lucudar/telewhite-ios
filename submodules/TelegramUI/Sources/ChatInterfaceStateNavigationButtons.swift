@@ -511,16 +511,36 @@ func quaternaryRightNavigationButtonForChatInterfaceState(context: AccountContex
     guard case .standard(.default) = presentationInterfaceState.mode, presentationInterfaceState.subject == nil else {
         return nil
     }
-    guard let user = presentationInterfaceState.renderedPeer?.chatMainPeer as? TelegramUser, user.id != context.account.peerId, !user.id.isSecretChat, user.isGenericUser else {
+    // Telewhite: the button used to require a TelegramUser, which is why outgoing
+    // translation was private-chats-only. Groups and supergroups qualify too; a broadcast
+    // channel only when the account can actually post to it, and never Saved Messages or a
+    // secret chat (the translation call would hand the plaintext to a third party).
+    guard let chatMainPeer = presentationInterfaceState.renderedPeer?.chatMainPeer, chatMainPeer.id != context.account.peerId, !chatMainPeer.id.isSecretChat else {
+        return nil
+    }
+    switch chatMainPeer {
+    case let user as TelegramUser:
+        // isGenericUser already excludes bots, deleted accounts, Replies and the
+        // Telegram Notifications service.
+        guard user.isGenericUser else {
+            return nil
+        }
+    case _ as TelegramGroup:
+        break
+    case let channel as TelegramChannel:
+        guard channel.hasPermission(.sendSomething) else {
+            return nil
+        }
+    default:
         return nil
     }
     let settings = TelewhiteModsSettings.current
     guard settings.outgoingTranslateButtonEnabled else {
         return nil
     }
-    
-    let isEnabled = settings.isOutgoingTranslationEnabled(for: user.id)
-    let rawPeerId = user.id.toInt64()
+
+    let isEnabled = settings.isOutgoingTranslationEnabled(for: chatMainPeer.id)
+    let rawPeerId = chatMainPeer.id.toInt64()
     
     if currentButton?.action == .toggleOutgoingTranslation(peerId: rawPeerId, isEnabled: isEnabled) {
         return currentButton

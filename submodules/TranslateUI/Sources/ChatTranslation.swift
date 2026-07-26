@@ -218,26 +218,56 @@ private let telewhiteUkrainianOnlyLetters: Set<Character> = ["і", "ї", "є", "
 private let telewhiteEastSlavicLanguages: Set<String> = ["ru", "uk", "be"]
 
 // Returns "ru" or "uk" when the alphabet settles which one it is, nil when it does not.
-// Two letters of one kind and none of the other is the bar: a single "і" in a Russian
-// message is a quoted word, a name or a brand — «Слава Україні» inside Russian text
-// must not turn the message Ukrainian, or it gets translated into its own language.
+//
+// The evidence is asymmetric, because the two alphabets are. Ukrainian reaches for
+// і/ї/є/ґ constantly — roughly one letter in ten — so their RATE is the signal, not their
+// presence: «Слава Україні» quoted inside a long Russian post is three such letters in
+// two hundred, which is a quoted name, not the language of the message. Russian, on the
+// other hand, is identified by their ABSENCE: requiring ы/ъ/э to be present instead left
+// ordinary short messages ("Привет, как дела?") with no verdict at all, and the
+// recognizer then read them as Ukrainian at 0.55 against 0.20 for Russian and translated
+// Russian into Russian — the complaint this whole guard exists to answer.
+//
+// Only consulted when the recognizer's top hypothesis is already East Slavic, so text
+// that is confidently Bulgarian, Serbian or Kazakh never reaches this function.
+private let telewhiteUkrainianLetterRateDenominator = 25
+
+private func telewhiteIsCyrillic(_ character: Character) -> Bool {
+    guard let scalar = character.unicodeScalars.first else {
+        return false
+    }
+    return scalar.value >= 0x0400 && scalar.value <= 0x04FF
+}
+
 private func telewhiteCyrillicAlphabetVerdict(_ text: String) -> String? {
     var russianOnlyCount = 0
     var ukrainianOnlyCount = 0
+    var cyrillicCount = 0
     for character in text.lowercased() {
         if telewhiteRussianOnlyLetters.contains(character) {
             russianOnlyCount += 1
         } else if telewhiteUkrainianOnlyLetters.contains(character) {
             ukrainianOnlyCount += 1
         }
+        if telewhiteIsCyrillic(character) {
+            cyrillicCount += 1
+        }
     }
-    if russianOnlyCount >= 2 && ukrainianOnlyCount == 0 {
-        return "ru"
+    // Too little Cyrillic to be judging Cyrillic languages.
+    guard cyrillicCount >= 6 else {
+        return nil
     }
-    if ukrainianOnlyCount >= 2 && russianOnlyCount == 0 {
+    let atUkrainianRate = ukrainianOnlyCount * telewhiteUkrainianLetterRateDenominator >= cyrillicCount
+    if ukrainianOnlyCount > 0, atUkrainianRate {
+        if russianOnlyCount > 0 {
+            // Both alphabets at their own rate — a genuinely mixed message. No verdict;
+            // let the recognizer and the probability floors decide.
+            return nil
+        }
         return "uk"
     }
-    return nil
+    // Ukrainian letters absent, or present only at a quoted-word rate: Russian.
+    return "ru"
 }
 
 // Telewhite: decide whether a message should be left untranslated. Translation must
@@ -295,10 +325,39 @@ private func telewhiteShouldSkipTranslation(_ text: String, toLang: String, reco
     return detected == target
 }
 
+// Telewhite: bookkeeping so the same message is not asked for over and over. The visible
+// range is re-scanned every second (and forcibly every ten), and a message only stops
+// being collected once it carries a TranslationMessageAttribute — which a message we
+// deliberately skip never gets. Without these two sets, every skipped message re-opened a
+// postbox transaction and re-ran language recognition once a second, forever, and every
+// in-flight message was requested again while its first request was still outstanding,
+// which is what earned the rate limit in the first place.
+private let telewhiteTranslationInFlight = Atomic<Set<EngineMessage.Id>>(value: Set())
+private let telewhiteTranslationSkipped = Atomic<Set<EngineMessage.Id>>(value: Set())
+private let telewhiteTranslationSkippedLanguage = Atomic<String>(value: "")
+private let telewhiteTranslationCooldownUntil = Atomic<Double>(value: 0.0)
+
 public func translateMessageIds(context: AccountContext, messageIds: [EngineMessage.Id], fromLang: String?, toLang: String) -> Signal<Never, NoError> {
+    if CFAbsoluteTimeGetCurrent() < telewhiteTranslationCooldownUntil.with({ $0 }) {
+        return .complete()
+    }
+    // "Skip" is a verdict about a target language, so it cannot outlive a change of target:
+    // a message left alone because it was already Russian must be reconsidered the moment
+    // the user asks for English.
+    let normalizedToLang = normalizeTranslationLanguage(toLang.lowercased())
+    if telewhiteTranslationSkippedLanguage.with({ $0 }) != normalizedToLang {
+        let _ = telewhiteTranslationSkippedLanguage.swap(normalizedToLang)
+        let _ = telewhiteTranslationSkipped.swap(Set())
+    }
+    let alreadyHandled = telewhiteTranslationInFlight.with({ $0 }).union(telewhiteTranslationSkipped.with({ $0 }))
+    let messageIds = messageIds.filter { !alreadyHandled.contains($0) }
+    if messageIds.isEmpty {
+        return .complete()
+    }
     return context.account.postbox.transaction { transaction -> Signal<Never, NoError> in
         var messageIdsToTranslate: [EngineMessage.Id] = []
         var messageIdsSet = Set<EngineMessage.Id>()
+        var messageIdsToSkip = Set<EngineMessage.Id>()
         // One recognizer for the whole batch. This loop runs inside a postbox
         // transaction, so allocating one per message would hold up database access
         // for nothing — and it must not be shared with chat-level detection, which
@@ -330,13 +389,22 @@ public func translateMessageIds(context: AccountContext, messageIds: [EngineMess
                 if !message.text.isEmpty {
                     // Telewhite: only translate text that is confidently foreign.
                     if telewhiteShouldSkipTranslation(message.text, toLang: toLang, recognizer: batchLanguageRecognizer) {
+                        messageIdsToSkip.insert(messageId)
                         continue
                     }
                     if !messageIdsSet.contains(messageId) {
                         messageIdsToTranslate.append(messageId)
                         messageIdsSet.insert(messageId)
                     }
-                } else if let _ = message.media.first(where: { $0 is TelegramMediaPoll }) {
+                } else if let poll = message.media.first(where: { $0 is TelegramMediaPoll }) as? TelegramMediaPoll {
+                    // Telewhite: a poll's own text was never language-checked, so a Russian
+                    // poll in a Russian-target chat was sent off to be translated — question,
+                    // every option and the solution, in three extra requests.
+                    let pollText = poll.text.isEmpty ? (poll.options.first?.text ?? "") : poll.text
+                    if !pollText.isEmpty, telewhiteShouldSkipTranslation(pollText, toLang: toLang, recognizer: batchLanguageRecognizer) {
+                        messageIdsToSkip.insert(messageId)
+                        continue
+                    }
                     if !messageIdsSet.contains(messageId) {
                         messageIdsToTranslate.append(messageId)
                         messageIdsSet.insert(messageId)
@@ -345,6 +413,7 @@ public func translateMessageIds(context: AccountContext, messageIds: [EngineMess
                     // Telewhite: a transcript is text like any other — check it, or a
                     // Russian voice message gets a Russian "translation" underneath it.
                     if telewhiteShouldSkipTranslation(audioTranscription.text, toLang: toLang, recognizer: batchLanguageRecognizer) {
+                        messageIdsToSkip.insert(messageId)
                         continue
                     }
                     if !messageIdsSet.contains(messageId) {
@@ -352,14 +421,26 @@ public func translateMessageIds(context: AccountContext, messageIds: [EngineMess
                         messageIdsSet.insert(messageId)
                     }
                 }
-            } else {
-                if !messageIdsSet.contains(messageId) {
-                    messageIdsToTranslate.append(messageId)
-                    messageIdsSet.insert(messageId)
-                }
+            }
+            // The message could not be loaded from the postbox. It used to be appended
+            // here unchecked — no author check, no existing-translation check, no language
+            // check — which is how untranslatable and already-target-language messages got
+            // into the batch. Every caller passes ids from a loaded view, so dropping it
+            // costs nothing.
+        }
+
+        if !messageIdsToSkip.isEmpty {
+            let _ = telewhiteTranslationSkipped.modify { current in
+                return current.union(messageIdsToSkip)
             }
         }
-        
+        if messageIdsToTranslate.isEmpty {
+            return .complete()
+        }
+        let _ = telewhiteTranslationInFlight.modify { current in
+            return current.union(messageIdsToTranslate)
+        }
+
         let translationConfiguration = TranslationConfiguration.with(appConfiguration: context.currentAppConfiguration.with { $0 })
         var enableLocalIfPossible = false
         switch translationConfiguration.auto {
@@ -371,7 +452,30 @@ public func translateMessageIds(context: AccountContext, messageIds: [EngineMess
             break
         }
         return context.engine.messages.translateMessages(messageIds: messageIdsToTranslate, fromLang: fromLang, toLang: toLang, enableLocalIfPossible: enableLocalIfPossible)
-        |> `catch` { _ -> Signal<Never, NoError> in
+        |> afterCompleted {
+            telewhiteTranslationInFlight.modify { current in
+                var current = current
+                for id in messageIdsToTranslate {
+                    current.remove(id)
+                }
+                return current
+            }
+        }
+        |> `catch` { error -> Signal<Never, NoError> in
+            telewhiteTranslationInFlight.modify { current in
+                var current = current
+                for id in messageIdsToTranslate {
+                    current.remove(id)
+                }
+                return current
+            }
+            if case .limitExceeded = error {
+                // The server rate-limited us. The visible-range scanner would otherwise
+                // re-submit these ids about once a second and extend the limit; hold off
+                // for a minute instead.
+                let until = CFAbsoluteTimeGetCurrent() + 60.0
+                let _ = telewhiteTranslationCooldownUntil.swap(until)
+            }
             return .complete()
         }
     } |> switchToLatest

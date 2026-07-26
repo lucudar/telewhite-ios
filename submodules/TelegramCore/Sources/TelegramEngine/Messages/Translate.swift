@@ -261,7 +261,14 @@ private func _internal_translateMessagesByPeerId(account: Account, peerId: Engin
                     }
                 }
             } else {
-                msgs = account.network.request(Api.functions.messages.translateText(flags: flags, peer: inputPeer, id: id, text: nil, toLang: toLang, tone: tone != .neutral ? tone.rawValue : nil))
+                // Telewhite: automaticFloodWait (the default) does not fail on FLOOD_WAIT —
+                // MtProtoKit parks the request and reschedules it at now + N seconds, with
+                // no cap. With translation of non-Premium accounts enabled by the fork, a
+                // FLOOD_WAIT_180 therefore looked like "three messages translate, then
+                // nothing for three minutes, then the rest arrives at once". Failing fast
+                // lets the caller back off deliberately and tell the user, instead of the
+                // whole queue hanging invisibly.
+                msgs = account.network.request(Api.functions.messages.translateText(flags: flags, peer: inputPeer, id: id, text: nil, toLang: toLang, tone: tone != .neutral ? tone.rawValue : nil), automaticFloodWait: false)
                 |> map(Optional.init)
                 |> mapError { error -> TranslationError in
                     if error.errorDescription.hasPrefix("FLOOD_WAIT") {

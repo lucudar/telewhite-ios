@@ -4782,7 +4782,11 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
     }
     
     private func telewhiteTranslateOutgoingMessagesIfNeeded(_ messages: [EnqueueMessage], _ completion: @escaping ([EnqueueMessage]) -> Void) {
-        guard let peerId = self.chatPresentationInterfaceState.chatLocation.peerId, peerId.namespace == Namespaces.Peer.CloudUser else {
+        // Telewhite: groups and channels included — the restriction to private chats was
+        // arbitrary, and writing to English-speaking groups is exactly what this is for.
+        // Secret chats stay excluded on purpose: the translation call sends the plaintext
+        // to a third-party service, which is the one thing a secret chat must never do.
+        guard let peerId = self.chatPresentationInterfaceState.chatLocation.peerId, peerId.namespace != Namespaces.Peer.SecretChat else {
             completion(messages)
             return
         }
