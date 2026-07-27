@@ -39,9 +39,6 @@ public struct TelewhiteModsSettings: Equatable {
     public var downloadOneTimeMedia: Bool
     public var downloadStories: Bool
     public var chatFontSizeOverride: Int32
-    public var outgoingTranslateButtonEnabled: Bool
-    public var outgoingTranslationPeerIds: Set<Int64>
-    public var outgoingTranslationLanguages: [Int64: String]
     public var openRouterApiKey: String
     public var forwardHideNamesByDefault: Bool
     public var showPreviousEditedText: Bool
@@ -79,9 +76,6 @@ public struct TelewhiteModsSettings: Equatable {
         static let downloadOneTimeMedia = "telewhite.mods.downloadOneTimeMedia"
         static let downloadStories = "telewhite.mods.downloadStories"
         static let chatFontSizeOverride = "telewhite.mods.chatFontSizeOverride"
-        static let outgoingTranslateButtonEnabled = "telewhite.mods.outgoingTranslateButtonEnabled"
-        static let outgoingTranslationPeerIds = "telewhite.mods.outgoingTranslationPeerIds"
-        static let outgoingTranslationLanguages = "telewhite.mods.outgoingTranslationLanguages"
         static let openRouterApiKey = "telewhite.mods.openRouterApiKey"
         static let forwardHideNamesByDefault = "telewhite.mods.forwardHideNamesByDefault"
         static let showPreviousEditedText = "telewhite.mods.showPreviousEditedText"
@@ -140,19 +134,6 @@ public struct TelewhiteModsSettings: Equatable {
             downloadOneTimeMedia: defaults.bool(forKey: Key.downloadOneTimeMedia),
             downloadStories: defaults.bool(forKey: Key.downloadStories),
             chatFontSizeOverride: (defaults.object(forKey: Key.chatFontSizeOverride) as? NSNumber)?.int32Value ?? 0,
-            outgoingTranslateButtonEnabled: defaults.object(forKey: Key.outgoingTranslateButtonEnabled) as? Bool ?? true,
-            outgoingTranslationPeerIds: Set((defaults.array(forKey: Key.outgoingTranslationPeerIds) as? [NSNumber] ?? []).map { $0.int64Value }),
-            outgoingTranslationLanguages: {
-                var result: [Int64: String] = [:]
-                if let stored = defaults.dictionary(forKey: Key.outgoingTranslationLanguages) as? [String: String] {
-                    for (key, value) in stored {
-                        if let rawId = Int64(key) {
-                            result[rawId] = value
-                        }
-                    }
-                }
-                return result
-            }(),
             openRouterApiKey: defaults.string(forKey: Key.openRouterApiKey) ?? "",
             forwardHideNamesByDefault: defaults.bool(forKey: Key.forwardHideNamesByDefault),
             showPreviousEditedText: defaults.object(forKey: Key.showPreviousEditedText) as? Bool ?? true,
@@ -204,39 +185,6 @@ public struct TelewhiteModsSettings: Equatable {
         return updated
     }
 
-    public func isOutgoingTranslationEnabled(for peerId: EnginePeer.Id?) -> Bool {
-        guard let peerId else {
-            return false
-        }
-        return self.outgoingTranslationPeerIds.contains(peerId.toInt64())
-    }
-
-    public func outgoingTranslationLanguage(for peerId: EnginePeer.Id?) -> String {
-        guard let peerId else {
-            return "en"
-        }
-        return self.outgoingTranslationLanguages[peerId.toInt64()] ?? "en"
-    }
-
-    public func withToggledOutgoingTranslationPeer(_ peerId: EnginePeer.Id) -> TelewhiteModsSettings {
-        var updated = self
-        let rawId = peerId.toInt64()
-        if updated.outgoingTranslationPeerIds.contains(rawId) {
-            updated.outgoingTranslationPeerIds.remove(rawId)
-        } else {
-            updated.outgoingTranslationPeerIds.insert(rawId)
-        }
-        return updated
-    }
-
-    public func withOutgoingTranslationLanguage(_ language: String, for peerId: EnginePeer.Id) -> TelewhiteModsSettings {
-        var updated = self
-        let rawId = peerId.toInt64()
-        updated.outgoingTranslationLanguages[rawId] = language
-        updated.outgoingTranslationPeerIds.insert(rawId)
-        return updated
-    }
-    
     public func save() {
         let defaults = UserDefaults.standard
         defaults.set(self.ghostMode, forKey: Key.ghostMode)
@@ -264,9 +212,6 @@ public struct TelewhiteModsSettings: Equatable {
         defaults.set(self.downloadOneTimeMedia, forKey: Key.downloadOneTimeMedia)
         defaults.set(self.downloadStories, forKey: Key.downloadStories)
         defaults.set(self.chatFontSizeOverride, forKey: Key.chatFontSizeOverride)
-        defaults.set(self.outgoingTranslateButtonEnabled, forKey: Key.outgoingTranslateButtonEnabled)
-        defaults.set(self.outgoingTranslationPeerIds.map { NSNumber(value: $0) }, forKey: Key.outgoingTranslationPeerIds)
-        defaults.set(Dictionary(uniqueKeysWithValues: self.outgoingTranslationLanguages.map { (String($0.key), $0.value) }), forKey: Key.outgoingTranslationLanguages)
         defaults.set(self.openRouterApiKey, forKey: Key.openRouterApiKey)
         defaults.set(self.forwardHideNamesByDefault, forKey: Key.forwardHideNamesByDefault)
         defaults.set(self.showPreviousEditedText, forKey: Key.showPreviousEditedText)
@@ -378,7 +323,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case translateMessages(String, Bool)
     case autoTranslateEnglish(String, Bool)
     case translationTargetLanguage(String, String)
-    case outgoingTranslateButtonEnabled(String, Bool)
     case translateVoiceMessages(String, Bool)
     case openRouterApiKey(String, String)
     case translatorInfo(String)
@@ -435,7 +379,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.menu.rawValue
         case .messengerHeader, .preserveDeletedMessages, .forwardHideNamesByDefault, .showPreviousEditedText, .oneTimeMedia, .hdPhotos, .quickForwardToSaved, .translatorLink, .messengerInfo:
             return TelewhiteModsSection.messenger.rawValue
-        case .translatorHeader, .translateMessages, .autoTranslateEnglish, .translationTargetLanguage, .outgoingTranslateButtonEnabled, .translateVoiceMessages, .openRouterApiKey, .translatorInfo:
+        case .translatorHeader, .translateMessages, .autoTranslateEnglish, .translationTargetLanguage, .translateVoiceMessages, .openRouterApiKey, .translatorInfo:
             return TelewhiteModsSection.translator.rawValue
         case .translationLanguageHeader, .translationLanguageOption:
             return TelewhiteModsSection.translationLanguage.rawValue
@@ -486,8 +430,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 52
         case .translateMessages:
             return 53
-        case .outgoingTranslateButtonEnabled:
-            return 54
         case .translateVoiceMessages:
             return 55
         case .openRouterApiKey:
@@ -691,10 +633,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: telewhiteLanguageDisplayName(value), labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                 arguments.openTab(.translationLanguage)
             })
-        case let .outgoingTranslateButtonEnabled(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.outgoingTranslateButtonEnabled = value
-            }
         case let .openRouterApiKey(text, value):
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: value.isEmpty ? "" : "•••" + String(value.suffix(4)), labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                 arguments.promptOpenRouterKey()
@@ -928,12 +866,10 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
         return text("The language everything is translated into.", "Язык, на который всё переводится.")
     case .translateMessages:
         return text("Adds \"Translate\" to the menu that appears when you hold a message.", "Добавляет пункт «Перевести» в меню, которое открывается долгим нажатием на сообщение.")
-    case .outgoingTranslateButtonEnabled:
-        return text("Puts a translator button at the top of private chats: tap it and your messages are sent translated, hold it to pick the language.", "Ставит кнопку переводчика в шапку личных чатов: нажатие — ваши сообщения уходят переведёнными, долгое нажатие — выбор языка.")
     case .translateVoiceMessages:
         return text("Voice messages in other languages get a translation under the transcript.", "Под расшифровкой голосового на чужом языке появляется перевод.")
     case .openRouterApiKey:
-        return text("Optional. A free key from openrouter.ai gives better translation and voice transcription. Without it the regular translator is used.", "Необязательно. Бесплатный ключ с openrouter.ai даёт ��олее точный перевод и расшифровку голосовых. Без него работает обычный переводчик.")
+        return text("Optional. A free key from openrouter.ai gives better translation and voice transcription. Without it the regular translator is used.", "Необязательно. Бесплатный ключ с openrouter.ai даёт более точный перевод и расшифровку голосовых. Без него работает обычный переводчик.")
     case .protectionBypass:
         return text("In chats and channels that block saving, you can take screenshots, copy text, forward and save media again.", "В чатах и каналах, где запрещено сохранять, снова работают скриншоты, копирование, пересылка и сохранение медиа.")
     case .hidePhoneInSettings:
@@ -990,7 +926,6 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.autoTranslateEnglish(strings.text("Translate Incoming Messages", "Переводить входящие"), settings.autoTranslateEnglish || translationSettings.translateChats))
         entries.append(.translationTargetLanguage(strings.text("Translate Into", "Переводить на"), settings.translationTargetLanguage))
         entries.append(.translateMessages(strings.text("\"Translate\" in the Message Menu", "«Перевести» в меню сообщения"), translationSettings.showTranslate))
-        entries.append(.outgoingTranslateButtonEnabled(strings.text("Translate What You Send", "Переводить то, что вы пишете"), settings.outgoingTranslateButtonEnabled))
         entries.append(.translateVoiceMessages(strings.text("Translate Voice Messages", "Переводить голосовые"), settings.translateVoiceMessages))
         entries.append(.openRouterApiKey(strings.text("OpenRouter Key", "Ключ OpenRouter"), settings.openRouterApiKey))
         entries.append(.translatorInfo(strings.text("Translation is free and needs no account. Messages already in your language are never translated.", "Перевод бесплатный и не требует аккаунта. Сообщения, уже написанные на вашем языке, не переводятся.")))
@@ -1089,9 +1024,8 @@ public func telewhiteModsController(context: AccountContext) -> ViewController {
         let updated = stateValue.modify { _ in
             // Mutate the LIVE settings, not this screen's snapshot. The screen stays alive
             // on the Settings tab while chats write the same struct (the per-chat ghost
-            // button writes ghostPeerIds, the chat translator writes
-            // outgoingTranslationPeerIds/Languages), so flipping any switch here used to
-            // save a stale copy over them and silently wipe the per-chat state.
+            // button writes ghostPeerIds), so flipping any switch here used to save a
+            // stale copy over them and silently wipe the per-chat state.
             let updated = f(TelewhiteModsSettings.current)
             updated.save()
             return updated

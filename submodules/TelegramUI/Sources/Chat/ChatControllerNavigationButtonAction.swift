@@ -158,24 +158,6 @@ extension ChatControllerImpl {
                     return false
                 }
             ), in: .current)
-        case let .toggleOutgoingTranslation(peerId, _):
-            var settings = TelewhiteModsSettings.current
-            settings = settings.withToggledOutgoingTranslationPeer(EnginePeer.Id(peerId))
-            settings.save()
-            
-            self.updateChatPresentationInterfaceState(transition: .immediate, interactive: false, force: true, { $0 })
-            
-            let isEnabled = settings.isOutgoingTranslationEnabled(for: EnginePeer.Id(peerId))
-            let language = settings.outgoingTranslationLanguage(for: EnginePeer.Id(peerId))
-            let languageName = outgoingTranslationLanguageDisplayName(language)
-            self.present(UndoOverlayController(
-                presentationData: self.presentationData,
-                content: .info(title: nil, text: isEnabled ? "Outgoing messages will be translated to \(languageName)" : "Outgoing translation disabled", timeout: nil, customUndoText: nil),
-                elevatedLayout: false,
-                action: { _ in
-                    return false
-                }
-            ), in: .current)
         case let .toggleTranslation(isEnabled):
             // Telewhite: translate into the globally configured target language
             // instead of hardcoded Russian.
@@ -187,7 +169,7 @@ extension ChatControllerImpl {
             }
             self.present(UndoOverlayController(
                 presentationData: self.presentationData,
-                content: .info(title: nil, text: isEnabled ? "Showing original text" : "Translating to \(outgoingTranslationLanguageDisplayName(targetLanguage))", timeout: nil, customUndoText: nil),
+                content: .info(title: nil, text: isEnabled ? "Showing original text" : "Translating to \(telewhiteTranslationLanguageDisplayName(targetLanguage))", timeout: nil, customUndoText: nil),
                 elevatedLayout: false,
                 action: { _ in
                     return false
@@ -785,50 +767,9 @@ extension ChatControllerImpl {
             self.editChat()
         }
     }
-    
-    func presentOutgoingTranslationLanguageMenu(peerId: EnginePeer.Id) {
-        let settings = TelewhiteModsSettings.current
-        let currentLanguage = settings.outgoingTranslationLanguage(for: peerId)
-        
-        let actionSheet = ActionSheetController(presentationData: self.presentationData)
-        var items: [ActionSheetItem] = []
-        items.append(ActionSheetTextItem(title: "Translate outgoing messages to"))
-        for (code, name) in outgoingTranslationLanguages {
-            let title = code == currentLanguage ? "\(name) ✓" : name
-            items.append(ActionSheetButtonItem(title: title, color: .accent, action: { [weak self, weak actionSheet] in
-                actionSheet?.dismissAnimated()
-                guard let self else {
-                    return
-                }
-                var settings = TelewhiteModsSettings.current
-                settings = settings.withOutgoingTranslationLanguage(code, for: peerId)
-                settings.save()
-                
-                self.updateChatPresentationInterfaceState(transition: .immediate, interactive: false, force: true, { $0 })
-                
-                self.present(UndoOverlayController(
-                    presentationData: self.presentationData,
-                    content: .info(title: nil, text: "Outgoing messages will be translated to \(name)", timeout: nil, customUndoText: nil),
-                    elevatedLayout: false,
-                    action: { _ in
-                        return false
-                    }
-                ), in: .current)
-            }))
-        }
-        actionSheet.setItemGroups([
-            ActionSheetItemGroup(items: items),
-            ActionSheetItemGroup(items: [
-                ActionSheetButtonItem(title: self.presentationData.strings.Common_Cancel, color: .accent, font: .bold, action: { [weak actionSheet] in
-                    actionSheet?.dismissAnimated()
-                })
-            ])
-        ])
-        self.present(actionSheet, in: .window(.root))
-    }
 }
 
-let outgoingTranslationLanguages: [(String, String)] = [
+let telewhiteTranslationLanguages: [(String, String)] = [
     ("en", "English"),
     ("es", "Spanish"),
     ("de", "German"),
@@ -872,8 +813,8 @@ let outgoingTranslationLanguages: [(String, String)] = [
     ("ru", "Russian")
 ]
 
-func outgoingTranslationLanguageDisplayName(_ code: String) -> String {
-    for (langCode, name) in outgoingTranslationLanguages {
+func telewhiteTranslationLanguageDisplayName(_ code: String) -> String {
+    for (langCode, name) in telewhiteTranslationLanguages {
         if langCode == code {
             return name
         }

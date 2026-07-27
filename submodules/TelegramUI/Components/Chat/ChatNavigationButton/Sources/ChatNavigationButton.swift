@@ -15,7 +15,6 @@ public enum ChatNavigationButtonAction: Equatable {
     case toggleInfoPanel
     case toggleGhostMode(peerId: Int64, isEnabled: Bool)
     case toggleTranslation(isEnabled: Bool)
-    case toggleOutgoingTranslation(peerId: Int64, isEnabled: Bool)
     case spacer
     case edit
 }
