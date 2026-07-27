@@ -407,9 +407,6 @@ public func currentPresentationDataAndSettings(accountManager: AccountManager<Te
         
         let storedAccentColors = themeSettings.themeSpecificAccentColors[effectiveTheme.index]
         var theme = makePresentationTheme(mediaBox: accountManager.mediaBox, themeReference: effectiveTheme, baseTheme: preferredBaseTheme, accentColor: storedAccentColors?.colorFor(baseTheme: preferredBaseTheme ?? .day), bubbleColors: storedAccentColors?.customBubbleColors ?? [], baseColor: storedAccentColors?.baseColor) ?? defaultPresentationTheme
-        // Telewhite mod: the monochrome look is applied unconditionally, before AMOLED,
-        // so AMOLED stays meaningful and only flattens the dark palette to true black.
-        theme = makeTelewhiteMonoPresentationTheme(theme)
         if telewhiteAmoledModeEnabled() {
             theme = makeTelewhiteAmoledPresentationTheme(theme)
         }
@@ -805,8 +802,6 @@ public func updatedPresentationData(accountManager: AccountManager<TelegramAccou
                         }
                         
                         var themeValue = makePresentationTheme(mediaBox: accountManager.mediaBox, themeReference: effectiveTheme, baseTheme: preferredBaseTheme, accentColor: effectiveColors?.colorFor(baseTheme: preferredBaseTheme ?? .day), bubbleColors: effectiveColors?.customBubbleColors ?? [], wallpaper: effectiveColors?.wallpaper, baseColor: effectiveColors?.baseColor, serviceBackgroundColor: serviceBackgroundColor) ?? defaultPresentationTheme
-                        // Telewhite mod: see the matching call in the synchronous path above.
-                        themeValue = makeTelewhiteMonoPresentationTheme(themeValue)
                         if telewhiteAmoledModeEnabled() {
                             themeValue = makeTelewhiteAmoledPresentationTheme(themeValue)
                         }

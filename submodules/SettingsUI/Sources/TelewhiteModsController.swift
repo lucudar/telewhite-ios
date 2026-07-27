@@ -345,7 +345,7 @@ private enum TelewhiteModsTab: Int32, Equatable {
     // did nothing when tapped, so the target could never be changed from ru.
     case translationLanguage
     // Telewhite: chat text sizing. Colours and bubble shape used to live here too, but
-    // the app now ships a single monochrome look, so there is nothing to pick.
+    // they duplicated the stock Appearance screen, so they were dropped.
     case chatText
 }
 
@@ -933,7 +933,7 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
     case .translateVoiceMessages:
         return text("Voice messages in other languages get a translation under the transcript.", "Под расшифровкой голосового на чужом языке появляется перевод.")
     case .openRouterApiKey:
-        return text("Optional. A free key from openrouter.ai gives better translation and voice transcription. Without it the regular translator is used.", "Необязательно. Бесплатный ключ с openrouter.ai даёт более точный перевод и расшифровку голосовых. Без него работает обычный переводчик.")
+        return text("Optional. A free key from openrouter.ai gives better translation and voice transcription. Without it the regular translator is used.", "Необязательно. Бесплатный ключ с openrouter.ai даёт ��олее точный перевод и расшифровку голосовых. Без него работает обычный переводчик.")
     case .protectionBypass:
         return text("In chats and channels that block saving, you can take screenshots, copy text, forward and save media again.", "В чатах и каналах, где запрещено сохранять, снова работают скриншоты, копирование, пересылка и сохранение медиа.")
     case .hidePhoneInSettings:
@@ -1025,7 +1025,7 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
     case .channels:
         entries.append(.channelsHeader(telewhiteTabTitle(.channels, strings: strings)))
         entries.append(.channelsDeclutter(strings.text("Clean Up Posts", "Убрать лишнее под постами"), settings.channelHideReactions || settings.channelHideComments || settings.channelHideShareButton))
-        entries.append(.channelsInfo(strings.text("Only changes how posts look on this phone. Nobody else is affected.", "Меняет только то, как посты выглядят на этом телефоне. Для остальных ничего не меняется.")))
+        entries.append(.channelsInfo(strings.text("Only changes how posts look on this phone. Nobody else is affected.", "Меняет только то, как посты выглядят на этом телефо��е. Для остальных ничего не меняется.")))
 
     case .media:
         entries.append(.mediaHeader(telewhiteTabTitle(.media, strings: strings)))

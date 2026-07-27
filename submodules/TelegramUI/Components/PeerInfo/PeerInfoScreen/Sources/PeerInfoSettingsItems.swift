@@ -15,43 +15,6 @@ import PeerNameColorItem
 import SettingsUI
 import AppBundle
 
-private var telewhiteAppIconRowCache: (name: String, image: UIImage)?
-
-private func telewhiteCurrentAppIconImage(context: AccountContext) -> UIImage? {
-    let icons = context.sharedContext.applicationBindings.getAvailableAlternateIcons()
-    let selectedIcon: PresentationAppIcon?
-    if let alternateIconName = context.sharedContext.applicationBindings.getAlternateIconName() {
-        selectedIcon = icons.first(where: { $0.name == alternateIconName })
-    } else {
-        // No icon is flagged default in non-AppStore builds — fall back to the
-        // first icon (BlueIcon, the actual default) so the row always syncs.
-        selectedIcon = icons.first(where: { $0.isDefault }) ?? icons.first
-    }
-    guard let selectedIcon else {
-        return nil
-    }
-    if let cached = telewhiteAppIconRowCache, cached.name == selectedIcon.name {
-        return cached.image
-    }
-    
-    // Alternate icon identity and its bundle image name are not always the same.
-    guard let sourceImage = UIImage(named: selectedIcon.imageName, in: getAppBundle(), compatibleWith: nil) else {
-        return nil
-    }
-    
-    // Render at 29x29 with the standard iOS settings-icon corner radius.
-    let size = CGSize(width: 29.0, height: 29.0)
-    let format = UIGraphicsImageRendererFormat()
-    format.opaque = false
-    let renderer = UIGraphicsImageRenderer(size: size, format: format)
-    let result = renderer.image { _ in
-        UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 6.5).addClip()
-        sourceImage.draw(in: CGRect(origin: .zero, size: size))
-    }
-    telewhiteAppIconRowCache = (selectedIcon.name, result)
-    return result
-}
-
 enum SettingsSection: Int, CaseIterable {
     case edit
     case phone
@@ -190,7 +153,9 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
         items[.myProfile]!.append(PeerInfoScreenDisclosureItem(id: 0, text: presentationData.strings.Settings_MyProfile, icon: PresentationResourcesSettings.myProfile, action: {
             interaction.openSettings(.profile)
         }))
-        items[.telewhite]!.append(PeerInfoScreenDisclosureItem(id: 0, label: .titleBadge("MOD", presentationData.theme.list.itemAccentColor), text: "Telewhite Mods", icon: telewhiteCurrentAppIconImage(context: context) ?? PresentationResourcesSettings.appearance, action: {
+        // Telewhite mod: the row deliberately carries no icon - passing nil also makes
+        // the disclosure item drop the 45pt icon gutter, so the title sits flush.
+        items[.telewhite]!.append(PeerInfoScreenDisclosureItem(id: 0, label: .titleBadge("MOD", presentationData.theme.list.itemAccentColor), text: "Telewhite Mods", icon: nil, action: {
             interaction.openSettings(.telewhiteMods)
         }))
         

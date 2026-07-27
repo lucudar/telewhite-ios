@@ -5,66 +5,42 @@ import AppBundle
 
 private let gradientImage = UIImage(bundleImageName: "Item List/Icons/Gradient")
 private let backdropImage = UIImage(bundleImageName: "Item List/Icons/Backdrop")
+// Telewhite mod: settings rows use flat monochrome glyphs instead of the stock
+// colored rounded plates.
+//
+// This is the single place every `PresentationResourcesSettings` entry goes through,
+// so restyling here converts the whole app (main settings, privacy, data & storage,
+// notifications, sticker screens) in one move and stays compatible with upstream —
+// the `backgroundColors` argument is still accepted at every call site, it is just
+// no longer painted, so no call site had to be edited.
+//
+// The tint is a fixed neutral gray rather than a theme color on purpose: these are
+// `static let` constants evaluated once at first access, so they cannot react to a
+// theme change. A mid gray is the one value that keeps acceptable contrast on both
+// the light and the dark background.
+private let telewhiteSettingsIconColor = UIColor(rgb: 0x9A9AA0)
+
 public func renderSettingsIcon(name: String, scaleFactor: CGFloat = 1.0, backgroundColors: [UIColor]? = nil) -> UIImage? {
     return generateImage(CGSize(width: 30.0, height: 30.0), contextGenerator: { size, context in
         let bounds = CGRect(origin: CGPoint(), size: size)
         context.clear(bounds)
         
-        if let backgroundColors {
-            var locations: [CGFloat] = [0.0, 1.0]
-            let colors: [CGColor] = backgroundColors.map(\.cgColor)
-            
-            let colorSpace = CGColorSpaceCreateDeviceRGB()
-            let gradient = CGGradient(colorsSpace: colorSpace, colors: colors as CFArray, locations: &locations)!
-            
-            context.drawLinearGradient(gradient, start: CGPoint(x: size.width, y: size.height), end: CGPoint(x: 0.0, y: 0.0), options: CGGradientDrawingOptions())
-            
-            if let gradientImage, let cgImage = gradientImage.cgImage {
-                context.setBlendMode(.plusLighter)
-                context.draw(cgImage, in: CGRect(origin: .zero, size: size))
-            }
-            
-            if let backdropImage, let cgImage = backdropImage.cgImage {
-                context.setBlendMode(.overlay)
-                context.draw(cgImage, in: CGRect(origin: CGPoint(x: 0.0, y: 0.0), size: size))
-            }
-                        
-            context.setBlendMode(.normal)
-            
-            if let image = UIImage(bundleImageName: name), let maskImage = image.cgImage {
-                let imageSize = CGSize(width: image.size.width * scaleFactor, height: image.size.height * scaleFactor)
-                let imageRect = CGRect(origin: CGPoint(x: (bounds.width - imageSize.width) * 0.5, y: (bounds.height - imageSize.height) * 0.5), size: imageSize)
-                
-                context.saveGState()
-                context.clip(to: imageRect, mask: maskImage)
-                context.setFillColor(UIColor.white.cgColor)
-                context.fill(imageRect)
-                context.restoreGState()
-            }
-            
-            let outerPath = UIBezierPath(rect: CGRect(origin: .zero, size: size))
-            let innerPath = UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 8.0)
-            outerPath.append(innerPath)
-
-            context.saveGState()
-            outerPath.usesEvenOddFillRule = true
-            context.addPath(outerPath.cgPath)
-            context.clip(using: .evenOdd)
-
-            context.setBlendMode(.clear)
-            context.fill(CGRect(origin: .zero, size: size))
-            context.restoreGState()
-        } else {
-            if let image = UIImage(bundleImageName: name), let cgImage = image.cgImage {
-                let imageSize: CGSize
-                if scaleFactor == 1.0 {
-                    imageSize = size
-                } else {
-                    imageSize = CGSize(width: image.size.width * scaleFactor, height: image.size.height * scaleFactor)
-                }
-                context.draw(cgImage, in: CGRect(origin: CGPoint(x: (bounds.width - imageSize.width) * 0.5, y: (bounds.height - imageSize.height) * 0.5), size: imageSize))
-            }
+        guard let image = UIImage(bundleImageName: name), let maskImage = image.cgImage else {
+            return
         }
+        
+        // Without a plate behind it the glyph can occupy a bit more of the row, which
+        // keeps the icon column visually as strong as before. Clamped so a glyph that
+        // is already full bleed cannot overflow the 30x30 box.
+        let glyphScale = min(scaleFactor * 1.15, size.width / max(image.size.width, 1.0))
+        let imageSize = CGSize(width: image.size.width * glyphScale, height: image.size.height * glyphScale)
+        let imageRect = CGRect(origin: CGPoint(x: (bounds.width - imageSize.width) * 0.5, y: (bounds.height - imageSize.height) * 0.5), size: imageSize)
+        
+        context.saveGState()
+        context.clip(to: imageRect, mask: maskImage)
+        context.setFillColor(telewhiteSettingsIconColor.cgColor)
+        context.fill(imageRect)
+        context.restoreGState()
     })
 }
 
@@ -171,140 +147,15 @@ public struct PresentationResourcesSettings {
     public static let timer = renderSettingsIcon(name: "Item List/Icons/Timer", backgroundColors: [colorPurple])
     public static let email = renderSettingsIcon(name: "Item List/Icons/Email", backgroundColors: [colorViolet])
         
-    public static let premium = generateImage(CGSize(width: 30.0, height: 30.0), contextGenerator: { size, context in
-        let bounds = CGRect(origin: CGPoint(), size: size)
-        context.clear(bounds)
-                
-        let colorsArray: [CGColor] = [
-            UIColor(rgb: 0x6b93ff).cgColor,
-            UIColor(rgb: 0x6b93ff).cgColor,
-            UIColor(rgb: 0x8d77ff).cgColor,
-            UIColor(rgb: 0xb56eec).cgColor,
-            UIColor(rgb: 0xb56eec).cgColor
-        ]
-        var locations: [CGFloat] = [0.0, 0.15, 0.5, 0.85, 1.0]
-        let gradient = CGGradient(colorsSpace: deviceColorSpace, colors: colorsArray as CFArray, locations: &locations)!
-        context.drawLinearGradient(gradient, start: CGPoint(x: 0.0, y: 0.0), end: CGPoint(x: size.width, y: size.height), options: CGGradientDrawingOptions())
-        
-        if let gradientImage, let cgImage = gradientImage.cgImage {
-            context.setBlendMode(.plusLighter)
-            context.draw(cgImage, in: CGRect(origin: .zero, size: size))
-        }
-        
-        if let backdropImage, let cgImage = backdropImage.cgImage {
-            context.setBlendMode(.overlay)
-            context.draw(cgImage, in: CGRect(origin: CGPoint(x: 0.0, y: 0.0), size: size))
-        }
-        
-        context.setBlendMode(.normal)
-        
-        if let image = generateTintedImage(image: UIImage(bundleImageName: "Item List/Icons/Premium"), color: UIColor(rgb: 0xffffff)), let cgImage = image.cgImage {
-            context.draw(cgImage, in: CGRect(origin: CGPoint(x: floorToScreenPixels((bounds.width - image.size.width) / 2.0), y: floorToScreenPixels((bounds.height - image.size.height) / 2.0)), size: image.size))
-        }
-        
-        let outerPath = UIBezierPath(rect: CGRect(origin: .zero, size: size))
-        let innerPath = UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 8.0)
-        outerPath.append(innerPath)
-
-        context.saveGState()
-        outerPath.usesEvenOddFillRule = true
-        context.addPath(outerPath.cgPath)
-        context.clip(using: .evenOdd)
-
-        context.setBlendMode(.clear)
-        context.fill(CGRect(origin: .zero, size: size))
-        context.restoreGState()
-    })
+    // Telewhite mod: Premium, Stars and Gift used to be hand-drawn gradient plates.
+    // Routed through renderSettingsIcon so they match the rest of the monochrome column.
+    public static let premium = renderSettingsIcon(name: "Item List/Icons/Premium")
     
     public static let ton = renderSettingsIcon(name: "Ads/TonAbout", backgroundColors: [UIColor(rgb: 0x32ade6)])
  
-    public static let stars = generateImage(CGSize(width: 30.0, height: 30.0), contextGenerator: { size, context in
-        let bounds = CGRect(origin: CGPoint(), size: size)
-        context.clear(bounds)
-        
-        let colorsArray: [CGColor] = [
-            UIColor(rgb: 0xfec80f).cgColor,
-            UIColor(rgb: 0xdd6f12).cgColor
-        ]
-        var locations: [CGFloat] = [0.0, 1.0]
-        let gradient = CGGradient(colorsSpace: deviceColorSpace, colors: colorsArray as CFArray, locations: &locations)!
-
-        context.drawLinearGradient(gradient, start: CGPoint(x: 0.0, y: 0.0), end: CGPoint(x: size.width, y: size.height), options: CGGradientDrawingOptions())
-        
-        if let gradientImage, let cgImage = gradientImage.cgImage {
-            context.setBlendMode(.plusLighter)
-            context.draw(cgImage, in: CGRect(origin: .zero, size: size))
-        }
-        
-        if let backdropImage, let cgImage = backdropImage.cgImage {
-            context.setBlendMode(.overlay)
-            context.draw(cgImage, in: CGRect(origin: CGPoint(x: 0.0, y: 0.0), size: size))
-        }
-        
-        context.setBlendMode(.normal)
-        
-        if let image = generateTintedImage(image: UIImage(bundleImageName: "Item List/Icons/Stars"), color: UIColor(rgb: 0xffffff)), let cgImage = image.cgImage {
-            context.draw(cgImage, in: CGRect(origin: CGPoint(x: floorToScreenPixels((bounds.width - image.size.width) / 2.0), y: floorToScreenPixels((bounds.height - image.size.height) / 2.0)), size: image.size))
-        }
-        
-        let outerPath = UIBezierPath(rect: CGRect(origin: .zero, size: size))
-        let innerPath = UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 8.0)
-        outerPath.append(innerPath)
-
-        context.saveGState()
-        outerPath.usesEvenOddFillRule = true
-        context.addPath(outerPath.cgPath)
-        context.clip(using: .evenOdd)
-
-        context.setBlendMode(.clear)
-        context.fill(CGRect(origin: .zero, size: size))
-        context.restoreGState()
-    })
+    public static let stars = renderSettingsIcon(name: "Item List/Icons/Stars")
     
-    public static let premiumGift = generateImage(CGSize(width: 30.0, height: 30.0), contextGenerator: { size, context in
-        let bounds = CGRect(origin: CGPoint(), size: size)
-        context.clear(bounds)
-        
-        let colorsArray: [CGColor] = [
-            UIColor(rgb: 0x3ba1f2).cgColor,
-            UIColor(rgb: 0x3ba1f2).cgColor,
-            UIColor(rgb: 0x39b3b4).cgColor,
-            UIColor(rgb: 0x34c27d).cgColor,
-            UIColor(rgb: 0x34c27d).cgColor
-        ]
-        var locations: [CGFloat] = [0.0, 0.15, 0.5, 0.85, 1.0]
-        let gradient = CGGradient(colorsSpace: deviceColorSpace, colors: colorsArray as CFArray, locations: &locations)!
-        context.drawLinearGradient(gradient, start: CGPoint(x: 0.0, y: 0.0), end: CGPoint(x: size.width, y: size.height), options: CGGradientDrawingOptions())
-        
-        if let gradientImage, let cgImage = gradientImage.cgImage {
-            context.setBlendMode(.plusLighter)
-            context.draw(cgImage, in: CGRect(origin: .zero, size: size))
-        }
-        
-        if let backdropImage, let cgImage = backdropImage.cgImage {
-            context.setBlendMode(.overlay)
-            context.draw(cgImage, in: CGRect(origin: CGPoint(x: 0.0, y: 0.0), size: size))
-        }
-        
-        context.setBlendMode(.normal)
-        
-        if let image = generateTintedImage(image: UIImage(bundleImageName: "Item List/Icons/Gift"), color: UIColor(rgb: 0xffffff)), let cgImage = image.cgImage {
-            context.draw(cgImage, in: CGRect(origin: CGPoint(x: floorToScreenPixels((bounds.width - image.size.width) / 2.0), y: floorToScreenPixels((bounds.height - image.size.height) / 2.0)), size: image.size))
-        }
-        
-        let outerPath = UIBezierPath(rect: CGRect(origin: .zero, size: size))
-        let innerPath = UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 8.0)
-        outerPath.append(innerPath)
-
-        context.saveGState()
-        outerPath.usesEvenOddFillRule = true
-        context.addPath(outerPath.cgPath)
-        context.clip(using: .evenOdd)
-
-        context.setBlendMode(.clear)
-        context.fill(CGRect(origin: .zero, size: size))
-        context.restoreGState()
-    })
+    public static let premiumGift = renderSettingsIcon(name: "Item List/Icons/Gift")
     
     public static let bot = renderSettingsIcon(name: "Item List/Icons/Bot", backgroundColors: [colorBlue])
 

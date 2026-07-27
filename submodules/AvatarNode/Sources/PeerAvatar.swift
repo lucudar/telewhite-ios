@@ -435,24 +435,11 @@ public func drawPeerAvatarLetters(context: CGContext, size: CGSize, round: Bool 
     
     context.setBlendMode(.normal)
     
-    let string = letters.count == 0 ? "" : (letters[0] + (letters.count == 1 ? "" : letters[1]))
-    let attributedString = NSAttributedString(string: string, attributes: [NSAttributedString.Key.font: font, NSAttributedString.Key.foregroundColor: UIColor.white])
-    
-    let line = CTLineCreateWithAttributedString(attributedString)
-    let lineBounds = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
-    
-    let lineOffset = CGPoint(x: string == "B" ? 1.0 : 0.0, y: 0.0)
-    let lineOrigin = CGPoint(x: floorToScreenPixels(-lineBounds.origin.x + (size.width - lineBounds.size.width) / 2.0) + lineOffset.x, y: floorToScreenPixels(-lineBounds.origin.y + (size.height - lineBounds.size.height) / 2.0))
-    
-    context.translateBy(x: size.width / 2.0, y: size.height / 2.0)
-    context.scaleBy(x: 1.0, y: -1.0)
-    context.translateBy(x: -size.width / 2.0, y: -size.height / 2.0)
-    
-    let textPosition = context.textPosition
-    context.translateBy(x: lineOrigin.x, y: lineOrigin.y)
-    CTLineDraw(line, context)
-    context.translateBy(x: -lineOrigin.x, y: -lineOrigin.y)
-    context.textPosition = textPosition
+    // Telewhite mod: no name initials on generated placeholder avatars.
+    // This is the second rasterization path (used for notifications, intents and
+    // other pre-rendered images), so it has to be cleared alongside AvatarNode.
+    // The `letters` and `font` parameters are intentionally left in the signature
+    // to avoid touching every call site across the app.
 }
 
 
