@@ -326,11 +326,7 @@ private enum TelewhiteModsSection: Int32 {
     case channels
     case media
     case appearance
-    case themePresets
-    case accentColor
-    case bubbleColor
-    case backgroundColor
-    case cornerRadius
+    case chatText
     case developer
 }
 
@@ -348,17 +344,9 @@ private enum TelewhiteModsTab: Int32, Equatable {
     // Telewhite: "Translate Into" used to be a row that displayed a language code and
     // did nothing when tapped, so the target could never be changed from ru.
     case translationLanguage
-    // Telewhite: sub-screens of the appearance tab. Every colour used to be one row
-    // on a single 31-row screen, which meant scrolling past three palettes to reach
-    // the radius options.
-    case accentColor
-    case bubbleColor
-    case background
-    case shape
-    // Telewhite: whole-look presets. "Dark Mono" used to be the only one and lived as a
-    // lone action row on the appearance screen, which gave no way to see what it had
-    // done or to get back to the stock look.
-    case themePresets
+    // Telewhite: chat text sizing. Colours and bubble shape used to live here too, but
+    // the app now ships a single monochrome look, so there is nothing to pick.
+    case chatText
 }
 
 private enum TelewhiteModsMenuIcon: Int32, Equatable {
@@ -426,29 +414,13 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case mediaInfo(String)
 
     case appearanceHeader(String)
-    case accentColorLink(String, Int64?)
-    case bubbleColorLink(String, Int64?)
-    case backgroundColorLink(String, Int64?, [Int64]?)
-    case shapeLink(String)
+    case chatTextLink(String)
     case compactChatList(String, Bool)
     case chatSplitLandscape(String, Bool)
     case amoledMode(String, Bool)
-    case themePresetsLink(String, [Int64]?)
-    case themePresetsHeader(String)
-    case themePresetOption(Int32, String, [Int64]?, Bool)
-    case themePresetsInfo(String)
-    case accentColorHeader(String)
-    case accentColorOption(Int32, String, Int64?, Bool)
-    case accentColorCustom(String, Int64?, Bool)
-    case bubbleColorHeader(String)
-    case bubbleColorOption(Int32, String, Int64?, Bool)
-    case bubbleColorCustom(String, Int64?, Bool)
-    case backgroundColorHeader(String)
-    case backgroundColorOption(Int32, String, Int64?, Bool)
-    case backgroundColorCustom(String, Int64?, Bool)
-    case cornerRadiusHeader(String)
-    case cornerRadiusOption(Int32, String, Int32?, Bool)
+    case chatTextHeader(String)
     case chatFontSizeOption(Int32, String, Int32, Bool)
+    case chatTextInfo(String)
     case appearanceInfo(String)
     
     case developerHeader(String)
@@ -475,18 +447,10 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.channels.rawValue
         case .mediaHeader, .downloadStories, .hideStories, .autoCacheCleanup, .cacheLimit, .mediaInfo:
             return TelewhiteModsSection.media.rawValue
-        case .appearanceHeader, .compactChatList, .chatSplitLandscape, .amoledMode, .themePresetsLink, .accentColorLink, .bubbleColorLink, .backgroundColorLink, .shapeLink:
+        case .appearanceHeader, .compactChatList, .chatSplitLandscape, .amoledMode, .chatTextLink, .appearanceInfo:
             return TelewhiteModsSection.appearance.rawValue
-        case .themePresetsHeader, .themePresetOption, .themePresetsInfo:
-            return TelewhiteModsSection.themePresets.rawValue
-        case .accentColorHeader, .accentColorOption, .accentColorCustom:
-            return TelewhiteModsSection.accentColor.rawValue
-        case .bubbleColorHeader, .bubbleColorOption, .bubbleColorCustom:
-            return TelewhiteModsSection.bubbleColor.rawValue
-        case .backgroundColorHeader, .backgroundColorOption, .backgroundColorCustom:
-            return TelewhiteModsSection.backgroundColor.rawValue
-        case .cornerRadiusHeader, .cornerRadiusOption, .chatFontSizeOption, .appearanceInfo:
-            return TelewhiteModsSection.cornerRadius.rawValue
+        case .chatTextHeader, .chatFontSizeOption, .chatTextInfo:
+            return TelewhiteModsSection.chatText.rawValue
         case .developerHeader, .pushStatus, .pushToken, .debugMenu, .developerInfo:
             return TelewhiteModsSection.developer.rawValue
         }
@@ -581,49 +545,17 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 703
         case .amoledMode:
             return 704
-        case .themePresetsLink:
+        case .chatTextLink:
             return 705
-        case .accentColorLink:
-            return 706
-        case .bubbleColorLink:
-            return 707
-        case .backgroundColorLink:
-            return 708
-        case .shapeLink:
-            return 709
-        case .accentColorHeader:
-            return 710
-        case let .accentColorOption(index, _, _, _):
-            return 711 + index
-        case .accentColorCustom:
-            return 729
-        case .bubbleColorHeader:
-            return 730
-        case let .bubbleColorOption(index, _, _, _):
-            return 731 + index
-        case .bubbleColorCustom:
-            return 749
-        case .backgroundColorHeader:
-            return 750
-        case let .backgroundColorOption(index, _, _, _):
-            return 751 + index
-        case .backgroundColorCustom:
-            return 769
-        case .cornerRadiusHeader:
-            return 770
-        case let .cornerRadiusOption(index, _, _, _):
-            return 771 + index
-        case let .chatFontSizeOption(index, _, _, _):
-            return 781 + index
         case .appearanceInfo:
             return 790
-        // The presets screen is its own section, so its ids only have to rise among
+        // The chat text screen is its own section, so its ids only have to rise among
         // themselves — they sit above the appearance block to keep the ranges readable.
-        case .themePresetsHeader:
+        case .chatTextHeader:
             return 900
-        case let .themePresetOption(index, _, _, _):
+        case let .chatFontSizeOption(index, _, _, _):
             return 901 + index
-        case .themePresetsInfo:
+        case .chatTextInfo:
             return 950
         case .developerHeader:
             return 800
@@ -659,58 +591,13 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: telewhiteMenuIcon(icon, color: presentationData.theme.list.itemAccentColor), title: title, titleFont: .bold, label: subtitle, labelStyle: .multilineDetailText, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                 arguments.openTab(tab)
             })
-        case let .messengerHeader(text), let .translatorHeader(text), let .translationLanguageHeader(text), let .privacyHeader(text), let .stealthHeader(text), let .channelsHeader(text), let .mediaHeader(text), let .appearanceHeader(text), let .developerHeader(text), let .accentColorHeader(text), let .bubbleColorHeader(text), let .backgroundColorHeader(text), let .cornerRadiusHeader(text), let .themePresetsHeader(text):
+        case let .messengerHeader(text), let .translatorHeader(text), let .translationLanguageHeader(text), let .privacyHeader(text), let .stealthHeader(text), let .channelsHeader(text), let .mediaHeader(text), let .appearanceHeader(text), let .developerHeader(text), let .chatTextHeader(text):
             return ItemListSectionHeaderItem(presentationData: presentationData, text: text, sectionId: self.section)
         case let .translationLanguageOption(_, title, code, selected):
             return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: title, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
                 arguments.updateSettings { current in
                     var updated = current
                     updated.translationTargetLanguage = code
-                    return updated
-                }
-            })
-        case let .accentColorOption(_, title, value, selected):
-            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, icon: telewhiteColorSwatchImage(value), iconSize: CGSize(width: 22.0, height: 22.0), title: title, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
-                arguments.updateSettings { current in
-                    var updated = current
-                    updated.accentColorOverride = value
-                    return updated
-                }
-            })
-        case let .bubbleColorOption(_, title, value, selected):
-            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, icon: telewhiteColorSwatchImage(value), iconSize: CGSize(width: 22.0, height: 22.0), title: title, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
-                arguments.updateSettings { current in
-                    var updated = current
-                    updated.bubbleColorOverride = value
-                    return updated
-                }
-            })
-        case let .backgroundColorOption(_, title, value, selected):
-            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, icon: telewhiteColorSwatchImage(value), iconSize: CGSize(width: 22.0, height: 22.0), title: title, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
-                arguments.updateSettings { current in
-                    var updated = current
-                    updated.chatBackgroundColorOverride = value
-                    updated.chatBackgroundGradientOverride = nil
-                    return updated
-                }
-            })
-        case let .accentColorCustom(title, value, selected):
-            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, icon: telewhiteColorSwatchImage(selected ? value : nil), iconSize: CGSize(width: 22.0, height: 22.0), title: title, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
-                arguments.promptCustomColor(.accent)
-            })
-        case let .bubbleColorCustom(title, value, selected):
-            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, icon: telewhiteColorSwatchImage(selected ? value : nil), iconSize: CGSize(width: 22.0, height: 22.0), title: title, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
-                arguments.promptCustomColor(.bubble)
-            })
-        case let .backgroundColorCustom(title, value, selected):
-            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, icon: telewhiteColorSwatchImage(selected ? value : nil), iconSize: CGSize(width: 22.0, height: 22.0), title: title, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
-                arguments.promptCustomColor(.background)
-            })
-        case let .cornerRadiusOption(_, title, value, selected):
-            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: title, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
-                arguments.updateSettings { current in
-                    var updated = current
-                    updated.bubbleCornerRadiusOverride = value
                     return updated
                 }
             })
@@ -828,7 +715,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: "", sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                 arguments.openDebug()
             })
-        case let .messengerInfo(text), let .translatorInfo(text), let .privacyInfo(text), let .stealthInfo(text), let .channelsInfo(text), let .mediaInfo(text), let .developerInfo(text), let .appearanceInfo(text), let .themePresetsInfo(text):
+        case let .messengerInfo(text), let .translatorInfo(text), let .privacyInfo(text), let .stealthInfo(text), let .channelsInfo(text), let .mediaInfo(text), let .developerInfo(text), let .appearanceInfo(text), let .chatTextInfo(text):
             return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
         case let .hidePhoneInSettings(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
@@ -841,36 +728,9 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
                 settings.showChatIds = value
                 settings.showMessageIds = value
             }
-        case let .accentColorLink(text, value):
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: telewhiteColorSwatchImage(value), title: text, label: "", labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
-                arguments.openTab(.accentColor)
-            })
-        case let .bubbleColorLink(text, value):
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: telewhiteColorSwatchImage(value), title: text, label: "", labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
-                arguments.openTab(.bubbleColor)
-            })
-        case let .backgroundColorLink(text, value, gradient):
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: gradient.flatMap(telewhiteGradientSwatchImage) ?? telewhiteColorSwatchImage(value), title: text, label: "", labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
-                arguments.openTab(.background)
-            })
-        case let .shapeLink(text):
+        case let .chatTextLink(text):
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: "", labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
-                arguments.openTab(.shape)
-            })
-        case let .themePresetsLink(text, swatch):
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: swatch.flatMap(telewhiteGradientSwatchImage) ?? telewhiteColorSwatchImage(nil), title: text, label: "", labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
-                arguments.openTab(.themePresets)
-            })
-        case let .themePresetOption(index, title, swatch, selected):
-            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, icon: swatch.flatMap(telewhiteGradientSwatchImage) ?? telewhiteColorSwatchImage(nil), title: title, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
-                guard let preset = telewhiteThemePreset(at: index) else {
-                    return
-                }
-                arguments.updateSettings { current in
-                    var updated = current
-                    preset.apply(to: &updated)
-                    return updated
-                }
+                arguments.openTab(.chatText)
             })
         case let .downloadStories(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
@@ -925,145 +785,6 @@ private struct TelewhiteModsStrings {
 
     func text(_ en: String, _ ru: String) -> String {
         return self.isRussian ? ru : en
-    }
-}
-
-private func telewhiteCustomColorTitle(strings: TelewhiteModsStrings, value: Int64?) -> String {
-    // No longer "(HEX)": the row opens the colour wheel now, and HEX is just one of the
-    // tabs inside it.
-    let base = strings.text("Custom Color", "Свой цвет")
-    if let value = value {
-        return base + String(format: " — #%06X", UInt32(truncatingIfNeeded: value) & 0xffffff)
-    }
-    return base
-}
-
-func telewhiteParseHexColor(_ input: String) -> Int64? {
-    var cleaned = input.trimmingCharacters(in: .whitespacesAndNewlines)
-    if cleaned.hasPrefix("#") {
-        cleaned = String(cleaned.dropFirst())
-    }
-    if cleaned.hasPrefix("0x") || cleaned.hasPrefix("0X") {
-        cleaned = String(cleaned.dropFirst(2))
-    }
-    if cleaned.count == 3 {
-        cleaned = cleaned.map { "\($0)\($0)" }.joined()
-    }
-    guard cleaned.count == 6, let value = UInt32(cleaned, radix: 16) else {
-        return nil
-    }
-    return Int64(value)
-}
-
-// Telewhite: a preset is nothing but a bundle of the overrides the appearance sub-screens
-// already set one at a time. Keeping them as plain values means a preset can also be
-// recognised after the fact, so the list can show which one is currently in effect and
-// stop pretending that tapping a row is a one-way action.
-private struct TelewhiteThemePreset {
-    let titleEn: String
-    let titleRu: String
-    let accentColor: Int64?
-    let bubbleColor: Int64?
-    let backgroundColor: Int64?
-    let cornerRadius: Int32?
-    let amoledMode: Bool
-
-    func title(strings: TelewhiteModsStrings) -> String {
-        return strings.text(self.titleEn, self.titleRu)
-    }
-
-    // Background first, then bubble, then accent: reading the swatch left to right gives
-    // the same order the eye meets those colours in a chat.
-    var swatch: [Int64]? {
-        let colors = [self.backgroundColor, self.bubbleColor, self.accentColor].compactMap { $0 }
-        return colors.isEmpty ? nil : colors
-    }
-
-    func matches(_ settings: TelewhiteModsSettings) -> Bool {
-        return settings.accentColorOverride == self.accentColor
-            && settings.bubbleColorOverride == self.bubbleColor
-            && settings.chatBackgroundColorOverride == self.backgroundColor
-            && settings.chatBackgroundGradientOverride == nil
-            && settings.bubbleCornerRadiusOverride == self.cornerRadius
-            && settings.amoledMode == self.amoledMode
-    }
-
-    func apply(to settings: inout TelewhiteModsSettings) {
-        settings.accentColorOverride = self.accentColor
-        settings.bubbleColorOverride = self.bubbleColor
-        settings.chatBackgroundColorOverride = self.backgroundColor
-        // A preset always defines a flat background, so a gradient left over from an
-        // earlier choice has to go or it would keep winning over the new colour.
-        settings.chatBackgroundGradientOverride = nil
-        settings.bubbleCornerRadiusOverride = self.cornerRadius
-        settings.amoledMode = self.amoledMode
-    }
-}
-
-private let telewhiteThemePresetList: [TelewhiteThemePreset] = [
-    // The first entry is the way back out: every override cleared, which is what the
-    // appearance screen had no row for before.
-    TelewhiteThemePreset(titleEn: "Telegram Default", titleRu: "Как в Telegram", accentColor: nil, bubbleColor: nil, backgroundColor: nil, cornerRadius: nil, amoledMode: false),
-    TelewhiteThemePreset(titleEn: "Dark Mono", titleRu: "Тёмная моно", accentColor: 0x8e8e93, bubbleColor: 0x1c1c1e, backgroundColor: 0x000000, cornerRadius: 17, amoledMode: true),
-    TelewhiteThemePreset(titleEn: "Graphite", titleRu: "Графит", accentColor: 0x0a84ff, bubbleColor: 0x3a3a3c, backgroundColor: 0x151515, cornerRadius: 12, amoledMode: false),
-    TelewhiteThemePreset(titleEn: "Forest", titleRu: "Лес", accentColor: 0x34c759, bubbleColor: 0x1f3d2b, backgroundColor: 0x0e1f16, cornerRadius: 12, amoledMode: false),
-    TelewhiteThemePreset(titleEn: "Ember", titleRu: "Закат", accentColor: 0xff9f0a, bubbleColor: 0x4a2418, backgroundColor: 0x1a0f0b, cornerRadius: 12, amoledMode: false),
-    TelewhiteThemePreset(titleEn: "Indigo Night", titleRu: "Индиго", accentColor: 0x5e5ce6, bubbleColor: 0x2b2b5c, backgroundColor: 0x0d0d1a, cornerRadius: 12, amoledMode: false),
-    TelewhiteThemePreset(titleEn: "Paper", titleRu: "Бумага", accentColor: 0x007aff, bubbleColor: 0xd8e3f0, backgroundColor: 0xf2f2f7, cornerRadius: 8, amoledMode: false)
-]
-
-private func telewhiteThemePreset(at index: Int32) -> TelewhiteThemePreset? {
-    let index = Int(index)
-    guard index >= 0 && index < telewhiteThemePresetList.count else {
-        return nil
-    }
-    return telewhiteThemePresetList[index]
-}
-
-private func telewhiteActiveThemePreset(_ settings: TelewhiteModsSettings) -> TelewhiteThemePreset? {
-    return telewhiteThemePresetList.first(where: { $0.matches(settings) })
-}
-
-private func telewhiteGradientSwatchImage(_ colors: [Int64]) -> UIImage? {
-    let size = CGSize(width: 22.0, height: 22.0)
-    let renderer = UIGraphicsImageRenderer(size: size)
-    return renderer.image { context in
-        let rect = CGRect(origin: .zero, size: size)
-        let path = UIBezierPath(ovalIn: rect.insetBy(dx: 1.0, dy: 1.0))
-        path.addClip()
-        let cgColors = colors.map { UIColor(rgb: UInt32(truncatingIfNeeded: $0)).cgColor }
-        if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: cgColors as CFArray, locations: nil) {
-            context.cgContext.drawLinearGradient(gradient, start: CGPoint(x: 0.0, y: 0.0), end: CGPoint(x: size.width, y: size.height), options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
-        }
-        path.lineWidth = 1.0
-        UIColor(white: 0.5, alpha: 0.35).setStroke()
-        path.stroke()
-    }
-}
-
-private func telewhiteColorSwatchImage(_ value: Int64?) -> UIImage? {
-    let size = CGSize(width: 22.0, height: 22.0)
-    let renderer = UIGraphicsImageRenderer(size: size)
-    return renderer.image { _ in
-        let rect = CGRect(origin: .zero, size: size)
-        let path = UIBezierPath(ovalIn: rect.insetBy(dx: 1.0, dy: 1.0))
-        if let value = value {
-            UIColor(rgb: UInt32(truncatingIfNeeded: value)).setFill()
-            path.fill()
-            path.lineWidth = 1.0
-            UIColor(white: 0.5, alpha: 0.35).setStroke()
-            path.stroke()
-        } else {
-            path.lineWidth = 1.5
-            UIColor(white: 0.5, alpha: 0.35).setStroke()
-            path.stroke()
-            let line = UIBezierPath()
-            line.move(to: CGPoint(x: 5.0, y: 17.0))
-            line.addLine(to: CGPoint(x: 17.0, y: 5.0))
-            line.lineWidth = 1.5
-            UIColor(white: 0.5, alpha: 0.5).setStroke()
-            line.stroke()
-        }
     }
 }
 
@@ -1147,18 +868,10 @@ private func telewhiteTabTitle(_ tab: TelewhiteModsTab, strings: TelewhiteModsSt
         return strings.text("Developer", "\u{0420}\u{0430}\u{0437}\u{0440}\u{0430}\u{0431}\u{043e}\u{0442}\u{0447}\u{0438}\u{043a}")
     case .translator:
         return strings.text("Translator", "Переводчик")
-    case .accentColor:
-        return strings.text("Accent Color", "Акцентный цвет")
-    case .bubbleColor:
-        return strings.text("Outgoing Bubble Color", "Цвет исходящих")
-    case .background:
-        return strings.text("Chat Background", "Фон чата")
-    case .shape:
-        return strings.text("Bubbles and Text", "Пузыри и текст")
     case .translationLanguage:
         return strings.text("Translate Into", "Переводить на")
-    case .themePresets:
-        return strings.text("Theme Presets", "Готовые темы")
+    case .chatText:
+        return strings.text("Chat Text", "Текст в чате")
     }
 }
 
@@ -1182,7 +895,7 @@ private func telewhiteMenuEntries(strings: TelewhiteModsStrings) -> [TelewhiteMo
         .menuItem(2, .messages, telewhiteTabTitle(.messenger, strings: strings), strings.text("Deleted messages, view-once media, forwarding, translation.", "Удалённые сообщения, одноразовые медиа, пересылка, перевод."), .messenger),
         .menuItem(3, .groups, telewhiteTabTitle(.channels, strings: strings), strings.text("What is shown under channel posts.", "Что показывать под постами каналов."), .channels),
         .menuItem(4, .media, telewhiteTabTitle(.media, strings: strings), strings.text("Stories and space taken up on the phone.", "Истории и место, занятое на телефоне."), .media),
-        .menuItem(5, .appearance, telewhiteTabTitle(.appearance, strings: strings), strings.text("Colours, chat list, landscape mode.", "Цвета, список чатов, горизонтальный режим."), .appearance),
+        .menuItem(5, .appearance, telewhiteTabTitle(.appearance, strings: strings), strings.text("Chat text, chat list, landscape mode.", "Текст в чате, список чатов, горизонтальный режим."), .appearance),
         .menuItem(6, .developer, telewhiteTabTitle(.developer, strings: strings), strings.text("Notification diagnostics and debug tools.", "Диагностика уведомлений и отладка."), .developer)
     ]
 }
@@ -1218,7 +931,7 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
     case .outgoingTranslateButtonEnabled:
         return text("Puts a translator button at the top of private chats: tap it and your messages are sent translated, hold it to pick the language.", "Ставит кнопку переводчика в шапку личных чатов: нажатие — ваши сообщения уходят переведёнными, долгое нажатие — выбор языка.")
     case .translateVoiceMessages:
-        return text("Voice messages in other languages get a translation under the transcript.", "Под ��асшифровкой голосового на чужом языке появляется перевод.")
+        return text("Voice messages in other languages get a translation under the transcript.", "Под расшифровкой голосового на чужом языке появляется перевод.")
     case .openRouterApiKey:
         return text("Optional. A free key from openrouter.ai gives better translation and voice transcription. Without it the regular translator is used.", "Необязательно. Бесплатный ключ с openrouter.ai даёт более точный перевод и расшифровку голосовых. Без него работает обычный переводчик.")
     case .protectionBypass:
@@ -1331,92 +1044,18 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.compactChatList(strings.text("Compact Chat List", "Компактный список чатов"), settings.compactChatList))
         entries.append(.chatSplitLandscape(strings.text("Split View in Landscape", "Сплит чатов (альбомная)"), settings.chatSplitLandscape))
         entries.append(.amoledMode(strings.text("AMOLED Mode", "AMOLED режим"), settings.amoledMode))
-        entries.append(.themePresetsLink(strings.text("Theme Presets", "Готовые темы"), telewhiteActiveThemePreset(settings)?.swatch))
-        // Telewhite: the three palettes and the shape options live on their own
-        // screens. Each row shows the colour currently in effect as its swatch, so the
-        // overview still answers "what is set?" without opening anything.
-        entries.append(.accentColorLink(strings.text("Accent Color", "Акцентный цвет"), settings.accentColorOverride))
-        entries.append(.bubbleColorLink(strings.text("Outgoing Bubble Color", "Цвет исходящих сообщений"), settings.bubbleColorOverride))
-        entries.append(.backgroundColorLink(strings.text("Chat Background", "Фон чата"), settings.chatBackgroundColorOverride, settings.chatBackgroundGradientOverride))
-        entries.append(.shapeLink(strings.text("Bubbles and Text", "Пузыри и текст")))
+        // Telewhite: text sizing is the only thing left to choose here. The accent,
+        // bubble and background palettes are gone — the app has one monochrome look now,
+        // so offering colours would just be a way to break it.
+        entries.append(.chatTextLink(strings.text("Chat Text", "Текст в чате")))
+        entries.append(.appearanceInfo(strings.text("Telewhite uses a single monochrome look, so there is nothing to recolor. AMOLED mode deepens the background to true black.", "Telewhite использует единый монохромный вид, поэтому перекрашивать нечего. AMOLED-режим делает фон полностью чёрным.")))
 
-    case .themePresets:
-        entries.append(.themePresetsHeader(strings.text("Theme Presets", "Готовые темы")))
-        let activePreset = telewhiteActiveThemePreset(settings)
-        for (index, preset) in telewhiteThemePresetList.enumerated() {
-            // Comparing titles rather than the struct keeps this free of an Equatable
-            // conformance while still marking exactly one row, since titles are unique.
-            let selected = activePreset?.titleEn == preset.titleEn
-            entries.append(.themePresetOption(Int32(index), preset.title(strings: strings), preset.swatch, selected))
-        }
-        if activePreset == nil {
-            entries.append(.themePresetsInfo(strings.text("Your current colors do not match any preset. Picking one replaces the accent, bubble, background, corner radius and AMOLED settings.", "Текущие цвета не совпадают ни с одной готовой темой. Выбор темы заменит акцент, цвет исходящих, фон, скругление и AMOLED.")))
-        } else {
-            entries.append(.themePresetsInfo(strings.text("A preset sets the accent, bubble, background, corner radius and AMOLED settings at once. You can still adjust each of them afterwards.", "Готовая тема сразу задаёт акцент, цвет исходящих, фон, скругление и AMOLED. Каждый параметр потом можно поправить отдельно.")))
-        }
-
-    case .accentColor:
-        let accentPresets: [(String, Int64?)] = [
-            (strings.text("Default", "По умолчанию"), nil),
-            (strings.text("Blue", "Синий"), 0x007aff),
-            (strings.text("Green", "Зелёный"), 0x34c759),
-            (strings.text("Red", "Красный"), 0xff3b30),
-            (strings.text("Pink", "Розовый"), 0xff2d55),
-            (strings.text("Indigo", "Индиго"), 0x5856d6)
-        ]
-        entries.append(.accentColorHeader(strings.text("Accent Color", "Акцентный цвет")))
-        for (index, preset) in accentPresets.enumerated() {
-            entries.append(.accentColorOption(Int32(index), preset.0, preset.1, settings.accentColorOverride == preset.1))
-        }
-        let accentIsCustom = settings.accentColorOverride != nil && !accentPresets.contains(where: { $0.1 == settings.accentColorOverride })
-        entries.append(.accentColorCustom(telewhiteCustomColorTitle(strings: strings, value: accentIsCustom ? settings.accentColorOverride : nil), settings.accentColorOverride, accentIsCustom))
-
-    case .bubbleColor:
-        let bubblePresets: [(String, Int64?)] = [
-            (strings.text("Default", "По умолчанию"), nil),
-            (strings.text("Blue", "Синий"), 0x007aff),
-            (strings.text("Indigo", "Индиго"), 0x5856d6),
-            (strings.text("Graphite", "Графит"), 0x3a3a3c),
-            (strings.text("Dark Green", "Тёмно-зелёный"), 0x1f3d2b)
-        ]
-        entries.append(.bubbleColorHeader(strings.text("Outgoing Bubble Color", "Цвет исходящих сообщений")))
-        for (index, preset) in bubblePresets.enumerated() {
-            entries.append(.bubbleColorOption(Int32(index), preset.0, preset.1, settings.bubbleColorOverride == preset.1))
-        }
-        let bubbleIsCustom = settings.bubbleColorOverride != nil && !bubblePresets.contains(where: { $0.1 == settings.bubbleColorOverride })
-        entries.append(.bubbleColorCustom(telewhiteCustomColorTitle(strings: strings, value: bubbleIsCustom ? settings.bubbleColorOverride : nil), settings.bubbleColorOverride, bubbleIsCustom))
-
-    case .background:
-        let backgroundPresets: [(String, Int64?)] = [
-            (strings.text("Default", "По умолчанию"), nil),
-            (strings.text("Black", "Чёрный"), 0x000000),
-            (strings.text("Graphite", "Графит"), 0x1c1c1e),
-            (strings.text("Deep Green", "Тёмно-зелёный"), 0x0e1f16),
-            (strings.text("Light", "Светлый"), 0xf2f2f7)
-        ]
-        entries.append(.backgroundColorHeader(strings.text("Chat Background", "Фон чата")))
-        for (index, preset) in backgroundPresets.enumerated() {
-            let selected = settings.chatBackgroundGradientOverride == nil && settings.chatBackgroundColorOverride == preset.1
-            entries.append(.backgroundColorOption(Int32(index), preset.0, preset.1, selected))
-        }
-        let backgroundIsCustom = settings.chatBackgroundGradientOverride == nil && settings.chatBackgroundColorOverride != nil && !backgroundPresets.contains(where: { $0.1 == settings.chatBackgroundColorOverride })
-        entries.append(.backgroundColorCustom(telewhiteCustomColorTitle(strings: strings, value: backgroundIsCustom ? settings.chatBackgroundColorOverride : nil), settings.chatBackgroundColorOverride, backgroundIsCustom))
-
-    case .shape:
-        let radiusPresets: [(String, Int32?)] = [
-            (strings.text("Default", "По умолчанию"), nil),
-            (strings.text("Small", "Маленькое"), 8),
-            (strings.text("Medium", "Среднее"), 12),
-            (strings.text("Large", "Большое"), 17)
-        ]
-        entries.append(.cornerRadiusHeader(strings.text("Bubble Corner Radius", "Скругление сообщений")))
-        for (index, preset) in radiusPresets.enumerated() {
-            entries.append(.cornerRadiusOption(Int32(index), preset.0, preset.1, settings.bubbleCornerRadiusOverride == preset.1))
-        }
-        entries.append(.chatFontSizeOption(0, strings.text("Chat Text: Default", "Текст чата: по умолчанию"), 0, settings.chatFontSizeOverride == 0))
-        entries.append(.chatFontSizeOption(1, strings.text("Chat Text: Small", "Текст чата: меньше"), PresentationFontSize.small.rawValue, settings.chatFontSizeOverride == PresentationFontSize.small.rawValue))
-        entries.append(.chatFontSizeOption(2, strings.text("Chat Text: Large", "Текст чата: больше"), PresentationFontSize.large.rawValue, settings.chatFontSizeOverride == PresentationFontSize.large.rawValue))
-        entries.append(.appearanceInfo(strings.text("Color, radius and chat text overrides apply on top of the selected Telegram theme and update instantly.", "Настройки цвета, скругления и текста чата применяются поверх выбранной темы Telegram и обновляются мгновенно.")))
+    case .chatText:
+        entries.append(.chatTextHeader(strings.text("Chat Text", "Текст в чате")))
+        entries.append(.chatFontSizeOption(0, strings.text("Default", "По умолчанию"), 0, settings.chatFontSizeOverride == 0))
+        entries.append(.chatFontSizeOption(1, strings.text("Small", "Меньше"), PresentationFontSize.small.rawValue, settings.chatFontSizeOverride == PresentationFontSize.small.rawValue))
+        entries.append(.chatFontSizeOption(2, strings.text("Large", "Больше"), PresentationFontSize.large.rawValue, settings.chatFontSizeOverride == PresentationFontSize.large.rawValue))
+        entries.append(.chatTextInfo(strings.text("Applies to message text in chats and updates instantly.", "Применяется к тексту сообщений в чатах и обновляется мгновенно.")))
 
     case .developer:
         entries.append(.developerHeader(telewhiteTabTitle(.developer, strings: strings)))
@@ -1514,60 +1153,6 @@ private func telewhiteModsSectionController(context: AccountContext, tab: Telewh
         // Telewhite: appearance sub-screens are pushed from this screen, so a section
         // controller has to be able to open another section controller.
         pushControllerImpl?(telewhiteModsSectionController(context: context, tab: tab, statePromise: statePromise, stateValue: stateValue, updateSettings: updateSettings))
-    }, promptCustomColor: { target in
-        let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-        let strings = TelewhiteModsStrings(presentationData: presentationData)
-        let settings = stateValue.with { $0 }
-        let currentValue: Int64?
-        switch target {
-        case .accent:
-            currentValue = settings.accentColorOverride
-        case .bubble:
-            currentValue = settings.bubbleColorOverride
-        case .background:
-            currentValue = settings.chatBackgroundColorOverride
-        }
-        let applyColor: (Int64) -> Void = { parsed in
-            updateSettings { current in
-                var updated = current
-                switch target {
-                case .accent:
-                    updated.accentColorOverride = parsed
-                case .bubble:
-                    updated.bubbleColorOverride = parsed
-                case .background:
-                    updated.chatBackgroundColorOverride = parsed
-                    updated.chatBackgroundGradientOverride = nil
-                }
-                return updated
-            }
-        }
-
-        let title = strings.text("Custom Color", "Свой цвет")
-
-        if #available(iOS 15.0, *) {
-            // The system picker covers the wheel, the grid and a HEX field, so it replaces
-            // the typed-HEX prompt entirely. The prompt below stays for iOS 13 and 14.
-            TelewhiteColorPickerPresenter.present(context: context, title: title, initialColor: currentValue, apply: applyColor)
-            return
-        }
-
-        let initialText = currentValue.flatMap { String(format: "#%06X", UInt32(truncatingIfNeeded: $0) & 0xffffff) } ?? ""
-        let prompt = promptController(
-            context: context,
-            text: title,
-            subtitle: strings.text("Enter a HEX code, e.g. #1E90FF", "Введите HEX-код, например #1E90FF"),
-            value: initialText,
-            placeholder: "#RRGGBB",
-            characterLimit: 9,
-            apply: { value in
-                guard let value = value, let parsed = telewhiteParseHexColor(value) else {
-                    return
-                }
-                applyColor(parsed)
-            }
-        )
-        presentControllerImpl?(prompt)
     }, openDebug: {
         if let debugController = context.sharedContext.makeDebugSettingsController(context: context) {
             pushControllerImpl?(debugController)
