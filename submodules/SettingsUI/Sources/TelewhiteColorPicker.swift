@@ -6,7 +6,10 @@ import AccountContext
 // Telewhite: the custom colour rows in the mods screen used to ask for a typed HEX code,
 // which meant no wheel, no live feel and no eyedropper. The system picker gives all three
 // (grid, spectrum wheel, sliders with a HEX field) so there is nothing left to hand-roll.
-@available(iOS 14.0, *)
+// Gated at 15.0 rather than the picker's own 14.0: the non-deprecated delegate callback
+// (didSelect:continuously:) only exists from 15, and implementing the 14-era one instead
+// would trip -warnings-as-errors on the deprecation. iOS 13/14 keep the HEX prompt.
+@available(iOS 15.0, *)
 final class TelewhiteColorPickerPresenter: NSObject, UIColorPickerViewControllerDelegate {
     // UIColorPickerViewController holds its delegate weakly. Without keeping the presenter
     // alive here it would be deallocated as soon as present() returns and the picked colour
@@ -40,9 +43,6 @@ final class TelewhiteColorPickerPresenter: NSObject, UIColorPickerViewController
         self.apply(Int64(color.rgb))
     }
 
-    // Deliberately not implementing colorPickerViewControllerDidSelectColor(_:): it is
-    // deprecated since iOS 15 and this module builds with -warnings-as-errors. On iOS 14
-    // the colour is picked up from didFinish below instead.
     func colorPickerViewController(_ viewController: UIColorPickerViewController, didSelect color: UIColor, continuously: Bool) {
         // Skip the intermediate values of a drag: every commit rewrites the settings and
         // rebuilds the presentation theme, which is far too heavy to run per touch move.

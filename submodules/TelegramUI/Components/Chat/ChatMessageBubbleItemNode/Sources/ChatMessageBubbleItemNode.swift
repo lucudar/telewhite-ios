@@ -693,6 +693,10 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
     private var telewhiteDeletedBadgeIsIncoming: Bool = false
     private var telewhiteDeletedBadgeContainerWidth: CGFloat = 0.0
     private var telewhiteDeletedBadgeReservedGutterWidth: CGFloat = 0.0
+    // Set while individual content nodes carry the dimming (a partially deleted album).
+    // Tracking it means the common path never writes contentNode.alpha at all, so it
+    // cannot fight the insertion/swap alpha animations that own that property.
+    private var telewhiteDimmedDeletedContentNodes: Bool = false
     private let shadowNode: ChatMessageShadowNode
     private var clippingNode: ChatMessageBubbleClippingNode
     
@@ -3929,16 +3933,27 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         strongSelf.backgroundWallpaperNode.setType(type: backgroundType, theme: item.presentationData.theme, essentialGraphics: graphics, maskMode: strongSelf.backgroundMaskMode, backgroundNode: presentationContext.backgroundNode)
         strongSelf.shadowNode.setType(type: backgroundType, hasWallpaper: hasWallpaper, graphics: graphics)
         
-        var isTelewhiteDeleted = false
         // Every message of the item, not just the first: an album is one item, so reading
         // firstMessage meant deleting any photo other than the leading one showed nothing
         // at all, and deleting the leading one labelled the whole album.
+        //
+        // An album can also be deleted photo by photo, so "deleted" is not one flag but
+        // two questions: is anything here deleted (the badge), and is all of it deleted
+        // (the bubble-wide fade and overlay). When only some photos are gone, fading the
+        // whole bubble claimed the surviving ones were deleted too; those cases fade the
+        // individual content nodes instead, further down.
+        var telewhiteDeletedStableIds = Set<UInt32>()
+        // ChatMessageItemContent is only a Sequence, so it has no count to compare against
+        // and the total has to be tallied here.
+        var telewhiteContentMessageCount = 0
         for (message, _) in item.content {
+            telewhiteContentMessageCount += 1
             if message.attributes.contains(where: { $0 is TelewhiteDeletedMessageAttribute }) {
-                isTelewhiteDeleted = true
-                break
+                telewhiteDeletedStableIds.insert(message.stableId)
             }
         }
+        let isTelewhiteDeleted = !telewhiteDeletedStableIds.isEmpty
+        let isTelewhiteFullyDeleted = isTelewhiteDeleted && telewhiteDeletedStableIds.count == telewhiteContentMessageCount
         // Telewhite: fade the content of a deleted-and-preserved message. This has to be
         // clippingNode, not contentContainersWrapperNode: content nodes are added to
         // clippingNode directly (see containerSupernode below), and the wrapper only ever
@@ -3950,7 +3965,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         // the name/reply/forward nodes, but NOT of backgroundNode (so no rectangular
         // backdrop artifact, which is what stopped mainContainerNode being used) and NOT
         // of the badge (so the badge stays fully opaque).
-        strongSelf.clippingNode.alpha = isTelewhiteDeleted ? telewhiteDeletedContentAlpha : 1.0
+        strongSelf.clippingNode.alpha = isTelewhiteFullyDeleted ? telewhiteDeletedContentAlpha : 1.0
         // containerWidth excludes the safe-area inset (landscape on a notched device put
         // the badge under the rounded corner) and the 42pt the whole bubble slides right
         // in selection mode; the reserved gutter is the 45pt the layout itself already
@@ -3958,7 +3973,9 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         // draws above the badge.
         let telewhiteBadgeSelectionOffset: CGFloat = (item.controllerInteraction.selectionState != nil && incoming) ? 42.0 : 0.0
         strongSelf.updateTelewhiteDeletedBadge(isDeleted: isTelewhiteDeleted, contentFrame: backgroundFrame, containerWidth: params.width - params.rightInset - telewhiteBadgeSelectionOffset, isIncoming: incoming, isRussian: item.presentationData.strings.baseLanguageCode.lowercased().hasPrefix("ru"), reservedGutterWidth: (needsShareButton || needsSummarizeButton) ? 45.0 : 0.0)
-        if isTelewhiteDeleted, !hideBackground {
+        // The overlay darkens the whole bubble shape, so it may only appear when the whole
+        // bubble is really gone.
+        if isTelewhiteFullyDeleted, !hideBackground {
             let telewhiteDeletedOverlayNode: ChatMessageBackground
             if let current = strongSelf.telewhiteDeletedOverlayNode {
                 telewhiteDeletedOverlayNode = current
@@ -5119,6 +5136,25 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             contentNode.visibility = mapVisibility(strongSelf.visibility, boundsSize: layout.contentSize, insets: strongSelf.insets, to: contentNode)
             
             contentNodeIndex += 1
+        }
+        
+        // Telewhite: a partially deleted album fades only the photos that are gone. This
+        // runs after the loop above because that loop owns contentNode.alpha while it
+        // animates insertions, and it only touches alpha when dimming is or was in effect
+        // so an untouched bubble keeps the upstream behaviour exactly.
+        if isTelewhiteDeleted && !isTelewhiteFullyDeleted {
+            for contentNode in strongSelf.contentNodes {
+                guard let stableId = contentNode.item?.message.stableId else {
+                    continue
+                }
+                contentNode.alpha = telewhiteDeletedStableIds.contains(stableId) ? telewhiteDeletedContentAlpha : 1.0
+            }
+            strongSelf.telewhiteDimmedDeletedContentNodes = true
+        } else if strongSelf.telewhiteDimmedDeletedContentNodes {
+            strongSelf.telewhiteDimmedDeletedContentNodes = false
+            for contentNode in strongSelf.contentNodes {
+                contentNode.alpha = 1.0
+            }
         }
         
         if let mosaicStatusOrigin = mosaicStatusOrigin, let (size, apply) = mosaicStatusSizeAndApply {

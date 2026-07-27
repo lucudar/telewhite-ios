@@ -4,6 +4,13 @@ on:
   push:
     # master is the live branch; other branches build on demand via workflow_dispatch.
     branches: [master]
+    # Documentation-only pushes cannot change the IPA, so they must not spend an hour of
+    # runner time and publish a duplicate release. Use workflow_dispatch to force a build.
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.gitignore'
   workflow_dispatch:
     inputs:
       app_name:

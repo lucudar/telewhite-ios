@@ -1206,6 +1206,8 @@ private func telewhiteTabTitle(_ tab: TelewhiteModsTab, strings: TelewhiteModsSt
         return strings.text("Bubbles and Text", "Пузыри и текст")
     case .translationLanguage:
         return strings.text("Translate Into", "Переводить на")
+    case .themePresets:
+        return strings.text("Theme Presets", "Готовые темы")
     }
 }
 
@@ -1378,7 +1380,7 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.compactChatList(strings.text("Compact Chat List", "Компактный список чатов"), settings.compactChatList))
         entries.append(.chatSplitLandscape(strings.text("Split View in Landscape", "Сплит чатов (альбомная)"), settings.chatSplitLandscape))
         entries.append(.amoledMode(strings.text("AMOLED Mode", "AMOLED режим"), settings.amoledMode))
-        entries.append(.darkMonoPreset(strings.text("Dark Mono Theme", "Тёмная моно-тема")))
+        entries.append(.themePresetsLink(strings.text("Theme Presets", "Готовые темы"), telewhiteActiveThemePreset(settings)?.swatch))
         // Telewhite: the three palettes and the shape options live on their own
         // screens. Each row shows the colour currently in effect as its swatch, so the
         // overview still answers "what is set?" without opening anything.
@@ -1386,6 +1388,21 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.bubbleColorLink(strings.text("Outgoing Bubble Color", "Цвет исходящих сообщений"), settings.bubbleColorOverride))
         entries.append(.backgroundColorLink(strings.text("Chat Background", "Фон чата"), settings.chatBackgroundColorOverride, settings.chatBackgroundGradientOverride))
         entries.append(.shapeLink(strings.text("Bubbles and Text", "Пузыри и текст")))
+
+    case .themePresets:
+        entries.append(.themePresetsHeader(strings.text("Theme Presets", "Готовые темы")))
+        let activePreset = telewhiteActiveThemePreset(settings)
+        for (index, preset) in telewhiteThemePresetList.enumerated() {
+            // Comparing titles rather than the struct keeps this free of an Equatable
+            // conformance while still marking exactly one row, since titles are unique.
+            let selected = activePreset?.titleEn == preset.titleEn
+            entries.append(.themePresetOption(Int32(index), preset.title(strings: strings), preset.swatch, selected))
+        }
+        if activePreset == nil {
+            entries.append(.themePresetsInfo(strings.text("Your current colors do not match any preset. Picking one replaces the accent, bubble, background, corner radius and AMOLED settings.", "Текущие цвета не совпадают ни с одной готовой темой. Выбор темы заменит акцент, цвет исходящих, фон, скругление и AMOLED.")))
+        } else {
+            entries.append(.themePresetsInfo(strings.text("A preset sets the accent, bubble, background, corner radius and AMOLED settings at once. You can still adjust each of them afterwards.", "Готовая тема сразу задаёт акцент, цвет исходящих, фон, скругление и AMOLED. Каждый параметр потом можно поправить отдельно.")))
+        }
 
     case .accentColor:
         let accentPresets: [(String, Int64?)] = [
@@ -1577,9 +1594,9 @@ private func telewhiteModsSectionController(context: AccountContext, tab: Telewh
 
         let title = strings.text("Custom Color", "Свой цвет")
 
-        if #available(iOS 14.0, *) {
+        if #available(iOS 15.0, *) {
             // The system picker covers the wheel, the grid and a HEX field, so it replaces
-            // the typed-HEX prompt entirely. The prompt stays below only for iOS 13.
+            // the typed-HEX prompt entirely. The prompt below stays for iOS 13 and 14.
             TelewhiteColorPickerPresenter.present(context: context, title: title, initialColor: currentValue, apply: applyColor)
             return
         }
