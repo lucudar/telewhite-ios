@@ -48,24 +48,14 @@ private func avatarViewLettersImage(size: CGSize, peerId: EnginePeer.Id, letters
 
     context?.setBlendMode(.normal)
 
-    let string = letters.count == 0 ? "" : (letters[0] + (letters.count == 1 ? "" : letters[1]))
-    let attributedString = NSAttributedString(string: string, attributes: [NSAttributedString.Key.font: UIFont.systemFont(ofSize: 8.0), NSAttributedString.Key.foregroundColor: UIColor.white])
-
-    let line = CTLineCreateWithAttributedString(attributedString)
-    let lineBounds = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
-
-    let lineOffset = CGPoint(x: string == "B" ? 1.0 : 0.0, y: 0.0)
-    let lineOrigin = CGPoint(x: floor(-lineBounds.origin.x + (size.width - lineBounds.size.width) / 2.0) + lineOffset.x, y: floor(-lineBounds.origin.y + (size.height - lineBounds.size.height) / 2.0))
-
+    // Telewhite mod: no name initials (third rasterization path, used by the live
+    // reaction stream in stories).
+    // The vertical flip below is deliberately kept even though the text it was set up
+    // for is gone: the story ring drawn after this point is rendered in these flipped
+    // coordinates, so dropping the transform would move the ring.
     context?.translateBy(x: size.width / 2.0, y: size.height / 2.0)
     context?.scaleBy(x: 1.0, y: -1.0)
     context?.translateBy(x: -size.width / 2.0, y: -size.height / 2.0)
-
-    context?.translateBy(x: lineOrigin.x, y: lineOrigin.y)
-    if let context = context {
-        CTLineDraw(line, context)
-    }
-    context?.translateBy(x: -lineOrigin.x, y: -lineOrigin.y)
     
     if isStory {
         context?.resetClip()
