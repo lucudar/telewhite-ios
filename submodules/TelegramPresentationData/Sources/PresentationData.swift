@@ -406,9 +406,10 @@ public func currentPresentationDataAndSettings(accountManager: AccountManager<Te
         }
         
         let storedAccentColors = themeSettings.themeSpecificAccentColors[effectiveTheme.index]
-        let telewhiteOverrides = telewhiteAppearanceOverrides()
-        let effectiveColors = telewhiteOverriddenAccentColors(storedAccentColors)
-        var theme = makePresentationTheme(mediaBox: accountManager.mediaBox, themeReference: effectiveTheme, baseTheme: preferredBaseTheme, accentColor: effectiveColors?.colorFor(baseTheme: preferredBaseTheme ?? .day), bubbleColors: effectiveColors?.customBubbleColors ?? [], baseColor: effectiveColors?.baseColor) ?? defaultPresentationTheme
+        var theme = makePresentationTheme(mediaBox: accountManager.mediaBox, themeReference: effectiveTheme, baseTheme: preferredBaseTheme, accentColor: storedAccentColors?.colorFor(baseTheme: preferredBaseTheme ?? .day), bubbleColors: storedAccentColors?.customBubbleColors ?? [], baseColor: storedAccentColors?.baseColor) ?? defaultPresentationTheme
+        // Telewhite mod: the monochrome look is applied unconditionally, before AMOLED,
+        // so AMOLED stays meaningful and only flattens the dark palette to true black.
+        theme = makeTelewhiteMonoPresentationTheme(theme)
         if telewhiteAmoledModeEnabled() {
             theme = makeTelewhiteAmoledPresentationTheme(theme)
         }
@@ -416,9 +417,6 @@ public func currentPresentationDataAndSettings(accountManager: AccountManager<Te
         var effectiveChatWallpaper: TelegramWallpaper = (themeSettings.themeSpecificChatWallpapers[coloredThemeIndex(reference: effectiveTheme, accentColor: storedAccentColors)] ?? themeSettings.themeSpecificChatWallpapers[effectiveTheme.index]) ?? theme.chat.defaultWallpaper
         if case .builtin = effectiveChatWallpaper {
             effectiveChatWallpaper = defaultBuiltinWallpaper(data: .legacy, colors: legacyBuiltinWallpaperGradientColors.map(\.rgb))
-        }
-        if let wallpaperOverride = telewhiteChatWallpaperOverride() {
-            effectiveChatWallpaper = wallpaperOverride
         }
         
         let dateTimeFormat = currentDateTimeFormat()
@@ -433,7 +431,7 @@ public func currentPresentationDataAndSettings(accountManager: AccountManager<Te
         
         let (chatFontSize, listsFontSize) = resolveFontSize(settings: themeSettings)
         
-        let chatBubbleCorners = PresentationChatBubbleCorners(mainRadius: CGFloat(telewhiteOverrides.bubbleCornerRadius ?? themeSettings.chatBubbleSettings.mainRadius), auxiliaryRadius: CGFloat(themeSettings.chatBubbleSettings.auxiliaryRadius), mergeBubbleCorners: themeSettings.chatBubbleSettings.mergeBubbleCorners)
+        let chatBubbleCorners = PresentationChatBubbleCorners(mainRadius: CGFloat(themeSettings.chatBubbleSettings.mainRadius), auxiliaryRadius: CGFloat(themeSettings.chatBubbleSettings.auxiliaryRadius), mergeBubbleCorners: themeSettings.chatBubbleSettings.mergeBubbleCorners)
         
         return InitialPresentationDataAndSettings(presentationData: PresentationData(strings: stringsValue, theme: theme, autoNightModeTriggered: autoNightModeTriggered, chatWallpaper: effectiveChatWallpaper, chatFontSize: chatFontSize, chatBubbleCorners: chatBubbleCorners, listsFontSize: listsFontSize, dateTimeFormat: dateTimeFormat, nameDisplayOrder: nameDisplayOrder, nameSortOrder: nameSortOrder, reduceMotion: themeSettings.reduceMotion, largeEmoji: themeSettings.largeEmoji), automaticMediaDownloadSettings: automaticMediaDownloadSettings, autodownloadSettings: autodownloadSettings, callListSettings: callListSettings, inAppNotificationSettings: inAppNotificationSettings, mediaInputSettings: mediaInputSettings, mediaDisplaySettings: mediaDisplaySettings, stickerSettings: stickerSettings, chatSettings: chatSettings, experimentalUISettings: experimentalUISettings)
     }
@@ -731,7 +729,7 @@ public func chatServiceBackgroundColor(wallpaper: TelegramWallpaper, mediaBox: M
 }
 
 public func updatedPresentationData(accountManager: AccountManager<TelegramAccountManagerTypes>, applicationInForeground: Signal<Bool, NoError>, systemUserInterfaceStyle: Signal<WindowUserInterfaceStyle, NoError>) -> Signal<PresentationData, NoError> {
-    return combineLatest(accountManager.sharedData(keys: [SharedDataKeys.localizationSettings, ApplicationSpecificSharedDataKeys.presentationThemeSettings, ApplicationSpecificSharedDataKeys.contactSynchronizationSettings]), systemUserInterfaceStyle, telewhiteAppearanceUpdated())
+    return combineLatest(accountManager.sharedData(keys: [SharedDataKeys.localizationSettings, ApplicationSpecificSharedDataKeys.presentationThemeSettings, ApplicationSpecificSharedDataKeys.contactSynchronizationSettings]), systemUserInterfaceStyle, telewhiteAmoledModeUpdated())
     |> mapToSignal { sharedData, systemUserInterfaceStyle, _ -> Signal<PresentationData, NoError> in
         let themeSettings: PresentationThemeSettings
         if let current = sharedData.entries[ApplicationSpecificSharedDataKeys.presentationThemeSettings]?.get(PresentationThemeSettings.self) {
@@ -806,9 +804,9 @@ public func updatedPresentationData(accountManager: AccountManager<TelegramAccou
                             effectiveColors = nil
                         }
                         
-                        effectiveColors = telewhiteOverriddenAccentColors(effectiveColors)
-                        
                         var themeValue = makePresentationTheme(mediaBox: accountManager.mediaBox, themeReference: effectiveTheme, baseTheme: preferredBaseTheme, accentColor: effectiveColors?.colorFor(baseTheme: preferredBaseTheme ?? .day), bubbleColors: effectiveColors?.customBubbleColors ?? [], wallpaper: effectiveColors?.wallpaper, baseColor: effectiveColors?.baseColor, serviceBackgroundColor: serviceBackgroundColor) ?? defaultPresentationTheme
+                        // Telewhite mod: see the matching call in the synchronous path above.
+                        themeValue = makeTelewhiteMonoPresentationTheme(themeValue)
                         if telewhiteAmoledModeEnabled() {
                             themeValue = makeTelewhiteAmoledPresentationTheme(themeValue)
                         }
@@ -824,10 +822,6 @@ public func updatedPresentationData(accountManager: AccountManager<TelegramAccou
                                 default:
                                     break
                             }
-                        }
-                        
-                        if let wallpaperOverride = telewhiteChatWallpaperOverride() {
-                            effectiveChatWallpaper = wallpaperOverride
                         }
                         
                         let localizationSettings: LocalizationSettings?
@@ -849,7 +843,7 @@ public func updatedPresentationData(accountManager: AccountManager<TelegramAccou
                         
                         let (chatFontSize, listsFontSize) = resolveFontSize(settings: themeSettings)
                         
-                        let chatBubbleCorners = PresentationChatBubbleCorners(mainRadius: CGFloat(telewhiteAppearanceOverrides().bubbleCornerRadius ?? themeSettings.chatBubbleSettings.mainRadius), auxiliaryRadius: CGFloat(themeSettings.chatBubbleSettings.auxiliaryRadius), mergeBubbleCorners: themeSettings.chatBubbleSettings.mergeBubbleCorners)
+                        let chatBubbleCorners = PresentationChatBubbleCorners(mainRadius: CGFloat(themeSettings.chatBubbleSettings.mainRadius), auxiliaryRadius: CGFloat(themeSettings.chatBubbleSettings.auxiliaryRadius), mergeBubbleCorners: themeSettings.chatBubbleSettings.mergeBubbleCorners)
                         
                         return PresentationData(strings: stringsValue, theme: themeValue, autoNightModeTriggered: autoNightModeTriggered, chatWallpaper: effectiveChatWallpaper, chatFontSize: chatFontSize, chatBubbleCorners: chatBubbleCorners, listsFontSize: listsFontSize, dateTimeFormat: dateTimeFormat, nameDisplayOrder: nameDisplayOrder, nameSortOrder: nameSortOrder, reduceMotion: themeSettings.reduceMotion, largeEmoji: themeSettings.largeEmoji)
                     }

@@ -38,11 +38,6 @@ public struct TelewhiteModsSettings: Equatable {
     public var oneTimeMediaUnlimited: Bool
     public var downloadOneTimeMedia: Bool
     public var downloadStories: Bool
-    public var accentColorOverride: Int64?
-    public var bubbleColorOverride: Int64?
-    public var chatBackgroundColorOverride: Int64?
-    public var chatBackgroundGradientOverride: [Int64]?
-    public var bubbleCornerRadiusOverride: Int32?
     public var chatFontSizeOverride: Int32
     public var outgoingTranslateButtonEnabled: Bool
     public var outgoingTranslationPeerIds: Set<Int64>
@@ -83,11 +78,6 @@ public struct TelewhiteModsSettings: Equatable {
         static let oneTimeMediaUnlimited = "telewhite.mods.oneTimeMediaUnlimited"
         static let downloadOneTimeMedia = "telewhite.mods.downloadOneTimeMedia"
         static let downloadStories = "telewhite.mods.downloadStories"
-        static let accentColor = "telewhite.mods.accentColor"
-        static let bubbleColor = "telewhite.mods.bubbleColor"
-        static let chatBackgroundColor = "telewhite.mods.chatBackgroundColor"
-        static let chatBackgroundGradient = "telewhite.mods.chatBackgroundGradient"
-        static let bubbleCornerRadius = "telewhite.mods.bubbleCornerRadius"
         static let chatFontSizeOverride = "telewhite.mods.chatFontSizeOverride"
         static let outgoingTranslateButtonEnabled = "telewhite.mods.outgoingTranslateButtonEnabled"
         static let outgoingTranslationPeerIds = "telewhite.mods.outgoingTranslationPeerIds"
@@ -149,11 +139,6 @@ public struct TelewhiteModsSettings: Equatable {
             oneTimeMediaUnlimited: defaults.bool(forKey: Key.oneTimeMediaUnlimited),
             downloadOneTimeMedia: defaults.bool(forKey: Key.downloadOneTimeMedia),
             downloadStories: defaults.bool(forKey: Key.downloadStories),
-            accentColorOverride: (defaults.object(forKey: Key.accentColor) as? NSNumber)?.int64Value,
-            bubbleColorOverride: (defaults.object(forKey: Key.bubbleColor) as? NSNumber)?.int64Value,
-            chatBackgroundColorOverride: (defaults.object(forKey: Key.chatBackgroundColor) as? NSNumber)?.int64Value,
-            chatBackgroundGradientOverride: (defaults.array(forKey: Key.chatBackgroundGradient) as? [NSNumber]).flatMap { numbers in numbers.count >= 2 ? numbers.map { $0.int64Value } : nil },
-            bubbleCornerRadiusOverride: (defaults.object(forKey: Key.bubbleCornerRadius) as? NSNumber)?.int32Value,
             chatFontSizeOverride: (defaults.object(forKey: Key.chatFontSizeOverride) as? NSNumber)?.int32Value ?? 0,
             outgoingTranslateButtonEnabled: defaults.object(forKey: Key.outgoingTranslateButtonEnabled) as? Bool ?? true,
             outgoingTranslationPeerIds: Set((defaults.array(forKey: Key.outgoingTranslationPeerIds) as? [NSNumber] ?? []).map { $0.int64Value }),
@@ -278,31 +263,6 @@ public struct TelewhiteModsSettings: Equatable {
         defaults.set(self.oneTimeMediaUnlimited, forKey: Key.oneTimeMediaUnlimited)
         defaults.set(self.downloadOneTimeMedia, forKey: Key.downloadOneTimeMedia)
         defaults.set(self.downloadStories, forKey: Key.downloadStories)
-        if let value = self.accentColorOverride {
-            defaults.set(NSNumber(value: value), forKey: Key.accentColor)
-        } else {
-            defaults.removeObject(forKey: Key.accentColor)
-        }
-        if let value = self.bubbleColorOverride {
-            defaults.set(NSNumber(value: value), forKey: Key.bubbleColor)
-        } else {
-            defaults.removeObject(forKey: Key.bubbleColor)
-        }
-        if let value = self.chatBackgroundColorOverride {
-            defaults.set(NSNumber(value: value), forKey: Key.chatBackgroundColor)
-        } else {
-            defaults.removeObject(forKey: Key.chatBackgroundColor)
-        }
-        if let value = self.chatBackgroundGradientOverride, value.count >= 2 {
-            defaults.set(value.map { NSNumber(value: $0) }, forKey: Key.chatBackgroundGradient)
-        } else {
-            defaults.removeObject(forKey: Key.chatBackgroundGradient)
-        }
-        if let value = self.bubbleCornerRadiusOverride {
-            defaults.set(NSNumber(value: value), forKey: Key.bubbleCornerRadius)
-        } else {
-            defaults.removeObject(forKey: Key.bubbleCornerRadius)
-        }
         defaults.set(self.chatFontSizeOverride, forKey: Key.chatFontSizeOverride)
         defaults.set(self.outgoingTranslateButtonEnabled, forKey: Key.outgoingTranslateButtonEnabled)
         defaults.set(self.outgoingTranslationPeerIds.map { NSNumber(value: $0) }, forKey: Key.outgoingTranslationPeerIds)
@@ -334,17 +294,10 @@ public struct TelewhiteModsSettings: Equatable {
     }
 }
 
-enum TelewhiteCustomColorTarget {
-    case accent
-    case bubble
-    case background
-}
-
 private final class TelewhiteModsControllerArguments {
     let updateSettings: ((TelewhiteModsSettings) -> TelewhiteModsSettings) -> Void
     let updateTranslationSettings: (@escaping (TranslationSettings) -> TranslationSettings) -> Void
     let openTab: (TelewhiteModsTab) -> Void
-    let promptCustomColor: (TelewhiteCustomColorTarget) -> Void
     let openDebug: () -> Void
     let promptOpenRouterKey: () -> Void
 
@@ -352,14 +305,12 @@ private final class TelewhiteModsControllerArguments {
         updateSettings: @escaping ((TelewhiteModsSettings) -> TelewhiteModsSettings) -> Void,
         updateTranslationSettings: @escaping (@escaping (TranslationSettings) -> TranslationSettings) -> Void,
         openTab: @escaping (TelewhiteModsTab) -> Void = { _ in },
-        promptCustomColor: @escaping (TelewhiteCustomColorTarget) -> Void = { _ in },
         openDebug: @escaping () -> Void = {},
         promptOpenRouterKey: @escaping () -> Void = {}
     ) {
         self.updateSettings = updateSettings
         self.updateTranslationSettings = updateTranslationSettings
         self.openTab = openTab
-        self.promptCustomColor = promptCustomColor
         self.openDebug = openDebug
         self.promptOpenRouterKey = promptOpenRouterKey
     }

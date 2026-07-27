@@ -315,14 +315,19 @@ public final class AvatarNode: ASDisplayNode {
         context.addPath(transformedPath)
     }
     
+    // Telewhite mod: monochrome placeholder avatars.
+    // The seven entries and their index order are kept exactly as upstream, so a
+    // given peer still maps to a stable, distinct shade - the identity cue survives,
+    // it is just carried by lightness instead of hue. All shades stay in the mid
+    // range so white initials keep enough contrast.
     public static let gradientColors: [[UIColor]] = [
-        [UIColor(rgb: 0xff516a), UIColor(rgb: 0xff885e)],
-        [UIColor(rgb: 0xffa85c), UIColor(rgb: 0xffcd6a)],
-        [UIColor(rgb: 0x665fff), UIColor(rgb: 0x82b1ff)],
-        [UIColor(rgb: 0x54cb68), UIColor(rgb: 0xa0de7e)],
-        [UIColor(rgb: 0x4acccd), UIColor(rgb: 0x00fcfd)],
-        [UIColor(rgb: 0x2a9ef1), UIColor(rgb: 0x72d5fd)],
-        [UIColor(rgb: 0xd669ed), UIColor(rgb: 0xe0a2f3)],
+        [UIColor(rgb: 0x4a4a4d), UIColor(rgb: 0x656569)],
+        [UIColor(rgb: 0x6b6b70), UIColor(rgb: 0x86868b)],
+        [UIColor(rgb: 0x3f3f42), UIColor(rgb: 0x5a5a5e)],
+        [UIColor(rgb: 0x5c5c61), UIColor(rgb: 0x77777c)],
+        [UIColor(rgb: 0x76767b), UIColor(rgb: 0x919196)],
+        [UIColor(rgb: 0x515156), UIColor(rgb: 0x6c6c71)],
+        [UIColor(rgb: 0x66666b), UIColor(rgb: 0x818186)],
     ]
     
     static let grayscaleColors: [UIColor] = [
@@ -334,11 +339,11 @@ public final class AvatarNode: ASDisplayNode {
     ]
     
     static let savedMessagesColors: [UIColor] = [
-        UIColor(rgb: 0x2a9ef1), UIColor(rgb: 0x72d5fd)
+        UIColor(rgb: 0x3a3a3f), UIColor(rgb: 0x55555a)
     ]
     
     static let repostColors: [UIColor] = [
-        UIColor(rgb: 0x3DA1FD), UIColor(rgb: 0x34C76F)
+        UIColor(rgb: 0x55555a), UIColor(rgb: 0x707075)
     ]
     
     public final class ContentNode: ASDisplayNode {
