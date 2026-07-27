@@ -375,7 +375,11 @@ class ThemeSettingsAppIconItemNode: ListViewItemNode, ItemListItemNode {
 
                             var name = "Icon"
                             var bordered = true
-                            switch icon.name {
+                            // Match on the artwork name, not on the plist key: the stock
+                            // icons are keyed "Blue"/"Black"/... while their artwork is
+                            // "BlueIcon"/"BlackIcon"/..., and a key of "Blue" would also
+                            // collide with the "Blue" label used for TelewhiteBlue.
+                            switch icon.imageName {
                                 case "BlueIcon":
                                     name = item.strings.Appearance_AppIconDefault
                                 case "BlackIcon":

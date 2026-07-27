@@ -537,7 +537,10 @@ public func themeSettingsController(context: AccountContext, focusOnItemTag: The
     
     let availableAppIcons: Signal<[PresentationAppIcon], NoError> = .single(appIcons)
     let currentAppIconName = ValuePromise<String?>()
-    currentAppIconName.set(currentAppIcon?.name ?? "Blue")
+    // Do not fall back to a hardcoded "Blue": currentAppIcon is already resolved from
+    // the default flag above, and hardcoding a name highlighted a row that may not even
+    // be the icon the system is currently showing.
+    currentAppIconName.set(currentAppIcon?.name)
     
     let cloudThemes = Promise<[TelegramTheme]>()
     let updatedCloudThemes = context.engine.themes.themes(accountManager: context.sharedContext.accountManager)
@@ -634,8 +637,25 @@ public func themeSettingsController(context: AccountContext, focusOnItemTag: The
                 }
                 pushControllerImpl?(controller)
             } else {
+                // The selection used to be marked before the system call and the result
+                // was discarded, so a rejected icon still looked selected until the
+                // screen was rebuilt. Remember what was actually applied and roll the
+                // checkmark back when iOS refuses the change.
+                let previousIconName = context.sharedContext.applicationBindings.getAlternateIconName()
                 currentAppIconName.set(icon.name)
-                context.sharedContext.applicationBindings.requestSetAlternateIconName(icon.isDefault ? nil : icon.name, { _ in
+                context.sharedContext.applicationBindings.requestSetAlternateIconName(icon.isDefault ? nil : icon.name, { success in
+                    Queue.mainQueue().async {
+                        guard !success else {
+                            return
+                        }
+                        if let previousIconName {
+                            currentAppIconName.set(previousIconName)
+                        } else {
+                            currentAppIconName.set(appIcons.first(where: { $0.isDefault })?.name)
+                        }
+                        let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+                        presentControllerImpl?(textAlertController(context: context, title: nil, text: presentationData.strings.Login_UnknownError, actions: [TextAlertAction(type: .defaultAction, title: presentationData.strings.Common_OK, action: {})]), nil)
+                    }
                 })
             }
         })
