@@ -83,22 +83,15 @@
         <key>UIPrerenderedIcon</key>
         <true/>
     </dict>
-        <key>New1</key>
+    <!-- See AlternateIcons.plist: the _NNxNN file names never existed on disk.
+         The -76 / -83.5 bases below are the iPad-sized artwork that does exist. -->
+    <key>New1</key>
     <dict>
         <key>CFBundleIconFiles</key>
         <array>
-            <string>New1_20x20</string>
-            <string>New1_29x29</string>
-            <string>New1_40x40</string>
-            <string>New1_58x58</string>
-            <string>New1_60x60</string>
-            <string>New1_76x76</string>
-            <string>New1_80x80</string>
-            <string>New1_87x87</string>
-            <string>New1_120x120</string>
-            <string>New1_152x152</string>
-            <string>New1_167x167</string>
-            <string>New1_180x180</string>
+            <string>New1</string>
+            <string>New1-76</string>
+            <string>New1-83.5</string>
         </array>
         <key>UIPrerenderedIcon</key>
         <true/>
@@ -107,18 +100,36 @@
     <dict>
         <key>CFBundleIconFiles</key>
         <array>
-            <string>New2_20x20</string>
-            <string>New2_29x29</string>
-            <string>New2_40x40</string>
-            <string>New2_58x58</string>
-            <string>New2_60x60</string>
-            <string>New2_76x76</string>
-            <string>New2_80x80</string>
-            <string>New2_87x87</string>
-            <string>New2_120x120</string>
-            <string>New2_152x152</string>
-            <string>New2_167x167</string>
-            <string>New2_180x180</string>
+            <string>New2</string>
+            <string>New2-76</string>
+            <string>New2-83.5</string>
+        </array>
+        <key>UIPrerenderedIcon</key>
+        <true/>
+    </dict>
+    <key>Premium</key>
+    <dict>
+        <key>CFBundleIconFiles</key>
+        <array>
+            <string>Premium</string>
+        </array>
+        <key>UIPrerenderedIcon</key>
+        <true/>
+    </dict>
+    <key>PremiumBlack</key>
+    <dict>
+        <key>CFBundleIconFiles</key>
+        <array>
+            <string>PremiumBlack</string>
+        </array>
+        <key>UIPrerenderedIcon</key>
+        <true/>
+    </dict>
+    <key>PremiumTurbo</key>
+    <dict>
+        <key>CFBundleIconFiles</key>
+        <array>
+            <string>PremiumTurbo</string>
         </array>
         <key>UIPrerenderedIcon</key>
         <true/>

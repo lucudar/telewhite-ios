@@ -958,8 +958,19 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
             self.window?.rootViewController?.dismiss(animated: true, completion: nil)
         }, getAvailableAlternateIcons: {
             if #available(iOS 10.3, *) {
+                // `name` is the CFBundleAlternateIcons key passed to
+                // setAlternateIconName; `imageName` is the bundled artwork used to draw
+                // the row. They are NOT the same string for the stock icons: the plist
+                // keys are "Blue"/"Black"/..., the PNGs are "BlueIcon"/"BlackIcon"/...
+                // Passing the image name (as this list used to) made iOS reject every
+                // stock icon, which is why the picker never actually changed anything.
+                //
+                // Blue is flagged default for every build type, not just App Store ones:
+                // CFBundlePrimaryIcon is AppIconLLC, which is the blue artwork in all
+                // configurations, so with no default flagged the picker had nothing to
+                // highlight on a sideloaded build and no way to clear the override.
                 var icons = [
-                    PresentationAppIcon(name: "BlueIcon", imageName: "BlueIcon", isDefault: buildConfig.isAppStoreBuild),
+                    PresentationAppIcon(name: "Blue", imageName: "BlueIcon", isDefault: true),
                     PresentationAppIcon(name: "TelewhiteGhost", imageName: "TelewhiteGhost"),
                     PresentationAppIcon(name: "TelewhiteWhite", imageName: "TelewhiteWhite"),
                     PresentationAppIcon(name: "TelewhiteNeon", imageName: "TelewhiteNeon"),
@@ -976,14 +987,14 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
                     PresentationAppIcon(name: "TelewhiteGraphite", imageName: "TelewhiteGraphite"),
                     PresentationAppIcon(name: "New2", imageName: "New2"),
                     PresentationAppIcon(name: "New1", imageName: "New1"),
-                    PresentationAppIcon(name: "BlackIcon", imageName: "BlackIcon"),
-                    PresentationAppIcon(name: "BlueClassicIcon", imageName: "BlueClassicIcon"),
-                    PresentationAppIcon(name: "BlackClassicIcon", imageName: "BlackClassicIcon"),
-                    PresentationAppIcon(name: "BlueFilledIcon", imageName: "BlueFilledIcon"),
-                    PresentationAppIcon(name: "BlackFilledIcon", imageName: "BlackFilledIcon"),
+                    PresentationAppIcon(name: "Black", imageName: "BlackIcon"),
+                    PresentationAppIcon(name: "BlueClassic", imageName: "BlueClassicIcon"),
+                    PresentationAppIcon(name: "BlackClassic", imageName: "BlackClassicIcon"),
+                    PresentationAppIcon(name: "BlueFilled", imageName: "BlueFilledIcon"),
+                    PresentationAppIcon(name: "BlackFilled", imageName: "BlackFilledIcon"),
                     PresentationAppIcon(name: "FontAwesomeTelegramIcon", imageName: "FontAwesomeTelegramIcon")
                 ]
-                icons.append(PresentationAppIcon(name: "WhiteFilledIcon", imageName: "WhiteFilledIcon"))
+                icons.append(PresentationAppIcon(name: "WhiteFilled", imageName: "WhiteFilledIcon"))
                 
                 icons.append(PresentationAppIcon(name: "Premium", imageName: "Premium", isPremium: true))
                 icons.append(PresentationAppIcon(name: "PremiumTurbo", imageName: "PremiumTurbo", isPremium: true))
