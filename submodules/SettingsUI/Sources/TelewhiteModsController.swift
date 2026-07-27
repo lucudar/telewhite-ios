@@ -960,7 +960,7 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
     case .channels:
         entries.append(.channelsHeader(telewhiteTabTitle(.channels, strings: strings)))
         entries.append(.channelsDeclutter(strings.text("Clean Up Posts", "Убрать лишнее под постами"), settings.channelHideReactions || settings.channelHideComments || settings.channelHideShareButton))
-        entries.append(.channelsInfo(strings.text("Only changes how posts look on this phone. Nobody else is affected.", "Меняет только то, как посты выглядят на этом телефо��е. Для остальных ничего не меняется.")))
+        entries.append(.channelsInfo(strings.text("Only changes how posts look on this phone. Nobody else is affected.", "Меняет только то, как посты выглядят на этом телефоне. Для остальных ничего не меняется.")))
 
     case .media:
         entries.append(.mediaHeader(telewhiteTabTitle(.media, strings: strings)))
