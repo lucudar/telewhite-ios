@@ -53,6 +53,7 @@ public struct TelewhiteModsSettings: Equatable {
     public var hdPhotos: Bool
     public var translateVoiceMessages: Bool
     public var quickForwardToSaved: Bool
+    public var showReadDateOnTap: Bool
 
     private enum Key {
         static let ghostMode = "telewhite.mods.ghostMode"
@@ -93,6 +94,7 @@ public struct TelewhiteModsSettings: Equatable {
         static let hdPhotos = "telewhite.mods.hdPhotos"
         static let translateVoiceMessages = "telewhite.mods.translateVoiceMessages"
         static let quickForwardToSaved = "telewhite.mods.quickForwardToSaved"
+        static let showReadDateOnTap = "telewhite.mods.showReadDateOnTap"
     }
 
     // The language the phone is set to, which is the only sensible guess for "translate
@@ -163,7 +165,9 @@ public struct TelewhiteModsSettings: Equatable {
             channelHideShareButton: defaults.bool(forKey: Key.channelHideShareButton),
             hdPhotos: defaults.object(forKey: Key.hdPhotos) as? Bool ?? false,
             translateVoiceMessages: defaults.bool(forKey: Key.translateVoiceMessages),
-            quickForwardToSaved: defaults.bool(forKey: Key.quickForwardToSaved)
+            quickForwardToSaved: defaults.bool(forKey: Key.quickForwardToSaved),
+            // Defaults on: it only reacts to a deliberate tap on your own checkmarks.
+            showReadDateOnTap: defaults.object(forKey: Key.showReadDateOnTap) as? Bool ?? true
         )
 
         // Telewhite: the five stealth flags are one switch now, but older builds wrote
@@ -278,6 +282,7 @@ public struct TelewhiteModsSettings: Equatable {
         defaults.set(self.hdPhotos, forKey: Key.hdPhotos)
         defaults.set(self.translateVoiceMessages, forKey: Key.translateVoiceMessages)
         defaults.set(self.quickForwardToSaved, forKey: Key.quickForwardToSaved)
+        defaults.set(self.showReadDateOnTap, forKey: Key.showReadDateOnTap)
         NotificationCenter.default.post(name: TelewhiteModsSettings.didChangeNotification, object: nil)
     }
 
@@ -371,6 +376,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case oneTimeMedia(String, Bool)
     case hdPhotos(String, Bool)
     case quickForwardToSaved(String, Bool)
+    case showReadDateOnTap(String, Bool)
     case translatorLink(String)
     case messengerInfo(String)
 
@@ -433,7 +439,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
         switch self {
         case .menuItem:
             return TelewhiteModsSection.menu.rawValue
-        case .messengerHeader, .preserveDeletedMessages, .forwardHideNamesByDefault, .showPreviousEditedText, .oneTimeMedia, .hdPhotos, .quickForwardToSaved, .translatorLink, .messengerInfo:
+        case .messengerHeader, .preserveDeletedMessages, .forwardHideNamesByDefault, .showPreviousEditedText, .oneTimeMedia, .hdPhotos, .quickForwardToSaved, .showReadDateOnTap, .translatorLink, .messengerInfo:
             return TelewhiteModsSection.messenger.rawValue
         case .translatorHeader, .translateMessages, .autoTranslateEnglish, .translationTargetLanguage, .outgoingTranslateButtonEnabled, .translateVoiceMessages, .openRouterApiKey, .translatorInfo:
             return TelewhiteModsSection.translator.rawValue
@@ -474,10 +480,12 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 5
         case .quickForwardToSaved:
             return 6
-        case .translatorLink:
+        case .showReadDateOnTap:
             return 7
-        case .messengerInfo:
+        case .translatorLink:
             return 8
+        case .messengerInfo:
+            return 9
         case .translatorHeader:
             return 50
         case .autoTranslateEnglish:
@@ -659,6 +667,10 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
         case let .showPreviousEditedText(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.showPreviousEditedText = value
+            }
+        case let .showReadDateOnTap(text, value):
+            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
+                settings.showReadDateOnTap = value
             }
         case let .translateMessages(text, value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: text, text: telewhiteEntryDescription(self, presentationData: presentationData), value: value, maximumNumberOfLines: 3, sectionId: self.section, style: .blocks, updated: { value in
@@ -920,6 +932,8 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
         return text("Your photos are sent with much less compression. They look better and use more data.", "Ваши фото отправляются почти без сжатия — выглядят лучше, весят больше.")
     case .quickForwardToSaved:
         return text("Adds \"Forward to Saved Messages\" to the message menu — one tap, no chat picker.", "Добавляет в меню сообщения пункт «Переслать в Избранное» — одно нажатие, без выбора чата.")
+    case .showReadDateOnTap:
+        return text("Tap the checkmarks under your message to see when it was read. Works in private chats. Nothing is shown if the other person hides their read times, or if you hide yours.", "Нажмите на галочки под своим сообщением, чтобы увидеть, когда его прочитали. Работает в личных чатах. Время не покажется, если собеседник скрыл время прочтения или если вы скрыли своё.")
     case .translatorLink:
         return text("Automatic translation of incoming messages, your own messages and voice messages.", "Автоперевод входящих, перевод ваших сообщений и голосовых.")
     case .autoTranslateEnglish:
@@ -979,6 +993,7 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.oneTimeMedia(strings.text("View-Once Photos and Videos", "Одноразовые фото и видео"), settings.oneTimeMediaUnlimited || settings.downloadOneTimeMedia))
         entries.append(.hdPhotos(strings.text("Send Photos in High Quality", "Отправлять фото в высоком качестве"), settings.hdPhotos))
         entries.append(.quickForwardToSaved(strings.text("\"To Saved Messages\" Button", "Кнопка «В Избранное»"), settings.quickForwardToSaved))
+        entries.append(.showReadDateOnTap(strings.text("Read Time on the Checkmarks", "Время прочтения по галочкам"), settings.showReadDateOnTap))
         entries.append(.translatorLink(telewhiteTabTitle(.translator, strings: strings)))
         entries.append(.messengerInfo(strings.text("Everything here works on this phone only.", "Всё перечисленное работает только на этом телефоне.")))
 

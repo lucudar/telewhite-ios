@@ -5739,6 +5739,11 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
               item.message.id.peerId.namespace == Namespaces.Peer.CloudUser else {
             return nil
         }
+        // Imported (chat-history) messages already own the status tap — it shows the
+        // "imported" tooltip — so leave those alone rather than shadowing them.
+        if let forwardInfo = item.message.forwardInfo, forwardInfo.flags.contains(.isImported) {
+            return nil
+        }
 
         var hitNode: ChatMessageBubbleContentNode?
         for contentNode in self.contentNodes {
@@ -5787,7 +5792,14 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
                 case .unavailable:
                     text = isRussian ? "Время прочтения недоступно" : "Read time unavailable"
                 }
-                item.controllerInteraction.displayMessageTooltip(messageId, text, false, hitNode ?? self, nil)
+                // Anchor on the status node so the tooltip points at the checkmarks; fall
+                // back to the bubble if the content node went away mid-request. Written out
+                // rather than `hitNode ?? self` because the two have no common declared type.
+                var anchorNode: ASDisplayNode = self
+                if let hitNode {
+                    anchorNode = hitNode
+                }
+                item.controllerInteraction.displayMessageTooltip(messageId, text, false, anchorNode, nil)
             })
         }))
     }

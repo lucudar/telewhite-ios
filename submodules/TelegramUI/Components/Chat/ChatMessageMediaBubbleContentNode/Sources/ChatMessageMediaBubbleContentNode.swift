@@ -568,6 +568,18 @@ public class ChatMessageMediaBubbleContentNode: ChatMessageBubbleContentNode {
         return self.interactiveImageNode.playMediaWithSound()
     }
     
+    override public func telewhiteStatusFrame() -> CGRect? {
+        let statusNode = self.interactiveImageNode.dateAndStatusNode
+        // Hidden while the media is covered (spoilers, "tap to view"), and there is nothing
+        // to aim at then.
+        if statusNode.isHidden {
+            return nil
+        }
+        // Unlike the text bubble, this status is nested inside the image node, so its frame
+        // has to be brought up into this content node's coordinates.
+        return statusNode.view.convert(statusNode.bounds, to: self.view)
+    }
+
     override public func tapActionAtPoint(_ point: CGPoint, gesture: TapLongTapOrDoubleTapGesture, isEstimating: Bool) -> ChatMessageBubbleContentTapAction {
         if self.interactiveImageNode.ignoreTapActionAtPoint(point) {
             return ChatMessageBubbleContentTapAction(content: .ignore)
