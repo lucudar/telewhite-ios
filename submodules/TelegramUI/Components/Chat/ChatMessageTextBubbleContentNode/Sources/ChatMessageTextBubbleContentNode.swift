@@ -1350,6 +1350,10 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
         }
     }
     
+    override public func telewhiteStatusFrame() -> CGRect? {
+        return self.statusNode?.frame
+    }
+
     override public func updateTouchesAtPoint(_ point: CGPoint?) {
         if let item = self.item {
             var rects: [CGRect]?

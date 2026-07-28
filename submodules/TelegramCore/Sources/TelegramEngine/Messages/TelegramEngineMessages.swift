@@ -520,6 +520,12 @@ public extension TelegramEngine {
         public func messageReadStats(id: MessageId) -> Signal<MessageReadStats?, NoError> {
             return _internal_messageReadStats(account: self.account, id: id)
         }
+
+        /// Telewhite: like `messageReadStats`, but preserves the server's reason for refusing
+        /// a read date instead of flattening every failure into empty stats.
+        public func telewhiteOutgoingReadDate(id: MessageId) -> Signal<TelewhiteOutgoingReadDate, NoError> {
+            return _internal_telewhiteOutgoingReadDate(account: self.account, id: id)
+        }
         
         public func getPreparedInlineMessage(botId: EnginePeer.Id, id: String) -> Signal<PreparedInlineMessage?, NoError> {
             return _internal_getPreparedInlineMessage(account: self.account, botId: botId, id: id)

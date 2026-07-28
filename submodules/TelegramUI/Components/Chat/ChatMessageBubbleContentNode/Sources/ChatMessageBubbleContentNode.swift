@@ -285,6 +285,16 @@ open class ChatMessageBubbleContentNode: ASDisplayNode {
     
     open func updateTouchesAtPoint(_ point: CGPoint?) {
     }
+
+    /// Telewhite: the frame of the date/checkmark status, in this content node's coordinates.
+    ///
+    /// Tapping the checkmarks to reveal the read time needs a hit target, but the status node
+    /// is a private detail of each of the 16 content node subclasses. Overriding this in the
+    /// few subclasses that matter keeps the tap handling itself in one place in the bubble,
+    /// instead of wiring an identical gesture into every subclass.
+    open func telewhiteStatusFrame() -> CGRect? {
+        return nil
+    }
     
     open func updateHighlightedState(animated: Bool) -> Bool {
         return false

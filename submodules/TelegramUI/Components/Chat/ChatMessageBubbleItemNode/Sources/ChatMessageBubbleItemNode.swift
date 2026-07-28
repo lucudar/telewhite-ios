@@ -5720,6 +5720,78 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         }
     }
     
+    /// Telewhite: tapping our own checkmarks asks the server when the recipient read the
+    /// message and reports the answer — or why there isn't one — in a tooltip.
+    ///
+    /// Returns nil when the tap misses the status or the message can't have a read date, so
+    /// the caller falls through to the normal tap targets untouched.
+    private func telewhiteReadDateTapAction(at location: CGPoint) -> InternalBubbleTapAction? {
+        guard UserDefaults.standard.object(forKey: "telewhite.mods.showReadDateOnTap") as? Bool ?? true else {
+            return nil
+        }
+        guard let item = self.item else {
+            return nil
+        }
+        // Only our own delivered messages in one-to-one chats have a read date at all.
+        // Unsent messages have no server id yet, so there is nothing to ask about.
+        guard !item.message.flags.contains(.Incoming), !item.message.flags.contains(.Unsent),
+              item.message.id.namespace == Namespaces.Message.Cloud,
+              item.message.id.peerId.namespace == Namespaces.Peer.CloudUser else {
+            return nil
+        }
+
+        var hitNode: ChatMessageBubbleContentNode?
+        for contentNode in self.contentNodes {
+            guard let statusFrame = contentNode.telewhiteStatusFrame() else {
+                continue
+            }
+            // The status frame is in the content node's own coordinates, so bring the tap
+            // location into that space before testing it.
+            let localLocation = self.view.convert(location, to: contentNode.view)
+            // Checkmarks are a small target; widen it a little so the tap isn't fiddly.
+            if statusFrame.insetBy(dx: -8.0, dy: -6.0).contains(localLocation) {
+                hitNode = contentNode
+                break
+            }
+        }
+        guard let hitNode else {
+            return nil
+        }
+
+        return .action(InternalBubbleTapAction.Action({ [weak self, weak hitNode] in
+            guard let self, let item = self.item else {
+                return
+            }
+            let strings = item.presentationData.strings
+            let isRussian = strings.baseLanguageCode.lowercased().hasPrefix("ru")
+            let dateTimeFormat = item.presentationData.dateTimeFormat
+            let messageId = item.message.id
+
+            let _ = (item.context.engine.messages.telewhiteOutgoingReadDate(id: messageId)
+            |> deliverOnMainQueue).start(next: { [weak self, weak hitNode] result in
+                guard let self, let item = self.item else {
+                    return
+                }
+                let text: String
+                switch result {
+                case let .read(timestamp):
+                    let dateText = stringForFullDate(timestamp: timestamp, strings: strings, dateTimeFormat: dateTimeFormat)
+                    text = isRussian ? "Прочитано \(dateText)" : "Read \(dateText)"
+                case .notReadYet:
+                    text = isRussian ? "Ещё не прочитано" : "Not read yet"
+                case .hiddenByRecipient:
+                    text = isRussian ? "Собеседник скрыл время прочтения" : "They hide their read times"
+                case .hiddenByOwnPrivacy:
+                    // Worth distinguishing: this one the user can actually fix.
+                    text = isRussian ? "Вы скрываете время прочтения, поэтому не видите чужое" : "You hide your read times, so theirs are hidden too"
+                case .unavailable:
+                    text = isRussian ? "Время прочтения недоступно" : "Read time unavailable"
+                }
+                item.controllerInteraction.displayMessageTooltip(messageId, text, false, hitNode ?? self, nil)
+            })
+        }))
+    }
+
     private func gestureRecognized(gesture: TapLongTapOrDoubleTapGesture, location: CGPoint, recognizer: TapLongTapOrDoubleTapGestureRecognizer?) -> InternalBubbleTapAction? {
         var mediaMessage: Message?
         var forceOpen = false
@@ -5780,6 +5852,12 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         
         switch gesture {
             case .tap:
+                // Telewhite: tapping our own checkmarks reveals when the recipient read the
+                // message. Checked before the other tap targets because the status sits inside
+                // a content node whose own tap handling would otherwise swallow it.
+                if let readDateAction = self.telewhiteReadDateTapAction(at: location) {
+                    return readDateAction
+                }
                 if let nameNode = self.nameNode, nameNode.frame.contains(location) {
                     if let item = self.item {
                         for attribute in item.message.attributes {
