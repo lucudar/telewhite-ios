@@ -1615,6 +1615,21 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
                     Logger.shared.log("App \(self.episodeId)", "Error submitting background task request: \(e)")
                 }
             })
+            
+            // Telewhite: the app refresh slot, used to pull the difference while the app is
+            // closed. Keep Deleted Messages can only save a message the phone already has,
+            // so without this a message that arrives and is deleted between two launches is
+            // simply never seen — the deletion arrives in the same batch as the message.
+            let refreshTaskId = "\(baseAppBundleId).refresh"
+            
+            BGTaskScheduler.shared.register(forTaskWithIdentifier: refreshTaskId, using: DispatchQueue.main) { task in
+                // iOS hands out one refresh at a time and never repeats it by itself, so the
+                // next one has to be booked here or this is the last one we ever get.
+                self.telewhiteScheduleBackgroundRefresh()
+                self.telewhiteRunBackgroundRefresh(task: task)
+            }
+            
+            self.telewhiteScheduleBackgroundRefresh()
         }
         
         let timestamp = Int(CFAbsoluteTimeGetCurrent())
@@ -1962,6 +1977,76 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         })
     }
 
+    private func telewhiteScheduleBackgroundRefresh() {
+        let identifier = "\(Bundle.main.bundleIdentifier!).refresh"
+        
+        let settings = TelewhiteModsSettings.current
+        // Nothing to preserve means nothing worth waking the phone up for, so a user who
+        // never turned Keep Deleted Messages on pays no battery for this at all.
+        if !settings.preserveDeletedMessages || !settings.backgroundMessageRefresh {
+            BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: identifier)
+            return
+        }
+        
+        let request = BGAppRefreshTaskRequest(identifier: identifier)
+        // The 15 minutes is a floor, not a promise: iOS stretches it to match how often the
+        // app actually gets opened, and gives nothing at all while the phone is low on power.
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 15.0 * 60.0)
+        do {
+            try BGTaskScheduler.shared.submit(request)
+        } catch let e {
+            Logger.shared.log("App \(self.episodeId)", "Error submitting background refresh request: \(e)")
+        }
+    }
+    
+    private func telewhiteRunBackgroundRefresh(task: BGTask) {
+        Logger.shared.log("App \(self.episodeId)", "Executing background refresh task")
+        
+        let disposable = MetaDisposable()
+        var isCompleted = false
+        let complete: (Bool) -> Void = { success in
+            // iOS kills the app if the task is completed twice, and the expiration handler
+            // races the signal finishing.
+            if isCompleted {
+                return
+            }
+            isCompleted = true
+            Logger.shared.log("App \(self.episodeId)", "Completed background refresh task, success: \(success)")
+            disposable.dispose()
+            task.setTaskCompleted(success: success)
+        }
+        
+        task.expirationHandler = {
+            complete(false)
+        }
+        
+        let signal = self.sharedContextPromise.get()
+        |> take(1)
+        |> deliverOnMainQueue
+        |> mapToSignal { sharedApplicationContext -> Signal<Never, NoError> in
+            // The postbox refuses to open write transactions in the background unless the
+            // wakeup manager is holding time, so without this the difference gets fetched
+            // and then has nowhere to be stored.
+            sharedApplicationContext.wakeupManager.allowBackgroundTimeExtension(timeout: 25.0, extendNow: true)
+            
+            return sharedApplicationContext.sharedContext.activeAccountContexts
+            |> take(1)
+            |> mapToSignal { activeAccounts -> Signal<Never, NoError> in
+                return combineLatest(activeAccounts.accounts.map { account -> Signal<Bool, NoError> in
+                    return account.1.account.stateManager.standalonePollDifference()
+                })
+                |> ignoreValues
+            }
+        }
+        // The system budget is around 30 seconds and overrunning it counts against every
+        // future refresh, so give up early rather than be throttled later.
+        |> timeout(20.0, queue: Queue.mainQueue(), alternate: .complete())
+        
+        disposable.set(signal.start(completed: {
+            complete(true)
+        }))
+    }
+    
     func applicationDidEnterBackground(_ application: UIApplication) {
         let _ = (self.sharedContextPromise.get()
         |> take(1)
@@ -1990,6 +2075,10 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         self.isInForegroundPromise.set(false)
         self.isActiveValue = false
         self.isActivePromise.set(false)
+        
+        // Re-booked on every trip to the background: this is also where flipping the switch
+        // in Settings takes effect, and where a request cancelled by the system comes back.
+        self.telewhiteScheduleBackgroundRefresh()
         
         final class TaskIdHolder {
             var taskId: UIBackgroundTaskIdentifier?

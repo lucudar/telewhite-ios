@@ -18,6 +18,7 @@ public struct TelewhiteModsSettings: Equatable {
     public var ghostMode: Bool
     public var ghostChatButtonEnabled: Bool
     public var preserveDeletedMessages: Bool
+    public var backgroundMessageRefresh: Bool
     public var hideOnlineStatus: Bool
     public var hideTypingStatus: Bool
     public var hideReadReceipts: Bool
@@ -59,6 +60,7 @@ public struct TelewhiteModsSettings: Equatable {
         static let ghostMode = "telewhite.mods.ghostMode"
         static let ghostChatButtonEnabled = "telewhite.mods.ghostChatButtonEnabled"
         static let preserveDeletedMessages = "telewhite.mods.preserveDeletedMessages"
+        static let backgroundMessageRefresh = "telewhite.mods.backgroundMessageRefresh"
         static let hideOnlineStatus = "telewhite.mods.hideOnlineStatus"
         static let hideTypingStatus = "telewhite.mods.hideTypingStatus"
         static let hideReadReceipts = "telewhite.mods.hideReadReceipts"
@@ -118,6 +120,9 @@ public struct TelewhiteModsSettings: Equatable {
             ghostMode: defaults.bool(forKey: Key.ghostMode),
             ghostChatButtonEnabled: defaults.object(forKey: Key.ghostChatButtonEnabled) as? Bool ?? true,
             preserveDeletedMessages: defaults.bool(forKey: Key.preserveDeletedMessages),
+            // On by default, but it only ever schedules anything while Keep Deleted Messages
+            // is on, so a user who never touched that feature pays nothing for this.
+            backgroundMessageRefresh: defaults.object(forKey: Key.backgroundMessageRefresh) as? Bool ?? true,
             hideOnlineStatus: defaults.bool(forKey: Key.hideOnlineStatus),
             hideTypingStatus: defaults.bool(forKey: Key.hideTypingStatus),
             hideReadReceipts: defaults.bool(forKey: Key.hideReadReceipts),
@@ -246,6 +251,7 @@ public struct TelewhiteModsSettings: Equatable {
         defaults.set(self.ghostMode, forKey: Key.ghostMode)
         defaults.set(self.ghostChatButtonEnabled, forKey: Key.ghostChatButtonEnabled)
         defaults.set(self.preserveDeletedMessages, forKey: Key.preserveDeletedMessages)
+        defaults.set(self.backgroundMessageRefresh, forKey: Key.backgroundMessageRefresh)
         defaults.set(self.hideOnlineStatus, forKey: Key.hideOnlineStatus)
         defaults.set(self.hideTypingStatus, forKey: Key.hideTypingStatus)
         defaults.set(self.hideReadReceipts, forKey: Key.hideReadReceipts)
@@ -369,6 +375,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
 
     case messengerHeader(String)
     case preserveDeletedMessages(String, Bool)
+    case backgroundMessageRefresh(String, Bool)
     case forwardHideNamesByDefault(String, Bool)
     case showPreviousEditedText(String, Bool)
     // Telewhite: one row for both halves of the view-once feature — opening without a
@@ -439,7 +446,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
         switch self {
         case .menuItem:
             return TelewhiteModsSection.menu.rawValue
-        case .messengerHeader, .preserveDeletedMessages, .forwardHideNamesByDefault, .showPreviousEditedText, .oneTimeMedia, .hdPhotos, .quickForwardToSaved, .showReadDateOnTap, .translatorLink, .messengerInfo:
+        case .messengerHeader, .preserveDeletedMessages, .backgroundMessageRefresh, .forwardHideNamesByDefault, .showPreviousEditedText, .oneTimeMedia, .hdPhotos, .quickForwardToSaved, .showReadDateOnTap, .translatorLink, .messengerInfo:
             return TelewhiteModsSection.messenger.rawValue
         case .translatorHeader, .translateMessages, .autoTranslateEnglish, .translationTargetLanguage, .outgoingTranslateButtonEnabled, .translateVoiceMessages, .openRouterApiKey, .translatorInfo:
             return TelewhiteModsSection.translator.rawValue
@@ -470,22 +477,24 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 0
         case .preserveDeletedMessages:
             return 1
-        case .showPreviousEditedText:
+        case .backgroundMessageRefresh:
             return 2
-        case .forwardHideNamesByDefault:
+        case .showPreviousEditedText:
             return 3
-        case .oneTimeMedia:
+        case .forwardHideNamesByDefault:
             return 4
-        case .hdPhotos:
+        case .oneTimeMedia:
             return 5
-        case .quickForwardToSaved:
+        case .hdPhotos:
             return 6
-        case .showReadDateOnTap:
+        case .quickForwardToSaved:
             return 7
-        case .translatorLink:
+        case .showReadDateOnTap:
             return 8
-        case .messengerInfo:
+        case .translatorLink:
             return 9
+        case .messengerInfo:
+            return 10
         case .translatorHeader:
             return 50
         case .autoTranslateEnglish:
@@ -659,6 +668,10 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
         case let .preserveDeletedMessages(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.preserveDeletedMessages = value
+            }
+        case let .backgroundMessageRefresh(text, value):
+            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
+                settings.backgroundMessageRefresh = value
             }
         case let .forwardHideNamesByDefault(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
@@ -922,6 +935,8 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
     switch entry {
     case .preserveDeletedMessages:
         return text("If someone deletes a message, it stays in the chat for you, marked \"Deleted\". Only on this phone — nothing is sent anywhere.", "Если собеседник удалит сообщение, у вас оно останется в чате с пометкой «Удалено». Только на этом телефоне — никуда ничего не отправляется.")
+    case .backgroundMessageRefresh:
+        return text("While the app is closed, the phone quietly picks up new messages on its own, so a message that arrives and is deleted before you ever look at it is still kept. iOS decides how often this happens — there is no fixed schedule, and no guarantee.", "Пока приложение закрыто, телефон сам время от времени забирает новые сообщения — тогда удалённое сохранится, даже если вы не успели его увидеть. Как часто это происходит, решает iOS: расписания нет и полной гарантии тоже.")
     case .showPreviousEditedText:
         return text("When someone edits a message, the old version stays visible in small text underneath.", "Когда сообщение изменят, под ним мелким шрифтом останется прошлый вариант.")
     case .forwardHideNamesByDefault:
@@ -984,6 +999,11 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
     case .messenger:
         entries.append(.messengerHeader(telewhiteTabTitle(.messenger, strings: strings)))
         entries.append(.preserveDeletedMessages(strings.text("Keep Deleted Messages", "Не терять удалённые сообщения"), settings.preserveDeletedMessages))
+        // Only shown under Keep Deleted Messages, because on its own it does nothing a user
+        // would notice — and it is the answer to "why did it not save that one?".
+        if settings.preserveDeletedMessages {
+            entries.append(.backgroundMessageRefresh(strings.text("Fetch Messages in the Background", "Забирать сообщения в фоне"), settings.backgroundMessageRefresh))
+        }
         entries.append(.showPreviousEditedText(strings.text("Show the Text Before an Edit", "Показывать текст до правки"), settings.showPreviousEditedText))
         entries.append(.forwardHideNamesByDefault(strings.text("Forward Without the Author", "Пересылать без автора"), settings.forwardHideNamesByDefault))
         // Rows that write several fields at once read them with OR. Each of these was two
