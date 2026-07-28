@@ -2371,9 +2371,8 @@ public final class PendingMessageManager {
     }
     
     private func applySentGroupMessages(postbox: Postbox, stateManager: AccountStateManager, messages: [Message], result: Api.Updates) -> Signal<Void, NoError> {
-        if let peerId = messages.first?.id.peerId {
-            TelewhitePresenceGuard.assertOffline(network: self.network)
-        }
+        // Telewhite: extend the burst past the server's reply (see the single-message path).
+        TelewhitePresenceGuard.assertOffline(network: self.network)
         var namespace = Namespaces.Message.Cloud
         if let message = messages.first {
             if let channel = message.peers[message.id.peerId] as? TelegramChannel, channel.isMonoForum {
