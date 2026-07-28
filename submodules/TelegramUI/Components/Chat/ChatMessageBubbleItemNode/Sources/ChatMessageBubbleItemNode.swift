@@ -3753,7 +3753,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
     // mainContextSourceNode.contentNode rather than in contentContainersWrapperNode, so
     // the wrapper's fade does not dim the badge itself, and it is positioned as a
     // free-floating overlay that never joins the measured layout.
-    private func updateTelewhiteDeletedBadge(isDeleted: Bool, contentFrame: CGRect, containerWidth: CGFloat, isIncoming: Bool, isRussian: Bool, reservedGutterWidth: CGFloat) {
+    private func updateTelewhiteDeletedBadge(isDeleted: Bool, contentFrame: CGRect, containerWidth: CGFloat, isIncoming: Bool, reservedGutterWidth: CGFloat) {
         if isDeleted {
             let badgeNode: ASImageNode
             if let current = self.telewhiteDeletedBadgeNode {
@@ -3768,7 +3768,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             self.telewhiteDeletedBadgeIsIncoming = isIncoming
             self.telewhiteDeletedBadgeContainerWidth = containerWidth
             self.telewhiteDeletedBadgeReservedGutterWidth = reservedGutterWidth
-            badgeNode.image = telewhiteDeletedBadgeImage(text: telewhiteDeletedBadgeTitle(isRussian: isRussian))
+            badgeNode.image = telewhiteDeletedBadgeImage()
             self.updateTelewhiteDeletedBadgeFrame(contentFrame: contentFrame)
         } else if let badgeNode = self.telewhiteDeletedBadgeNode {
             self.telewhiteDeletedBadgeNode = nil
@@ -3972,7 +3972,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         // sets aside for the share/summarize button, which lives in the same gutter and
         // draws above the badge.
         let telewhiteBadgeSelectionOffset: CGFloat = (item.controllerInteraction.selectionState != nil && incoming) ? 42.0 : 0.0
-        strongSelf.updateTelewhiteDeletedBadge(isDeleted: isTelewhiteDeleted, contentFrame: backgroundFrame, containerWidth: params.width - params.rightInset - telewhiteBadgeSelectionOffset, isIncoming: incoming, isRussian: item.presentationData.strings.baseLanguageCode.lowercased().hasPrefix("ru"), reservedGutterWidth: (needsShareButton || needsSummarizeButton) ? 45.0 : 0.0)
+        strongSelf.updateTelewhiteDeletedBadge(isDeleted: isTelewhiteDeleted, contentFrame: backgroundFrame, containerWidth: params.width - params.rightInset - telewhiteBadgeSelectionOffset, isIncoming: incoming, reservedGutterWidth: (needsShareButton || needsSummarizeButton) ? 45.0 : 0.0)
         // The overlay darkens the whole bubble shape, so it may only appear when the whole
         // bubble is really gone.
         if isTelewhiteFullyDeleted, !hideBackground {

@@ -695,8 +695,7 @@ public class ChatMessageInstantVideoItemNode: ChatMessageItemView, ASGestureReco
                             strongSelf.contextSourceNode.contentNode.addSubnode(badgeNode)
                             strongSelf.telewhiteDeletedBadgeNode = badgeNode
                         }
-                        let isRussian = item.presentationData.strings.baseLanguageCode.lowercased().hasPrefix("ru")
-                        let badgeImage = telewhiteDeletedBadgeImage(text: telewhiteDeletedBadgeTitle(isRussian: isRussian))
+                        let badgeImage = telewhiteDeletedBadgeImage()
                         badgeNode.image = badgeImage
                         if let badgeImage {
                             badgeNode.frame = telewhiteDeletedBadgeFrame(badgeSize: badgeImage.size, contentFrame: videoFrame, containerWidth: params.width - params.rightInset, isIncoming: incoming, preferInsideBottom: strongSelf.telewhiteDeletedBadgeAvoidsHeader)

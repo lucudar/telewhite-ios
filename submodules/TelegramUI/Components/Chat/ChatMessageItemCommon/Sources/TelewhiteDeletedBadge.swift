@@ -7,7 +7,7 @@ import Display
 //
 // Fading the content alone did not communicate deletion: a translucent photo over
 // a dark wallpaper still reads as a normal photo, and a dimmed text bubble reads as
-// a theme quirk. The badge states it outright, which also lets the content stay
+// a theme quirk. The trash glyph states it outright, which also lets the content stay
 // readable — the whole point of preserving a deleted message is being able to read
 // it — so callers pair this with a mild fade instead of a heavy one.
 //
@@ -19,10 +19,10 @@ private final class TelewhiteDeletedBadgeCache {
     static let shared = TelewhiteDeletedBadgeCache()
 
     private let lock = NSLock()
-    private var images: [String: UIImage] = [:]
+    private var images: [CGFloat: UIImage] = [:]
 
-    func image(for text: String, _ generate: () -> UIImage?) -> UIImage? {
-        let key = "\(text)-\(UIScreen.main.scale)"
+    func image(_ generate: () -> UIImage?) -> UIImage? {
+        let key = UIScreen.main.scale
         self.lock.lock()
         if let existing = self.images[key] {
             self.lock.unlock()
@@ -44,40 +44,33 @@ private final class TelewhiteDeletedBadgeCache {
 /// badge carries the signal, so the content stays legible.
 public let telewhiteDeletedContentAlpha: CGFloat = 0.6
 
-/// Label shown inside the badge, in the chat's language.
-public func telewhiteDeletedBadgeTitle(isRussian: Bool) -> String {
-    return isRussian ? "Удалено" : "Deleted"
-}
-
-/// A dark translucent pill with a trash glyph and `text`, legible over both message
-/// bubbles and photos. Cached per (text, screen scale).
-public func telewhiteDeletedBadgeImage(text: String) -> UIImage? {
-    return TelewhiteDeletedBadgeCache.shared.image(for: text) {
-        let font = Font.semibold(11.0)
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: UIColor.white
-        ]
-        let attributedText = NSAttributedString(string: text, attributes: attributes)
-        let textSize = attributedText.boundingRect(with: CGSize(width: 200.0, height: 100.0), options: [.usesLineFragmentOrigin], context: nil).size
-
+/// A dark translucent circle holding just a trash glyph, legible over both message
+/// bubbles and photos. Cached per screen scale.
+///
+/// Telewhite: this used to be a pill reading "Удалено"/"Deleted". The word made the badge
+/// roughly five times wider, which was the whole problem: at that width it no longer fit
+/// the gutter beside a wide bubble, so `telewhiteDeletedBadgeFrame` fell back to drawing
+/// it inside the message and it covered the last line of long texts. A glyph-only circle
+/// fits the gutter in almost every layout, so the badge now sits beside the message
+/// instead of on top of it — and the trash icon alone already reads as "deleted".
+public func telewhiteDeletedBadgeImage() -> UIImage? {
+    return TelewhiteDeletedBadgeCache.shared.image {
         let glyphSize = CGSize(width: 9.0, height: 10.0)
-        let leftInset: CGFloat = 6.0
-        let glyphSpacing: CGFloat = 4.0
-        let rightInset: CGFloat = 7.0
-        let height: CGFloat = 17.0
-        let width = leftInset + glyphSize.width + glyphSpacing + ceil(textSize.width) + rightInset
+        let diameter: CGFloat = 18.0
 
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: width, height: height))
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: diameter, height: diameter))
         return renderer.image { rendererContext in
             let context = rendererContext.cgContext
 
-            let bounds = CGRect(origin: CGPoint(), size: CGSize(width: width, height: height))
+            let bounds = CGRect(origin: CGPoint(), size: CGSize(width: diameter, height: diameter))
             context.setFillColor(UIColor(white: 0.0, alpha: 0.75).cgColor)
-            UIBezierPath(roundedRect: bounds, cornerRadius: height * 0.5).fill()
+            UIBezierPath(ovalIn: bounds).fill()
 
-            // Trash glyph: lid, handle bump, tapered body.
-            let glyphOrigin = CGPoint(x: leftInset, y: floor((height - glyphSize.height) * 0.5))
+            // Trash glyph: lid, handle bump, tapered body. Centred in the circle.
+            let glyphOrigin = CGPoint(
+                x: floor((diameter - glyphSize.width) * 0.5),
+                y: floor((diameter - glyphSize.height) * 0.5)
+            )
             context.setStrokeColor(UIColor.white.cgColor)
             context.setLineWidth(1.0)
             context.setLineCap(.round)
@@ -101,12 +94,6 @@ public func telewhiteDeletedBadgeImage(text: String) -> UIImage? {
             body.addLine(to: CGPoint(x: glyphOrigin.x + glyphSize.width - 1.25, y: glyphOrigin.y + 3.75))
             body.lineJoinStyle = .round
             body.stroke()
-
-            let textOrigin = CGPoint(
-                x: leftInset + glyphSize.width + glyphSpacing,
-                y: floor((height - textSize.height) * 0.5)
-            )
-            attributedText.draw(at: textOrigin)
         }
     }
 }

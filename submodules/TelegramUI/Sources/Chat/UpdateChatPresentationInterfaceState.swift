@@ -549,18 +549,21 @@ func updateChatPresentationInterfaceStateImpl(
         selfController.secondaryRightNavigationButton = nil
     }
 
-    if let button = tertiaryRightNavigationButtonForChatInterfaceState(context: selfController.context, presentationInterfaceState: updatedChatPresentationInterfaceState, currentButton: selfController.tertiaryRightNavigationButton, target: selfController, selector: #selector(selfController.tertiaryRightNavigationButtonAction)) {
-        if selfController.tertiaryRightNavigationButton != button {
-            if let currentButton = selfController.tertiaryRightNavigationButton?.action, currentButton == button.action {
+    if let button = quaternaryRightNavigationButtonForChatInterfaceState(context: selfController.context, presentationInterfaceState: updatedChatPresentationInterfaceState, currentButton: selfController.quaternaryRightNavigationButton, target: selfController, selector: #selector(selfController.quaternaryRightNavigationButtonAction), longPressSelector: #selector(selfController.quaternaryRightNavigationButtonLongPressAction)) {
+        if selfController.quaternaryRightNavigationButton != button {
+            if let currentButton = selfController.quaternaryRightNavigationButton?.action, currentButton == button.action {
                 buttonsAnimated = false
             }
-            selfController.tertiaryRightNavigationButton = button
+            selfController.quaternaryRightNavigationButton = button
         }
-    } else if let _ = selfController.tertiaryRightNavigationButton {
-        selfController.tertiaryRightNavigationButton = nil
+    } else if let _ = selfController.quaternaryRightNavigationButton {
+        selfController.quaternaryRightNavigationButton = nil
     }
     
     var rightBarButtons: [UIBarButtonItem] = []
+    if let quaternaryRightNavigationButton = selfController.quaternaryRightNavigationButton {
+        rightBarButtons.append(quaternaryRightNavigationButton.buttonItem)
+    }
     if let secondaryRightNavigationButton = selfController.secondaryRightNavigationButton, case .toggleGhostMode(_, _) = secondaryRightNavigationButton.action {
         rightBarButtons.append(secondaryRightNavigationButton.buttonItem)
     }
@@ -572,9 +575,6 @@ func updateChatPresentationInterfaceStateImpl(
         } else {
             rightBarButtons.append(secondaryRightNavigationButton.buttonItem)
         }
-    }
-    if let tertiaryRightNavigationButton = selfController.tertiaryRightNavigationButton {
-        rightBarButtons.append(tertiaryRightNavigationButton.buttonItem)
     }
     var rightBarButtonsUpdated = false
     let currentRightBarButtons = selfController.navigationItem.rightBarButtonItems ?? []

@@ -80,9 +80,92 @@ private func telewhiteGhostModeIcon(theme: PresentationTheme, isEnabled: Bool) -
     })
 }
 
-private func telewhiteTranslateIcon(theme: PresentationTheme, isEnabled: Bool) -> UIImage? {
-    let foregroundColor = isEnabled ? theme.list.itemAccentColor : theme.rootController.navigationBar.buttonColor
-    return generateTintedImage(image: UIImage(bundleImageName: "Chat/Title Panels/Translate"), color: foregroundColor)
+private func telewhiteOutgoingTranslationIcon(theme: PresentationTheme, isEnabled: Bool) -> UIImage? {
+    let size = CGSize(width: 30.0, height: 30.0)
+    if isEnabled {
+        let fillColor = theme.rootController.navigationBar.accentTextColor
+        guard let iconImage = generateTintedImage(image: UIImage(bundleImageName: "Chat/Title Panels/Translate"), color: .white) else {
+            return nil
+        }
+        return generateImage(size, rotatedContext: { size, context in
+            context.clear(CGRect(origin: CGPoint(), size: size))
+            
+            context.setFillColor(fillColor.cgColor)
+            let backgroundRect = CGRect(origin: CGPoint(), size: size)
+            let path = UIBezierPath(roundedRect: backgroundRect, cornerRadius: 8.0)
+            context.addPath(path.cgPath)
+            context.fillPath()
+            
+            UIGraphicsPushContext(context)
+            let scale: CGFloat = 0.8
+            let iconSize = CGSize(width: iconImage.size.width * scale, height: iconImage.size.height * scale)
+            let iconRect = CGRect(
+                x: floor((size.width - iconSize.width) / 2.0),
+                y: floor((size.height - iconSize.height) / 2.0),
+                width: iconSize.width,
+                height: iconSize.height
+            )
+            iconImage.draw(in: iconRect)
+            UIGraphicsPopContext()
+        })
+    } else {
+        guard let iconImage = generateTintedImage(image: UIImage(bundleImageName: "Chat/Title Panels/Translate"), color: .white) else {
+            return nil
+        }
+        return generateImage(size, rotatedContext: { size, context in
+            context.clear(CGRect(origin: CGPoint(), size: size))
+            
+            UIGraphicsPushContext(context)
+            let iconRect = CGRect(
+                x: floor((size.width - iconImage.size.width) / 2.0),
+                y: floor((size.height - iconImage.size.height) / 2.0),
+                width: iconImage.size.width,
+                height: iconImage.size.height
+            )
+            iconImage.draw(in: iconRect, blendMode: .normal, alpha: 0.75)
+            UIGraphicsPopContext()
+        })
+    }
+}
+
+final class TelewhiteOutgoingTranslationButtonNode: HighlightableButtonNode, NavigationButtonCustomDisplayNode {
+    var isHighlightable: Bool {
+        return true
+    }
+    
+    var pressed: (() -> Void)?
+    var longPressed: (() -> Void)?
+    
+    private var longPressRecognizer: UILongPressGestureRecognizer?
+    
+    override init(pointerStyle: PointerStyle? = nil) {
+        super.init(pointerStyle: pointerStyle)
+        self.addTarget(self, action: #selector(self.tapAction), forControlEvents: .touchUpInside)
+    }
+    
+    override func didLoad() {
+        super.didLoad()
+        if self.longPressRecognizer == nil {
+            let recognizer = UILongPressGestureRecognizer(target: self, action: #selector(self.longPressGesture(_:)))
+            recognizer.minimumPressDuration = 0.35
+            self.longPressRecognizer = recognizer
+            self.view.addGestureRecognizer(recognizer)
+        }
+    }
+    
+    @objc private func tapAction() {
+        self.pressed?()
+    }
+    
+    @objc private func longPressGesture(_ recognizer: UILongPressGestureRecognizer) {
+        if case .began = recognizer.state {
+            self.longPressed?()
+        }
+    }
+    
+    override func calculateSizeThatFits(_ constrainedSize: CGSize) -> CGSize {
+        return CGSize(width: 34.0, height: 44.0)
+    }
 }
 
 func leftNavigationButtonForChatInterfaceState(_ presentationInterfaceState: ChatPresentationInterfaceState, subject: ChatControllerSubject?, strings: PresentationStrings, currentButton: ChatNavigationButton?, target: Any?, selector: Selector?) -> ChatNavigationButton? {
@@ -392,27 +475,65 @@ func secondaryRightNavigationButtonForChatInterfaceState(context: AccountContext
     return nil
 }
 
-func tertiaryRightNavigationButtonForChatInterfaceState(context: AccountContext, presentationInterfaceState: ChatPresentationInterfaceState, currentButton: ChatNavigationButton?, target: Any?, selector: Selector?) -> ChatNavigationButton? {
+func quaternaryRightNavigationButtonForChatInterfaceState(context: AccountContext, presentationInterfaceState: ChatPresentationInterfaceState, currentButton: ChatNavigationButton?, target: Any?, selector: Selector?, longPressSelector: Selector?) -> ChatNavigationButton? {
     if presentationInterfaceState.interfaceState.selectionState != nil {
         return nil
     }
     guard case .standard(.default) = presentationInterfaceState.mode, presentationInterfaceState.subject == nil else {
         return nil
     }
-    guard let translationState = presentationInterfaceState.translationState else {
+    // Telewhite: the button used to require a TelegramUser, which is why outgoing
+    // translation was private-chats-only. Groups and supergroups qualify too; a broadcast
+    // channel only when the account can actually post to it, and never Saved Messages or a
+    // secret chat (the translation call would hand the plaintext to a third party).
+    guard let chatMainPeer = presentationInterfaceState.renderedPeer?.chatMainPeer, chatMainPeer.id != context.account.peerId, !chatMainPeer.id.isSecretChat else {
         return nil
     }
-    if translationState.fromLang.lowercased() != "en" {
+    switch chatMainPeer {
+    case let user as TelegramUser:
+        // isGenericUser already excludes bots, deleted accounts, Replies and the
+        // Telegram Notifications service.
+        guard user.isGenericUser else {
+            return nil
+        }
+    case _ as TelegramGroup:
+        break
+    case let channel as TelegramChannel:
+        guard channel.hasPermission(.sendSomething) else {
+            return nil
+        }
+    default:
+        return nil
+    }
+    let settings = TelewhiteModsSettings.current
+    guard settings.outgoingTranslateButtonEnabled else {
         return nil
     }
 
-    let isEnabled = translationState.isEnabled && translationState.toLang.lowercased() == "ru"
-    if currentButton?.action == .toggleTranslation(isEnabled: isEnabled) {
+    let isEnabled = settings.isOutgoingTranslationEnabled(for: chatMainPeer.id)
+    let rawPeerId = chatMainPeer.id.toInt64()
+    
+    if currentButton?.action == .toggleOutgoingTranslation(peerId: rawPeerId, isEnabled: isEnabled) {
         return currentButton
     } else {
-        let buttonItem = UIBarButtonItem(image: telewhiteTranslateIcon(theme: presentationInterfaceState.theme, isEnabled: isEnabled), style: .plain, target: target, action: selector)
-        buttonItem.accessibilityLabel = isEnabled ? "Show original text" : "Translate English to Russian"
-        return ChatNavigationButton(action: .toggleTranslation(isEnabled: isEnabled), buttonItem: buttonItem)
+        let buttonNode = TelewhiteOutgoingTranslationButtonNode()
+        buttonNode.setImage(telewhiteOutgoingTranslationIcon(theme: presentationInterfaceState.theme, isEnabled: isEnabled), for: [])
+        guard let buttonItem = UIBarButtonItem(customDisplayNode: buttonNode) else {
+            return nil
+        }
+        buttonItem.target = target as AnyObject?
+        buttonItem.action = selector
+        buttonNode.pressed = { [weak buttonItem] in
+            buttonItem?.performActionOnTarget()
+        }
+        if let targetObject = target as? NSObject {
+            buttonNode.longPressed = { [weak targetObject] in
+                if let targetObject, let longPressSelector {
+                    let _ = targetObject.perform(longPressSelector)
+                }
+            }
+        }
+        buttonItem.accessibilityLabel = isEnabled ? "Disable outgoing message translation for this chat" : "Enable outgoing message translation for this chat"
+        return ChatNavigationButton(action: .toggleOutgoingTranslation(peerId: rawPeerId, isEnabled: isEnabled), buttonItem: buttonItem)
     }
 }
-
