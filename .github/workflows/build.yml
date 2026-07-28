@@ -47,6 +47,32 @@ jobs:
           sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app/Contents/Developer"
           xcodebuild -version
 
+      - name: Free up disk space
+        # Reclaiming space is an optimisation, not a requirement: never let it block a build.
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+
+          echo "Before:"
+          df -h /
+
+          # Standard macOS runners only guarantee ~14 GB free, and the image ships several
+          # Xcode versions at roughly 15 GB each. Only the pinned one is ever used, so
+          # deleting the rest is what makes room for the Bazel cache below. Without this the
+          # build hits "no space left on device" once the cache is added.
+          XCODE_VERSION="$(python3 -c 'import json; print(json.load(open("versions.json"))["xcode"])')"
+          for app in /Applications/Xcode_*.app; do
+            [ -e "$app" ] || continue
+            if [ "$app" = "/Applications/Xcode_${XCODE_VERSION}.app" ]; then
+              continue
+            fi
+            echo "Removing unused $app"
+            sudo rm -rf "$app"
+          done
+
+          echo "After:"
+          df -h /
+
       - name: Create build input
         env:
           TG_API_ID: ${{ secrets.TG_API_ID }}
@@ -104,6 +130,24 @@ jobs:
           cp build-system/fake-codesigning/certs/* build-input/generated-codesigning/certs/
           cp build-input/generated-profiles/*.mobileprovision build-input/generated-codesigning/profiles/
 
+      # Without this the runner recompiles all of Telegram from scratch on every push,
+      # which is where ~67 of the ~69 minutes go. Restore is best-effort: a miss just
+      # means a cold build, never a failure.
+      #
+      # The cache lives outside the workspace on purpose — the build step below copies the
+      # checkout to /Users/Shared/telegram-ios and wipes that directory first.
+      - name: Restore Bazel disk cache
+        continue-on-error: true
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/bazel-disk-cache
+          # versions.json pins Xcode and Bazel; when either moves the old artifacts are
+          # unusable, so its hash belongs in the key. run_id keeps the key unique because
+          # GitHub caches are immutable once written.
+          key: bazel-disk-${{ hashFiles('versions.json') }}-${{ github.run_id }}
+          restore-keys: |
+            bazel-disk-${{ hashFiles('versions.json') }}-
+
       - name: Build release IPA
         run: |
           set -euo pipefail
@@ -124,6 +168,7 @@ jobs:
           # (the IPA is still produced); drop it if runs get too slow.
           python3 -u build-system/Make/Make.py \
             --bazelUserRoot="$BAZEL_USER_ROOT" \
+            --cacheDir="$HOME/bazel-disk-cache" \
             build \
             --continueOnError \
             --configurationPath=build-input/fork-configuration.json \
@@ -209,3 +254,69 @@ jobs:
             --latest \
             build/artifacts/Telewhite-sideload-fake-signed.ipa \
             build/artifacts/altstore.json
+
+      # Cache housekeeping runs last and cannot fail the job. Anything here is a speed
+      # optimisation for the next run, so it must never delay or block a release — and a
+      # non-always step failing mid-job would silently skip the publish steps above.
+      - name: Trim Bazel disk cache
+        if: always()
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+
+          echo "Disk after build:"
+          df -h /
+
+          # GitHub allows 10 GB of caches per repository and evicts the least recently used
+          # ones, so an unbounded Bazel cache would end up pushing out its own entries.
+          # Bazel's built-in cache GC only runs while a server idles between builds, which
+          # never happens here because the runner is destroyed, so pruning must be explicit.
+          python3 - <<'PY'
+          import os
+
+          cap = 8 * 1024 ** 3
+          root = os.path.expanduser("~/bazel-disk-cache")
+          if not os.path.isdir(root):
+              # SystemExit with a message would exit 1 and fail the step for no reason.
+              print("no cache directory; nothing to trim")
+              raise SystemExit(0)
+
+          entries = []
+          total = 0
+          for dirpath, _, filenames in os.walk(root):
+              for name in filenames:
+                  path = os.path.join(dirpath, name)
+                  try:
+                      stat = os.stat(path)
+                  except OSError:
+                      continue
+                  entries.append((stat.st_mtime, stat.st_size, path))
+                  total += stat.st_size
+
+          print(f"cache holds {len(entries)} files, {total / 1024 ** 3:.2f} GiB")
+          if total <= cap:
+              raise SystemExit(0)
+
+          # Oldest first: entries are independent, so dropping one only costs a future miss.
+          entries.sort()
+          removed = 0
+          for _, size, path in entries:
+              if total <= cap:
+                  break
+              try:
+                  os.remove(path)
+              except OSError:
+                  continue
+              total -= size
+              removed += 1
+
+          print(f"removed {removed} files, now {total / 1024 ** 3:.2f} GiB")
+          PY
+
+      - name: Save Bazel disk cache
+        if: always()
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: ~/bazel-disk-cache
+          key: bazel-disk-${{ hashFiles('versions.json') }}-${{ github.run_id }}
