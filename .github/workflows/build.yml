@@ -47,31 +47,11 @@ jobs:
           sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app/Contents/Developer"
           xcodebuild -version
 
-      - name: Free up disk space
-        # Reclaiming space is an optimisation, not a requirement: never let it block a build.
-        continue-on-error: true
-        run: |
-          set -uo pipefail
-
-          echo "Before:"
-          df -h /
-
-          # Standard macOS runners only guarantee ~14 GB free, and the image ships several
-          # Xcode versions at roughly 15 GB each. Only the pinned one is ever used, so
-          # deleting the rest is what makes room for the Bazel cache below. Without this the
-          # build hits "no space left on device" once the cache is added.
-          XCODE_VERSION="$(python3 -c 'import json; print(json.load(open("versions.json"))["xcode"])')"
-          for app in /Applications/Xcode_*.app; do
-            [ -e "$app" ] || continue
-            if [ "$app" = "/Applications/Xcode_${XCODE_VERSION}.app" ]; then
-              continue
-            fi
-            echo "Removing unused $app"
-            sudo rm -rf "$app"
-          done
-
-          echo "After:"
-          df -h /
+      # Deliberately no "free up disk space" step: this runner reports 94 GB free before the
+      # build, so the Bazel cache fits with room to spare. An earlier attempt to delete the
+      # unused Xcodes broke the build instead — /Applications/Xcode_26.2.app is a symlink to
+      # Xcode_26.2.0.app, so removing the "unused" 26.2.0 destroyed the selected toolchain
+      # and every C header (stdlib.h, errno.h) vanished mid-build.
 
       - name: Create build input
         env:
