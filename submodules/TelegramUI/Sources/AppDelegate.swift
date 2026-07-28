@@ -2013,6 +2013,8 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
             isCompleted = true
             Logger.shared.log("App \(self.episodeId)", "Completed background refresh task, success: \(success)")
             disposable.dispose()
+            // Breaks the task -> handler -> task retain cycle created just below.
+            task.expirationHandler = nil
             task.setTaskCompleted(success: success)
         }
         
@@ -2024,23 +2026,22 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         |> take(1)
         |> deliverOnMainQueue
         |> mapToSignal { sharedApplicationContext -> Signal<Never, NoError> in
-            // The postbox refuses to open write transactions in the background unless the
-            // wakeup manager is holding time, so without this the difference gets fetched
-            // and then has nowhere to be stored.
-            sharedApplicationContext.wakeupManager.allowBackgroundTimeExtension(timeout: 25.0, extendNow: true)
+            // Same call the app already makes when a push arrives. Handing the wakeup manager
+            // explicit time is what flips the primary account back to being a service task
+            // master; in the background it is otherwise pinned to .never and fetches nothing.
+            //
+            // Deliberately not stateManager.standalonePollDifference(): that path hits
+            // preconditionFailure() on a differenceTooLong reply, which is exactly what a
+            // phone that has been asleep for hours gets back. The normal state manager
+            // handles that case by resetting state instead of crashing.
+            sharedApplicationContext.wakeupManager.allowBackgroundTimeExtension(timeout: 20.0, extendNow: true)
             
-            return sharedApplicationContext.sharedContext.activeAccountContexts
-            |> take(1)
-            |> mapToSignal { activeAccounts -> Signal<Never, NoError> in
-                return combineLatest(activeAccounts.accounts.map { account -> Signal<Bool, NoError> in
-                    return account.1.account.stateManager.standalonePollDifference()
-                })
-                |> ignoreValues
-            }
+            // The extension above lasts 20 seconds; hold the task open for slightly less so
+            // the sync is not cut off mid-transaction, and so we stay well inside the ~30
+            // second budget that iOS shrinks on every overrun.
+            return Signal<Never, NoError>.complete()
+            |> delay(15.0, queue: Queue.mainQueue())
         }
-        // The system budget is around 30 seconds and overrunning it counts against every
-        // future refresh, so give up early rather than be throttled later.
-        |> timeout(20.0, queue: Queue.mainQueue(), alternate: .complete())
         
         disposable.set(signal.start(completed: {
             complete(true)

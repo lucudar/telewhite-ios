@@ -936,7 +936,7 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
     case .preserveDeletedMessages:
         return text("If someone deletes a message, it stays in the chat for you, marked \"Deleted\". Only on this phone — nothing is sent anywhere.", "Если собеседник удалит сообщение, у вас оно останется в чате с пометкой «Удалено». Только на этом телефоне — никуда ничего не отправляется.")
     case .backgroundMessageRefresh:
-        return text("While the app is closed, the phone quietly picks up new messages on its own, so a message that arrives and is deleted before you ever look at it is still kept. iOS decides how often this happens — there is no fixed schedule, and no guarantee.", "Пока приложение закрыто, телефон сам время от времени забирает новые сообщения — тогда удалённое сохранится, даже если вы не успели его увидеть. Как часто это происходит, решает iOS: расписания нет и полной гарантии тоже.")
+        return text("While the app is closed, the phone quietly picks up new messages on its own, so a message that arrives and is deleted before you ever look at it is still kept. iOS decides how often this happens — there is no fixed schedule and no guarantee, and only the account you are currently using is refreshed.", "Пока приложение закрыто, телефон сам время от времени забирает новые сообщения — тогда удалённое сохранится, даже если вы не успели его увидеть. Как часто это происходит, решает iOS: расписания нет и полной гарантии тоже. Обновляется только тот аккаунт, в котором вы сейчас находитесь.")
     case .showPreviousEditedText:
         return text("When someone edits a message, the old version stays visible in small text underneath.", "Когда сообщение изменят, под ним мелким шрифтом останется прошлый вариант.")
     case .forwardHideNamesByDefault:
@@ -1028,7 +1028,7 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.outgoingTranslateButtonEnabled(strings.text("Translate What You Send", "Переводить то, что вы пишете"), settings.outgoingTranslateButtonEnabled))
         entries.append(.translateVoiceMessages(strings.text("Translate Voice Messages", "Переводить голосовые"), settings.translateVoiceMessages))
         entries.append(.openRouterApiKey(strings.text("OpenRouter Key", "Ключ OpenRouter"), settings.openRouterApiKey))
-        entries.append(.translatorInfo(strings.text("Translation is free and needs no account. Messages already in your language are never translated.", "Перевод бесплатный и не требует аккаунта. Сообщения, уже написанные на вашем языке, не переводятся.")))
+        entries.append(.translatorInfo(strings.text("Translation is free and needs no account. Messages already in your language are never translated.", "Перевод бесплатный и не требует аккаун��а. Сообщения, уже написанные на вашем языке, не переводятся.")))
 
     case .translationLanguage:
         entries.append(.translationLanguageHeader(telewhiteTabTitle(.translationLanguage, strings: strings)))
