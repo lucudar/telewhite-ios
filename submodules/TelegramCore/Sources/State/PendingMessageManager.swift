@@ -1518,6 +1518,11 @@ public final class PendingMessageManager {
                 }
                 
                 return sendMessageRequest
+                // Telewhite: see the single-message path — hide presence from the moment
+                // the album request is issued, not when it completes.
+                |> beforeStarted {
+                    TelewhitePresenceGuard.assertOffline(network: network)
+                }
                 |> deliverOn(queue)
                 |> mapToSignal { result -> Signal<Void, MTRpcError> in
                     if let strongSelf = self {
@@ -2196,6 +2201,11 @@ public final class PendingMessageManager {
                 }
                 
                 return sendMessageRequest
+                // Telewhite: start hiding presence as the request goes out. Waiting for
+                // the reply left the account online for the whole round trip.
+                |> beforeStarted {
+                    TelewhitePresenceGuard.assertOffline(network: network)
+                }
                 |> deliverOn(queue)
                 |> mapToSignal { result -> Signal<Void, MTRpcError> in
                     guard let strongSelf = self else {
@@ -2292,33 +2302,11 @@ public final class PendingMessageManager {
         }
     }
     
-    // Telewhite: sending a message makes the server mark the account online,
-    // which would leak presence ("last seen recently") even in a ghost chat.
-    // Immediately reassert offline after every send while global Ghost Mode is on,
-    // with delayed follow-up passes to outlast the server-side online window.
-    private func telewhiteReassertOfflineAfterSend(peerId: PeerId) {
-        let defaults = UserDefaults.standard
-        let onlineHidden = defaults.bool(forKey: "telewhite.mods.ghostMode") || defaults.bool(forKey: "telewhite.mods.hideOnlineStatus")
-        let ghostPeerIds = defaults.array(forKey: "telewhite.mods.ghostPeerIds") as? [NSNumber] ?? []
-        let perChatGhost = ghostPeerIds.contains(NSNumber(value: peerId.toInt64()))
-        guard onlineHidden || perChatGhost else {
-            return
-        }
-        let network = self.network
-        let sendOffline: () -> Void = {
-            let _ = network.request(Api.functions.account.updateStatus(offline: .boolTrue)).start()
-        }
-        sendOffline()
-        Queue.concurrentDefaultQueue().after(1.5, {
-            sendOffline()
-        })
-        Queue.concurrentDefaultQueue().after(5.0, {
-            sendOffline()
-        })
-    }
     
     private func applySentMessage(postbox: Postbox, stateManager: AccountStateManager, message: Message, content: PendingMessageUploadedContentAndReuploadInfo, result: Api.Updates) -> Signal<Void, NoError> {
-        self.telewhiteReassertOfflineAfterSend(peerId: message.id.peerId)
+        // Telewhite: the burst normally started at request-issue time; extend it here so
+        // it also outlasts the server's reply.
+        TelewhitePresenceGuard.assertOffline(network: self.network)
         if let _ = message.peers[message.id.peerId] as? TelegramChannel {
             for attribute in message.attributes {
                 if let attribute = attribute as? PaidStarsMessageAttribute {
@@ -2384,7 +2372,7 @@ public final class PendingMessageManager {
     
     private func applySentGroupMessages(postbox: Postbox, stateManager: AccountStateManager, messages: [Message], result: Api.Updates) -> Signal<Void, NoError> {
         if let peerId = messages.first?.id.peerId {
-            self.telewhiteReassertOfflineAfterSend(peerId: peerId)
+            TelewhitePresenceGuard.assertOffline(network: self.network)
         }
         var namespace = Namespaces.Message.Cloud
         if let message = messages.first {
