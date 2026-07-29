@@ -647,13 +647,26 @@ func enqueueMessages(transaction: Transaction, account: Account, peerId: PeerId,
                         updatedMessages.append((true, .forward(source: replyToMessageId.messageId, threadId: threadId, grouping: .none, attributes: attributes, correlationId: nil)))
                     }
                 }
-            case let .forward(sourceId, threadId, _, _, _):
+            case let .forward(sourceId, threadId, _, forwardAttributes, forwardCorrelationId):
                 // Telewhite: intercept copy-protected forwards here, at the single choke point every
                 // forward in the app funnels through, so "Share", search results, profile actions and
                 // the context menu are covered as well — not just the forward screen.
                 if telewhiteContentRestrictionBypassEnabled(), let sourceMessage = transaction.getMessage(sourceId), sourceMessage.isCopyProtected(), let resent = telewhiteResendableMessagesFromProtectedSource(sourceMessage) {
-                    for resentMessage in resent {
-                        updatedMessages.append((transformedMedia, resentMessage.withUpdatedThreadId(threadId)))
+                    for (index, resentMessage) in resent.enumerated() {
+                        // The forward's own attributes carry the send options the user picked —
+                        // silent, scheduled, send-as — so they have to travel with the copies,
+                        // otherwise a scheduled protected forward would send immediately.
+                        var updatedResentMessage = resentMessage.withUpdatedThreadId(threadId).withUpdatedAttributes { attributes in
+                            var attributes = attributes
+                            attributes.append(contentsOf: forwardAttributes)
+                            return attributes
+                        }
+                        // The correlation id is what the sending animation waits for, and it must
+                        // stay unique, so only the first copy inherits it.
+                        if index == 0 {
+                            updatedResentMessage = updatedResentMessage.withUpdatedCorrelationId(forwardCorrelationId)
+                        }
+                        updatedMessages.append((transformedMedia, updatedResentMessage))
                     }
                     continue outer
                 }
