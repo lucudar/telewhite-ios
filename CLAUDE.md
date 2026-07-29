@@ -2,6 +2,27 @@
 
 This file provides guidance to AI assistants when working with code in this repository.
 
+## This is the Telewhite fork — read `docs/telewhite.md` first
+
+This repository is not upstream Telegram-iOS. It is the **Telewhite** fork (`app.teledark`,
+fake-codesigned, installed by sideloading), and it carries a set of custom "mods": preserved
+deleted messages, ghost mode, background message refresh, outgoing read dates, AMOLED theme,
+letterless avatars, and more.
+
+**Before touching anything fork-specific, read [`docs/telewhite.md`](docs/telewhite.md).** It is
+written in Russian (the repository owner's language) and holds what this file does not:
+
+- current state — which release the owner is running, what landed last, which CI runs failed and why;
+- decisions already made with the owner, and options he explicitly rejected — do not re-propose them;
+- open tasks;
+- hard-won traps that cost real time: UTF-8 corruption in `TelewhiteModsController.swift`, why
+  deleting "unused" Xcodes breaks CI, how to tell live code from dead code in this codebase.
+
+Two things worth knowing up front, because both are expensive to rediscover: a release CI run
+takes ~40 minutes, and `-warnings-as-errors` is on — an orphaned local variable fails the build
+an hour after you push it. Release builds run through `.github/workflows/build.yml`, which
+ignores `**.md` and `docs/**`, so documentation commits never trigger a build.
+
 ## Build
 
 The app is built using Bazel via the `Make.py` wrapper. There is no selective per-module build — the only supported invocation builds the full `Telegram/Telegram` target.
