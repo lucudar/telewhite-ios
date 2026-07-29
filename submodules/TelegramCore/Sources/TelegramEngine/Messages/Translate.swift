@@ -268,7 +268,7 @@ private func _internal_translateMessagesByPeerId(account: Account, peerId: Engin
                 // nothing for three minutes, then the rest arrives at once". Failing fast
                 // lets the caller back off deliberately and tell the user, instead of the
                 // whole queue hanging invisibly.
-                msgs = account.network.request(Api.functions.messages.translateText(flags: flags, peer: inputPeer, id: id, text: nil, toLang: toLang, tone: tone != .neutral ? tone.rawValue : nil), automaticFloodWait: false)
+                let telegramRequest: Signal<Api.messages.TranslatedText?, TranslationError> = account.network.request(Api.functions.messages.translateText(flags: flags, peer: inputPeer, id: id, text: nil, toLang: toLang, tone: tone != .neutral ? tone.rawValue : nil), automaticFloodWait: false)
                 |> map(Optional.init)
                 |> mapError { error -> TranslationError in
                     if error.errorDescription.hasPrefix("FLOOD_WAIT") {
@@ -284,6 +284,27 @@ private func _internal_translateMessagesByPeerId(account: Account, peerId: Engin
                     } else {
                         return .generic
                     }
+                }
+                
+                // Telewhite: incoming messages are translated through the free Google endpoint
+                // first, because Telegram's own translation is rate limited per account and
+                // meant for Premium — that is the FLOOD_WAIT described above. Telegram's API
+                // stays as the fallback, so nothing is lost when the endpoint is unreachable.
+                //
+                // Secret chats are excluded outright: their text must never leave for a third
+                // party, so they keep using Telegram's own translation.
+                if peerId.namespace != Namespaces.Peer.SecretChat {
+                    msgs = telewhiteGoogleTranslateMessages(account: account, messageIds: messageIds, fromLang: fromLang, toLang: toLang)
+                    |> castError(TranslationError.self)
+                    |> mapToSignal { result -> Signal<Api.messages.TranslatedText?, TranslationError> in
+                        if let result {
+                            return .single(result)
+                        } else {
+                            return telegramRequest
+                        }
+                    }
+                } else {
+                    msgs = telegramRequest
                 }
             }
         }

@@ -4680,69 +4680,15 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
         }
     }
     
-    // Telewhite: small in-memory cache so repeated phrases translate instantly and
-    // repeated sends don't re-hit the network. NSCache is thread-safe and self-evicting.
-    private static let telewhiteTranslateCache: NSCache<NSString, NSString> = {
-        let cache = NSCache<NSString, NSString>()
-        cache.countLimit = 400
-        return cache
-    }()
-
+    // Telewhite: the endpoint call, the cache and the slang glossary now live in TelegramCore's
+    // TelewhiteGoogleTranslate, shared with the incoming-message path. There used to be a second
+    // copy here, which meant the two directions cached separately and could drift apart.
+    //
+    // The short timeout is the one thing that stays specific to sending: this request holds the
+    // message back, so a slow answer must not hold the message hostage. Incoming translation is
+    // allowed to wait longer.
     private static func telewhiteFreeTranslate(text: String, toLang: String) -> Signal<String?, NoError> {
-        let cacheKey = "\(toLang)\u{1}\(text)" as NSString
-        if let cached = ChatControllerNode.telewhiteTranslateCache.object(forKey: cacheKey) {
-            return .single(cached as String)
-        }
-        return Signal { subscriber in
-            // Free Google Translate endpoint — no API key, no tokens. Same approach
-            // Teledark uses. "sl=auto" auto-detects the source language.
-            var components = URLComponents(string: "https://translate.googleapis.com/translate_a/single")
-            components?.queryItems = [
-                URLQueryItem(name: "client", value: "gtx"),
-                URLQueryItem(name: "sl", value: "auto"),
-                URLQueryItem(name: "tl", value: toLang),
-                URLQueryItem(name: "dt", value: "t"),
-                URLQueryItem(name: "q", value: text)
-            ]
-            guard let url = components?.url else {
-                subscriber.putNext(nil)
-                subscriber.putCompletion()
-                return EmptyDisposable
-            }
-            var request = URLRequest(url: url)
-            request.httpMethod = "GET"
-            // Keep this short: this request blocks message sending, so a slow
-            // response must not hold the message hostage.
-            request.timeoutInterval = 3.0
-
-            let task = URLSession.shared.dataTask(with: request) { data, response, error in
-                // Response is a nested JSON array: [[["translated","original",...],...],...]
-                guard error == nil, let data = data,
-                      let json = try? JSONSerialization.jsonObject(with: data) as? [Any],
-                      let segments = json.first as? [Any] else {
-                    subscriber.putNext(nil)
-                    subscriber.putCompletion()
-                    return
-                }
-                var translated = ""
-                for segment in segments {
-                    if let parts = segment as? [Any], let piece = parts.first as? String {
-                        translated += piece
-                    }
-                }
-                translated = translated.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !translated.isEmpty {
-                    ChatControllerNode.telewhiteTranslateCache.setObject(translated as NSString, forKey: cacheKey)
-                }
-                subscriber.putNext(translated.isEmpty ? nil : translated)
-                subscriber.putCompletion()
-            }
-            task.resume()
-
-            return ActionDisposable {
-                task.cancel()
-            }
-        }
+        return TelewhiteGoogleTranslate.translate(text: text, toLang: toLang, timeout: 3.0)
     }
     
     // Telewhite: true when the outgoing text is already in `toLang`, so translating it
