@@ -405,8 +405,7 @@ public func legacyAssetPickerEnqueueMessages(
                                     var randomId: Int64 = 0
                                     arc4random_buf(&randomId, 8)
                                     let tempFilePath = NSTemporaryDirectory() + "\(randomId).jpeg"
-                                    let hdEnabled = item.forceHd || (UserDefaults.standard.object(forKey: "telewhite.mods.hdPhotos") as? Bool ?? false)
-                                    let maxSize = hdEnabled ? CGSize(width: 2560.0, height: 2560.0) : CGSize(width: 1280.0, height: 1280.0)
+                                    let maxSize = TelewhitePhotoQuality.maxSize(forceHd: item.forceHd)
                                     let scaledSize = image.size.aspectFittedOrSmaller(maxSize)
                                 
                                     if let scaledImage = TGScaleImageToPixelSize(image, scaledSize) {
@@ -414,7 +413,7 @@ public func legacyAssetPickerEnqueueMessages(
                                         defer {
                                             EngineTempBox.shared.dispose(tempFile)
                                         }
-                                        if let scaledImageData = compressImageToJPEG(scaledImage, quality: 0.6, tempFilePath: tempFile.path) {
+                                        if let scaledImageData = compressImageToJPEG(scaledImage, quality: TelewhitePhotoQuality.jpegQuality(forceHd: item.forceHd), tempFilePath: tempFile.path) {
                                             let _ = try? scaledImageData.write(to: URL(fileURLWithPath: tempFilePath))
 
                                             let resource = LocalFileReferenceMediaResource(localFilePath: tempFilePath, randomId: randomId)
@@ -620,9 +619,10 @@ public func legacyAssetPickerEnqueueMessages(
                                         var randomId: Int64 = 0
                                         arc4random_buf(&randomId, 8)
                                         let size = CGSize(width: CGFloat(asset.pixelWidth), height: CGFloat(asset.pixelHeight))
-                                        let hdEnabled = item.forceHd || (UserDefaults.standard.object(forKey: "telewhite.mods.hdPhotos") as? Bool ?? false)
-                                        let scaledSize = size.aspectFittedOrSmaller(CGSize(width: hdEnabled ? 2560.0 : 1280.0, height: hdEnabled ? 2560.0 : 1280.0))
-                                        let resource = PhotoLibraryMediaResource(localIdentifier: asset.localIdentifier, uniqueId: Int64.random(in: Int64.min ... Int64.max), forceHd: hdEnabled)
+                                        // The dimensions recorded here must match what the resource fetch
+                                        // actually encodes, so both sides go through the same helper.
+                                        let scaledSize = size.aspectFittedOrSmaller(TelewhitePhotoQuality.maxSize(forceHd: item.forceHd))
+                                        let resource = PhotoLibraryMediaResource(localIdentifier: asset.localIdentifier, uniqueId: Int64.random(in: Int64.min ... Int64.max), forceHd: item.forceHd || TelewhitePhotoQuality.isEnabled)
                                     
                                         let media: EngineRawMedia
                                         representations.append(TelegramMediaImageRepresentation(dimensions: PixelDimensions(scaledSize), resource: resource, progressiveSizes: [], immediateThumbnailData: nil, hasVideo: false, isPersonal: false))

@@ -238,6 +238,8 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
     private var contextValue: AuthorizedApplicationContext?
     private let context = Promise<AuthorizedApplicationContext?>()
     private let contextDisposable = MetaDisposable()
+    // Last time the unread-counter aggregates were rebuilt; see telewhiteReindexUnreadCountersIfNeeded.
+    private var telewhiteLastUnreadReindexTimestamp: Double?
     
     private var authContextValue: UnauthorizedApplicationContext?
     private let authContext = Promise<UnauthorizedApplicationContext?>()
@@ -2048,6 +2050,32 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         }))
     }
     
+    // Folder tabs badge the number of unread chats from the aggregated total-unread counters
+    // rather than by walking the chat list, and those aggregates can drift out of step with the
+    // per-chat read states: the tab then shows "1" while every chat inside it is already read,
+    // and nothing clears it because there is no unread chat left to open. Recomputing the
+    // aggregates from the per-chat states is exactly what Telegram itself does when it resets
+    // state, so this only repairs derived data and can never invent or lose an unread message.
+    private func telewhiteReindexUnreadCountersIfNeeded() {
+        // The reindex walks the whole chat list index, so it is throttled instead of running on
+        // every single foreground. It stays off the main thread (postbox transaction).
+        let timestamp = CFAbsoluteTimeGetCurrent()
+        if let previous = self.telewhiteLastUnreadReindexTimestamp, timestamp - previous < 300.0 {
+            return
+        }
+        self.telewhiteLastUnreadReindexTimestamp = timestamp
+        
+        let _ = (self.context.get()
+        |> filter { $0 != nil }
+        |> take(1)
+        |> deliverOnMainQueue).start(next: { context in
+            guard let context = context else {
+                return
+            }
+            let _ = context.context.engine.messages.debugReindexUnreadCounters().start()
+        })
+    }
+    
     func applicationDidEnterBackground(_ application: UIApplication) {
         let _ = (self.sharedContextPromise.get()
         |> take(1)
@@ -2138,6 +2166,8 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         self.isActivePromise.set(true)
 
         self.resetBadge()
+        
+        self.telewhiteReindexUnreadCountersIfNeeded()
         
         self.maybeCheckForUpdates()
         

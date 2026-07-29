@@ -7,6 +7,51 @@ import ImageCompression
 import Accelerate.vImage
 import CoreImage
 
+// Telewhite: "Original quality" for photos.
+//
+// Stock Telegram downscales every outgoing photo to 1280px and re-encodes it at JPEG quality
+// 0.6, and even its own HD switch only raises the size to 2560px while leaving that same 0.6
+// quality in place - which is why HD photos still showed compression artifacts. These helpers
+// are the single source of truth for both numbers so that the size baked into the message
+// (computed in the picker) can never disagree with the size the resource is actually encoded at.
+public enum TelewhitePhotoQuality {
+    // Reuses the key the previous "HD photos" switch already wrote, so the toggle keeps whatever
+    // state the user had set instead of silently reverting to off after the upgrade.
+    private static let key = "telewhite.mods.hdPhotos"
+    
+    public static var isEnabled: Bool {
+        return UserDefaults.standard.object(forKey: key) as? Bool ?? false
+    }
+    
+    // Deliberately capped rather than unbounded: a 48MP or panoramic shot would otherwise
+    // produce an upload big enough to fail, and 4096 already covers the full native resolution
+    // of every iPhone camera (4032x3024), so nothing gets downscaled in the normal case.
+    private static let originalMaxDimension: CGFloat = 4096.0
+    
+    public static func maxDimension(forceHd: Bool) -> CGFloat {
+        if self.isEnabled {
+            return originalMaxDimension
+        } else if forceHd {
+            return 2560.0
+        } else {
+            return 1280.0
+        }
+    }
+    
+    public static func maxSize(forceHd: Bool) -> CGSize {
+        let dimension = self.maxDimension(forceHd: forceHd)
+        return CGSize(width: dimension, height: dimension)
+    }
+    
+    // Keeping the stock 0.6 when the mod is off means a user who never enables it sends exactly
+    // the same bytes as before; 0.92 is high enough to be visually lossless without the absurd
+    // file sizes that 1.0 produces.
+    // Float, not CGFloat: this feeds compressImageToJPEG(_:quality:tempFilePath:) directly.
+    public static func jpegQuality(forceHd: Bool) -> Float {
+        return self.isEnabled ? 0.92 : 0.6
+    }
+}
+
 private final class RequestId {
     var id: PHImageRequestID?
     var invalidated: Bool = false
@@ -121,13 +166,7 @@ public func fetchPhotoLibraryResource(localIdentifier: String, width: Int32?, he
             if let width, let height {
                 size = CGSize(width: CGFloat(width), height: CGFloat(height))
             } else {
-                if hd {
-                    size = CGSize(width: 2560.0, height: 2560.0)
-                } else if UserDefaults.standard.object(forKey: "telewhite.mods.hdPhotos") as? Bool ?? false {
-                    size = CGSize(width: 2560.0, height: 2560.0)
-                } else {
-                    size = CGSize(width: 1280.0, height: 1280.0)
-                }
+                size = TelewhitePhotoQuality.maxSize(forceHd: hd)
             }
             
             var targetSize = PHImageManagerMaximumSize
@@ -184,7 +223,7 @@ public func fetchPhotoLibraryResource(localIdentifier: String, width: Int32?, he
                                     defer {
                                         EngineTempBox.shared.dispose(tempFile)
                                     }
-                                    if let scaledImage = scaledImage, let data = compressImageToJPEG(scaledImage, quality: 0.6, tempFilePath: tempFile.path) {
+                                    if let scaledImage = scaledImage, let data = compressImageToJPEG(scaledImage, quality: TelewhitePhotoQuality.jpegQuality(forceHd: hd), tempFilePath: tempFile.path) {
     #if DEBUG
                                         print("compression completion \((CACurrentMediaTime() - startTime) * 1000.0) ms")
     #endif

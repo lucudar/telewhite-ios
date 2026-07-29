@@ -1011,7 +1011,7 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         // users actually have — and with AND the row showed OFF while the behaviour was
         // still on, which is both a lie and impossible to undo in one tap.
         entries.append(.oneTimeMedia(strings.text("View-Once Photos and Videos", "Одноразовые фото и видео"), settings.oneTimeMediaUnlimited || settings.downloadOneTimeMedia))
-        entries.append(.hdPhotos(strings.text("Send Photos in High Quality", "Отправлять фото в высоком качестве"), settings.hdPhotos))
+        entries.append(.hdPhotos(strings.text("Send Photos in Original Quality", "Отправлять фото в оригинальном качестве"), settings.hdPhotos))
         entries.append(.quickForwardToSaved(strings.text("\"To Saved Messages\" Button", "Кнопка «В Избранное»"), settings.quickForwardToSaved))
         entries.append(.showReadDateOnTap(strings.text("Read Time on the Checkmarks", "Время прочтения по галочкам"), settings.showReadDateOnTap))
         entries.append(.translatorLink(telewhiteTabTitle(.translator, strings: strings)))

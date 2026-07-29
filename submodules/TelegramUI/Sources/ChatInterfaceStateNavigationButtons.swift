@@ -83,8 +83,18 @@ private func telewhiteGhostModeIcon(theme: PresentationTheme, isEnabled: Bool) -
 private func telewhiteOutgoingTranslationIcon(theme: PresentationTheme, isEnabled: Bool) -> UIImage? {
     let size = CGSize(width: 30.0, height: 30.0)
     if isEnabled {
-        let fillColor = theme.rootController.navigationBar.accentTextColor
-        guard let iconImage = generateTintedImage(image: UIImage(bundleImageName: "Chat/Title Panels/Translate"), color: .white) else {
+        // The filled chip has to stay readable in every theme, so pick both colors from the
+        // theme instead of hardcoding white: in the monochrome/AMOLED themes accentTextColor is
+        // itself white, and a white glyph on a white fill turned the button into a blank square.
+        let navigationBar = theme.rootController.navigationBar
+        var fillColor = navigationBar.accentTextColor
+        // An accent that barely differs from the bar (a dark accent on a dark bar) would make the
+        // chip invisible instead, so fall back to the regular text color, which is always readable.
+        if fillColor.contrastRatio(with: navigationBar.opaqueBackgroundColor) < 1.5 {
+            fillColor = navigationBar.primaryTextColor
+        }
+        let glyphColor: UIColor = fillColor.lightness > 0.5 ? .black : .white
+        guard let iconImage = generateTintedImage(image: UIImage(bundleImageName: "Chat/Title Panels/Translate"), color: glyphColor) else {
             return nil
         }
         return generateImage(size, rotatedContext: { size, context in
@@ -109,7 +119,9 @@ private func telewhiteOutgoingTranslationIcon(theme: PresentationTheme, isEnable
             UIGraphicsPopContext()
         })
     } else {
-        guard let iconImage = generateTintedImage(image: UIImage(bundleImageName: "Chat/Title Panels/Translate"), color: .white) else {
+        // Same reason as above: the bare glyph sits directly on the bar, so it takes the theme's
+        // button color rather than a hardcoded white that would vanish on a light navigation bar.
+        guard let iconImage = generateTintedImage(image: UIImage(bundleImageName: "Chat/Title Panels/Translate"), color: theme.rootController.navigationBar.buttonColor) else {
             return nil
         }
         return generateImage(size, rotatedContext: { size, context in
