@@ -240,6 +240,13 @@ func augmentMediaWithReference(_ mediaReference: AnyMediaReference) -> Media {
     }
 }
 
+// Telewhite: the mod toggle lives in UserDefaults, matching how every other Telewhite mod in
+// this fork reads its state. Kept as a function rather than a cached constant so toggling the
+// switch in Settings takes effect immediately, without an app restart.
+func telewhiteContentRestrictionBypassEnabled() -> Bool {
+    return UserDefaults.standard.bool(forKey: "telewhite.mods.contentRestrictionBypass")
+}
+
 // Telewhite: rebuild a copy-protected source message as a set of fresh outgoing
 // messages so the server treats them as new uploads instead of a rejected
 // forward. Each media item is cloned into the Local namespace AND has its cloud
@@ -258,20 +265,44 @@ private func telewhiteStrippedResendableMedia(_ media: Media) -> Media? {
             strippedResource = file.resource
         }
         return TelegramMediaFile(fileId: MediaId(namespace: Namespaces.Media.LocalFile, id: Int64.random(in: Int64.min ... Int64.max)), partialReference: nil, resource: strippedResource, previewRepresentations: file.previewRepresentations, videoThumbnails: file.videoThumbnails, immediateThumbnailData: file.immediateThumbnailData, mimeType: file.mimeType, size: file.size, attributes: file.attributes, alternativeRepresentations: [])
+    } else if let contact = media as? TelegramMediaContact {
+        // Contacts, locations and polls carry no uploaded bytes at all, so re-sending them is only
+        // a matter of describing the same thing again. Previously they fell through to the `nil`
+        // below, which handed the whole message back to the regular forward path — the very path
+        // the server rejects in a copy-protected chat.
+        return TelegramMediaContact(firstName: contact.firstName, lastName: contact.lastName, phoneNumber: contact.phoneNumber, peerId: contact.peerId, vCardData: contact.vCardData)
+    } else if let map = media as? TelegramMediaMap {
+        // A live location is deliberately flattened into a static pin: live sharing belongs to the
+        // original sender and only they can keep updating it, so a "live" copy sent by us would be
+        // a location that silently never moves again.
+        return TelegramMediaMap(latitude: map.latitude, longitude: map.longitude, heading: map.heading, accuracyRadius: map.accuracyRadius, venue: map.venue, address: map.address, liveBroadcastingTimeout: nil, liveProximityNotificationRadius: nil)
+    } else if let poll = media as? TelegramMediaPoll {
+        // Recreated as a brand new open poll owned by us. Votes are intentionally not carried
+        // over: they belong to the original poll, and copying the tallies would show results
+        // nobody in the destination chat actually voted for. deadlineDate is dropped as well,
+        // since it is an absolute timestamp that may already be in the past.
+        return TelegramMediaPoll(pollId: MediaId(namespace: Namespaces.Media.LocalPoll, id: Int64.random(in: Int64.min ... Int64.max)), publicity: poll.publicity, kind: poll.kind, text: poll.text, textEntities: poll.textEntities, options: poll.options, correctAnswers: poll.correctAnswers, results: TelegramMediaPollResults(voters: nil, totalVoters: nil, recentVoters: [], solution: poll.results.solution.flatMap { solution in
+            // Keep the quiz explanation text, but drop any media attached to it: that media is a
+            // cloud reference owned by the protected source and would not survive the re-send.
+            return TelegramMediaPollResults.Solution(text: solution.text, entities: solution.entities, media: nil)
+        }, hasUnseenVotes: nil, canViewStats: false), isClosed: false, deadlineTimeout: poll.deadlineTimeout, deadlineDate: nil, pollHash: 0, openAnswers: poll.openAnswers, revotingDisabled: poll.revotingDisabled, shuffleAnswers: poll.shuffleAnswers, hideResultsUntilClose: poll.hideResultsUntilClose, isCreator: true, attachedMedia: nil, restrictToSubscribers: false, countries: poll.countries)
     } else {
         return nil
     }
 }
 
-public func telewhiteResendableMessagesFromProtectedSource(_ message: Message) -> [EnqueueMessage]? {
+private func telewhiteResendableMessagesFromProtectedSource(_ message: Message) -> [EnqueueMessage]? {
     var resendableMedia: [Media] = []
     for media in message.media {
-        if media is TelegramMediaImage || media is TelegramMediaFile {
+        if media is TelegramMediaImage || media is TelegramMediaFile || media is TelegramMediaContact || media is TelegramMediaMap || media is TelegramMediaPoll {
             guard let stripped = telewhiteStrippedResendableMedia(media) else {
                 return nil
             }
             resendableMedia.append(stripped)
         } else if media is TelegramMediaWebpage || media is TelegramMediaAction {
+            // A webpage is only a preview of a link that is already part of the text, and an
+            // action is a service event that cannot be authored by us. Both are skipped rather
+            // than aborting, so a message that also carries real media still goes through.
             continue
         } else {
             return nil
@@ -294,13 +325,37 @@ public func telewhiteResendableMessagesFromProtectedSource(_ message: Message) -
         return [.message(text: text, attributes: textAttributes, inlineStickers: [:], mediaReference: nil, threadId: nil, replyToMessageId: nil, replyToStoryId: nil, localGroupingKey: nil, correlationId: nil, bubbleUpEmojiOrStickersets: [])]
     }
 
-    let groupingKey: Int64? = resendableMedia.count > 1 ? Int64.random(in: Int64.min ... Int64.max) : nil
+    // Only photos and files can travel as one album. Polls, contacts and locations must each be
+    // their own message — putting them under a shared grouping key would produce an album the
+    // server refuses to accept, so the whole re-send would fail.
+    let groupableCount = resendableMedia.filter { $0 is TelegramMediaImage || $0 is TelegramMediaFile }.count
+    let groupingKey: Int64? = groupableCount > 1 ? Int64.random(in: Int64.min ... Int64.max) : nil
+
+    // The caption has to ride along with an item that can actually display one. Polls carry their
+    // own question text and contacts/locations have no caption field, so attaching it to such an
+    // item would silently drop the original text. Pick the first item that can hold it instead.
+    let captionIndex = resendableMedia.firstIndex { $0 is TelegramMediaImage || $0 is TelegramMediaFile }
+
     var result: [EnqueueMessage] = []
-    for (index, media) in resendableMedia.enumerated() {
-        let itemText = index == 0 ? text : ""
-        let itemAttributes = index == 0 ? textAttributes : []
-        result.append(.message(text: itemText, attributes: itemAttributes, inlineStickers: [:], mediaReference: .standalone(media: media), threadId: nil, replyToMessageId: nil, replyToStoryId: nil, localGroupingKey: groupingKey, correlationId: nil, bubbleUpEmojiOrStickersets: []))
+    var pendingStandaloneText: String? = nil
+    if captionIndex == nil && !text.isEmpty {
+        pendingStandaloneText = text
     }
+
+    for (index, media) in resendableMedia.enumerated() {
+        let carriesCaption = index == captionIndex
+        let itemText = carriesCaption ? text : ""
+        let itemAttributes = carriesCaption ? textAttributes : []
+        let isGroupable = media is TelegramMediaImage || media is TelegramMediaFile
+        result.append(.message(text: itemText, attributes: itemAttributes, inlineStickers: [:], mediaReference: .standalone(media: media), threadId: nil, replyToMessageId: nil, replyToStoryId: nil, localGroupingKey: isGroupable ? groupingKey : nil, correlationId: nil, bubbleUpEmojiOrStickersets: []))
+    }
+
+    // Nothing in the message could hold the caption, so send it as its own message rather than
+    // losing it.
+    if let pendingStandaloneText {
+        result.insert(.message(text: pendingStandaloneText, attributes: textAttributes, inlineStickers: [:], mediaReference: nil, threadId: nil, replyToMessageId: nil, replyToStoryId: nil, localGroupingKey: nil, correlationId: nil, bubbleUpEmojiOrStickersets: []), at: 0)
+    }
+
     return result
 }
 
@@ -593,6 +648,15 @@ func enqueueMessages(transaction: Transaction, account: Account, peerId: PeerId,
                     }
                 }
             case let .forward(sourceId, threadId, _, _, _):
+                // Telewhite: intercept copy-protected forwards here, at the single choke point every
+                // forward in the app funnels through, so "Share", search results, profile actions and
+                // the context menu are covered as well — not just the forward screen.
+                if telewhiteContentRestrictionBypassEnabled(), let sourceMessage = transaction.getMessage(sourceId), sourceMessage.isCopyProtected(), let resent = telewhiteResendableMessagesFromProtectedSource(sourceMessage) {
+                    for resentMessage in resent {
+                        updatedMessages.append((transformedMedia, resentMessage.withUpdatedThreadId(threadId)))
+                    }
+                    continue outer
+                }
                 if let sourceMessage = forwardedMessageToBeReuploaded(transaction: transaction, id: sourceId) {
                     var mediaReference: AnyMediaReference?
                     if sourceMessage.id.peerId.namespace == Namespaces.Peer.SecretChat {

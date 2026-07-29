@@ -156,12 +156,9 @@ extension ChatControllerImpl {
                         var attributes: [EngineMessage.Attribute] = []
                         attributes.append(ForwardOptionsMessageAttribute(hideNames: forwardOptions?.hideNames == true, hideCaptions: forwardOptions?.hideCaptions == true))
 
-                        let telewhiteBypassProtectedForward = UserDefaults.standard.bool(forKey: "telewhite.mods.contentRestrictionBypass")
-                        result.append(contentsOf: messages.flatMap { message -> [EnqueueMessage] in
-                            if telewhiteBypassProtectedForward, message.isCopyProtected(), let resent = telewhiteResendableMessagesFromProtectedSource(message) {
-                                return resent
-                            }
-                            return [.forward(source: message.id, threadId: nil, grouping: .auto, attributes: attributes, correlationId: nil)]
+                        // Telewhite: see above — the bypass is applied centrally in enqueueMessages.
+                        result.append(contentsOf: messages.map { message -> EnqueueMessage in
+                            return .forward(source: message.id, threadId: nil, grouping: .auto, attributes: attributes, correlationId: nil)
                         })
                         
                         let commit: ([EnqueueMessage]) -> Void = { result in
@@ -397,18 +394,12 @@ extension ChatControllerImpl {
                     }
                     
                     var correlationIds: [Int64] = []
-                    let telewhiteBypassProtectedForward = UserDefaults.standard.bool(forKey: "telewhite.mods.contentRestrictionBypass")
-                    let mappedMessages = messages.flatMap { message -> [EnqueueMessage] in
-                        if telewhiteBypassProtectedForward, message.isCopyProtected(), let resent = telewhiteResendableMessagesFromProtectedSource(message) {
-                            return resent.map { resentMessage in
-                                let correlationId = Int64.random(in: Int64.min ... Int64.max)
-                                correlationIds.append(correlationId)
-                                return resentMessage.withUpdatedCorrelationId(correlationId)
-                            }
-                        }
+                    // Telewhite: the copy-protection bypass now lives in enqueueMessages, so plain
+                    // forwards are emitted here and rewritten in the core for every send path.
+                    let mappedMessages = messages.map { message -> EnqueueMessage in
                         let correlationId = Int64.random(in: Int64.min ... Int64.max)
                         correlationIds.append(correlationId)
-                        return [.forward(source: message.id, threadId: nil, grouping: .auto, attributes: [], correlationId: correlationId)]
+                        return .forward(source: message.id, threadId: nil, grouping: .auto, attributes: [], correlationId: correlationId)
                     }
                     
                     let _ = (reactionItems
