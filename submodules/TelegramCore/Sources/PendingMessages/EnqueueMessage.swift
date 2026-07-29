@@ -249,22 +249,51 @@ func telewhiteContentRestrictionBypassEnabled() -> Bool {
 
 // Telewhite: rebuild a copy-protected source message as a set of fresh outgoing
 // messages so the server treats them as new uploads instead of a rejected
-// forward. Each media item is cloned into the Local namespace AND has its cloud
-// reference stripped, which forces the pending-message uploader past its
-// "re-send by reference" shortcut into a genuine byte re-upload from the locally
-// cached resource — dropping the copy-protection lineage entirely. Returns nil
-// when the message carries no re-sendable media (the caller sends text instead).
-private func telewhiteStrippedResendableMedia(_ media: Media) -> Media? {
+// forward. Each media item is cloned into the Local namespace, and wherever the
+// bytes are already in the media cache the clone is pointed straight at that file.
+// That takes the pending-message uploader past its "re-send by reference" shortcut
+// into a genuine byte upload, dropping the copy-protection lineage entirely, while
+// still leaving the media fetchable — an earlier version instead blanked out the
+// cloud file reference, which produced a resource nothing could ever download.
+// Returns nil when the message carries no re-sendable media (caller sends text).
+private func telewhiteStrippedResendableMedia(_ media: Media, mediaBox: MediaBox) -> Media? {
     if let image = media as? TelegramMediaImage {
-        return TelegramMediaImage(imageId: MediaId(namespace: Namespaces.Media.LocalImage, id: Int64.random(in: Int64.min ... Int64.max)), representations: image.representations, immediateThumbnailData: image.immediateThumbnailData, reference: nil, partialReference: nil, flags: [])
+        // Only the largest representation is what actually gets uploaded, so that is the one
+        // worth repointing at the cached bytes; the smaller ones stay as they are, since they
+        // serve as local thumbnails and are never sent.
+        var representations = image.representations
+        if let largest = largestImageRepresentation(representations), let index = representations.firstIndex(where: { $0.resource.id == largest.resource.id }), let path = mediaBox.completedResourcePath(largest.resource), let size = fileSize(path) {
+            // progressiveSizes is dropped along with the cloud resource: it describes how to
+            // fetch that cloud photo progressively and means nothing for a local file.
+            representations[index] = TelegramMediaImageRepresentation(dimensions: largest.dimensions, resource: LocalFileReferenceMediaResource(localFilePath: path, randomId: Int64.random(in: Int64.min ... Int64.max), isUniquelyReferencedTemporaryFile: false, size: size), progressiveSizes: [], immediateThumbnailData: largest.immediateThumbnailData, hasVideo: largest.hasVideo, isPersonal: largest.isPersonal)
+        }
+        return TelegramMediaImage(imageId: MediaId(namespace: Namespaces.Media.LocalImage, id: Int64.random(in: Int64.min ... Int64.max)), representations: representations, immediateThumbnailData: image.immediateThumbnailData, reference: nil, partialReference: nil, flags: [])
     } else if let file = media as? TelegramMediaFile {
         let strippedResource: TelegramMediaResource
+        // Kept in sync with the resource actually being uploaded: a size that disagrees with the
+        // bytes on disk makes the server reject the assembled upload.
+        var strippedSize = file.size
         if let cloud = file.resource as? CloudDocumentMediaResource {
-            strippedResource = CloudDocumentMediaResource(datacenterId: cloud.datacenterId, fileId: cloud.fileId, accessHash: cloud.accessHash, size: cloud.size, fileReference: nil, fileName: cloud.fileName)
+            if let path = mediaBox.completedResourcePath(cloud), let size = fileSize(path) {
+                strippedSize = size
+                // The bytes are already in the local cache, so hand the uploader a purely local
+                // resource. It then uploads real bytes, carries no cloud lineage, and — unlike a
+                // cloud resource with its reference removed — needs no file reference to fetch
+                // anything. isUniquelyReferencedTemporaryFile stays false on purpose: this path
+                // is the shared media cache, and letting the uploader move or delete it would
+                // break the copy still shown in the original chat.
+                strippedResource = LocalFileReferenceMediaResource(localFilePath: path, randomId: Int64.random(in: Int64.min ... Int64.max), isUniquelyReferencedTemporaryFile: false, size: size)
+            } else {
+                // Not fully cached yet — protected videos are usually only streamed, so this is
+                // the common case. Keep the original reference intact: dropping it (as this code
+                // used to do) leaves a resource nothing can ever download, and the send fails
+                // outright instead of fetching the missing bytes first.
+                strippedResource = cloud
+            }
         } else {
             strippedResource = file.resource
         }
-        return TelegramMediaFile(fileId: MediaId(namespace: Namespaces.Media.LocalFile, id: Int64.random(in: Int64.min ... Int64.max)), partialReference: nil, resource: strippedResource, previewRepresentations: file.previewRepresentations, videoThumbnails: file.videoThumbnails, immediateThumbnailData: file.immediateThumbnailData, mimeType: file.mimeType, size: file.size, attributes: file.attributes, alternativeRepresentations: [])
+        return TelegramMediaFile(fileId: MediaId(namespace: Namespaces.Media.LocalFile, id: Int64.random(in: Int64.min ... Int64.max)), partialReference: nil, resource: strippedResource, previewRepresentations: file.previewRepresentations, videoThumbnails: file.videoThumbnails, immediateThumbnailData: file.immediateThumbnailData, mimeType: file.mimeType, size: strippedSize, attributes: file.attributes, alternativeRepresentations: [])
     } else if let contact = media as? TelegramMediaContact {
         // Contacts, locations and polls carry no uploaded bytes at all, so re-sending them is only
         // a matter of describing the same thing again. Previously they fell through to the `nil`
@@ -291,11 +320,11 @@ private func telewhiteStrippedResendableMedia(_ media: Media) -> Media? {
     }
 }
 
-private func telewhiteResendableMessagesFromProtectedSource(_ message: Message) -> [EnqueueMessage]? {
+private func telewhiteResendableMessagesFromProtectedSource(_ message: Message, mediaBox: MediaBox) -> [EnqueueMessage]? {
     var resendableMedia: [Media] = []
     for media in message.media {
         if media is TelegramMediaImage || media is TelegramMediaFile || media is TelegramMediaContact || media is TelegramMediaMap || media is TelegramMediaPoll {
-            guard let stripped = telewhiteStrippedResendableMedia(media) else {
+            guard let stripped = telewhiteStrippedResendableMedia(media, mediaBox: mediaBox) else {
                 return nil
             }
             resendableMedia.append(stripped)
@@ -651,7 +680,7 @@ func enqueueMessages(transaction: Transaction, account: Account, peerId: PeerId,
                 // Telewhite: intercept copy-protected forwards here, at the single choke point every
                 // forward in the app funnels through, so "Share", search results, profile actions and
                 // the context menu are covered as well — not just the forward screen.
-                if telewhiteContentRestrictionBypassEnabled(), let sourceMessage = transaction.getMessage(sourceId), sourceMessage.isCopyProtected(), let resent = telewhiteResendableMessagesFromProtectedSource(sourceMessage) {
+                if telewhiteContentRestrictionBypassEnabled(), let sourceMessage = transaction.getMessage(sourceId), sourceMessage.isCopyProtected(), let resent = telewhiteResendableMessagesFromProtectedSource(sourceMessage, mediaBox: account.postbox.mediaBox) {
                     for (index, resentMessage) in resent.enumerated() {
                         // The forward's own attributes carry the send options the user picked —
                         // silent, scheduled, send-as — so they have to travel with the copies,
