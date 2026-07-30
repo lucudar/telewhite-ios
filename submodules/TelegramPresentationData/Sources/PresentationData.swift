@@ -410,9 +410,7 @@ public func currentPresentationDataAndSettings(accountManager: AccountManager<Te
         if telewhiteAmoledModeEnabled() {
             theme = makeTelewhiteAmoledPresentationTheme(theme)
         }
-        // Telewhite: hand the accent to the settings icons. They are static members
-        // with no call site that could pass a theme, so the colour is pushed to them
-        // from here, where the effective theme is known.
+        // Telewhite: hand the accent to the settings icons from the effective theme.
         telewhiteSetSettingsIconAccentColor(theme.list.itemAccentColor)
         
         var effectiveChatWallpaper: TelegramWallpaper = (themeSettings.themeSpecificChatWallpapers[coloredThemeIndex(reference: effectiveTheme, accentColor: storedAccentColors)] ?? themeSettings.themeSpecificChatWallpapers[effectiveTheme.index]) ?? theme.chat.defaultWallpaper

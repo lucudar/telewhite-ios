@@ -10,9 +10,8 @@ import SwiftSignalKit
 // Side by side that reads as two different apps, so this maps every stock bitmap
 // name onto an SF Symbol and tints it with the accent.
 //
-// Gated behind a switch (off by default) so the old look can be compared and
-// restored on the device without a rebuild — a 40 minute CI run per opinion is
-// too slow a loop to iterate on taste.
+// The settings glyphs follow the same accent-driven visual language as the rest
+// of the app, and the cache keeps redraws cheap.
 
 public func telewhiteSettingsIconStyleEnabled() -> Bool {
     return UserDefaults.standard.bool(forKey: "telewhite.mods.settingsIconStyle")
