@@ -30,6 +30,7 @@ public struct TelewhiteModsSettings: Equatable {
     public var compactChatList: Bool
     public var chatSplitLandscape: Bool
     public var amoledMode: Bool
+    public var settingsIconStyle: Bool
     public var showUserIds: Bool
     public var showChatIds: Bool
     public var showMessageIds: Bool
@@ -75,6 +76,7 @@ public struct TelewhiteModsSettings: Equatable {
         static let compactChatList = "telewhite.mods.compactChatList"
         static let chatSplitLandscape = "telewhite.mods.chatSplitLandscape"
         static let amoledMode = "telewhite.mods.amoledMode"
+        static let settingsIconStyle = "telewhite.mods.settingsIconStyle"
         static let showUserIds = "telewhite.mods.showUserIds"
         static let showChatIds = "telewhite.mods.showChatIds"
         static let showMessageIds = "telewhite.mods.showMessageIds"
@@ -140,6 +142,9 @@ public struct TelewhiteModsSettings: Equatable {
             compactChatList: defaults.bool(forKey: Key.compactChatList),
             chatSplitLandscape: defaults.bool(forKey: Key.chatSplitLandscape),
             amoledMode: defaults.bool(forKey: Key.amoledMode),
+            // Off by default: this only changes how the settings rows look, so the
+            // stock appearance stays until the user asks for the new one.
+            settingsIconStyle: defaults.bool(forKey: Key.settingsIconStyle),
             showUserIds: defaults.bool(forKey: Key.showUserIds),
             showChatIds: defaults.bool(forKey: Key.showChatIds),
             showMessageIds: defaults.bool(forKey: Key.showMessageIds),
@@ -278,6 +283,7 @@ public struct TelewhiteModsSettings: Equatable {
         defaults.set(self.chatSplitLandscape, forKey: Key.chatSplitLandscape)
         TelewhiteSplitViewSettings.splitInCompactLandscape = self.chatSplitLandscape
         defaults.set(self.amoledMode, forKey: Key.amoledMode)
+        defaults.set(self.settingsIconStyle, forKey: Key.settingsIconStyle)
         defaults.set(self.showUserIds, forKey: Key.showUserIds)
         defaults.set(self.showChatIds, forKey: Key.showChatIds)
         defaults.set(self.showMessageIds, forKey: Key.showMessageIds)
@@ -451,6 +457,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case compactChatList(String, Bool)
     case chatSplitLandscape(String, Bool)
     case amoledMode(String, Bool)
+    case settingsIconStyle(String, Bool)
     case chatTextHeader(String)
     case chatFontSizeOption(Int32, String, Int32, Bool)
     case chatTextInfo(String)
@@ -480,7 +487,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.channels.rawValue
         case .mediaHeader, .downloadStories, .hideStories, .autoCacheCleanup, .cacheLimit, .mediaInfo:
             return TelewhiteModsSection.media.rawValue
-        case .appearanceHeader, .compactChatList, .chatSplitLandscape, .amoledMode, .chatTextLink, .appearanceInfo:
+        case .appearanceHeader, .compactChatList, .settingsIconStyle, .chatSplitLandscape, .amoledMode, .chatTextLink, .appearanceInfo:
             return TelewhiteModsSection.appearance.rawValue
         case .chatTextHeader, .chatFontSizeOption, .chatTextInfo:
             return TelewhiteModsSection.chatText.rawValue
@@ -582,6 +589,8 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 599
         case .appearanceHeader:
             return 700
+        case .settingsIconStyle:
+            return 701
         case .compactChatList:
             return 702
         case .chatSplitLandscape:
@@ -828,6 +837,10 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.amoledMode = value
             }
+        case let .settingsIconStyle(text, value):
+            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
+                settings.settingsIconStyle = value
+            }
         case let .pushStatus(text, value):
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: value, labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .none, action: nil)
         case let .pushToken(text, value):
@@ -1006,7 +1019,7 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
     case .openRouterApiKey:
         return text("Optional. A free key from openrouter.ai gives better translation and voice transcription. Without it the regular translator is used.", "Необязательно. Бесплатный ключ с openrouter.ai даёт более точный перевод и расшифровку голосовых. Без него работает обычный переводчик.")
     case .protectionBypass:
-        return text("In chats and channels that block saving, you can take screenshots, copy text, forward and save media again.", "В чатах и каналах, где запрещено сохранять, снова работают скриншоты, копирование, пересылка �� сохранение медиа.")
+        return text("In chats and channels that block saving, you can take screenshots, copy text, forward and save media again.", "В чатах и каналах, где запрещено сохранять, снова работают скриншоты, копирование, пересылка и сохранение медиа.")
     case .hidePhoneInSettings:
         return text("Your phone number and @username stop being shown in Settings and on your own profile, so nobody sees them over your shoulder. Other people still see them as usual.", "Ваш номер и @имя перестают показываться в настройках и в вашем профиле — их не увидят, заглянув в ваш экран. Для других людей ничего не меняется.")
     case .showProfileIds:
@@ -1031,6 +1044,8 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
         return text("Turn the phone sideways and the chat list stays next to the open chat, like on a computer.", "Поверните телефон горизонтально — список чатов останется рядом с открытым чатом, как на компьютере.")
     case .amoledMode:
         return text("Makes the dark theme pure black. On OLED screens black pixels are switched off, so it also saves battery.", "Делает тёмную тему полностью чёрной. На OLED-экранах чёрные пиксели не светятся, поэтому расходуется меньше заряда.")
+    case .settingsIconStyle:
+        return text("Draws the icons in Settings as system symbols in the theme colour, matching this menu.", "Рисует иконки в настройках системными символами в цвете темы — как в этом меню.")
     default:
         return nil
     }
@@ -1090,7 +1105,7 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.privacyHeader(telewhiteTabTitle(.privacy, strings: strings)))
         entries.append(.protectionBypass(strings.text("Allow Saving Everywhere", "Разрешить сохранять везде"), settings.screenshotProtectionBypass || settings.contentRestrictionBypass))
         entries.append(.hidePhoneInSettings(strings.text("Hide My Number and Username", "Скрыть свой номер и юзернейм"), settings.hidePhoneInSettings))
-        entries.append(.showProfileIds(strings.text("Show Numeric IDs", "Показывать число��ые ID"), settings.showUserIds || settings.showChatIds || settings.showMessageIds))
+        entries.append(.showProfileIds(strings.text("Show Numeric IDs", "Показывать числовые ID"), settings.showUserIds || settings.showChatIds || settings.showMessageIds))
         entries.append(.privacyInfo(strings.text("These switches change what this phone shows and allows. They do not change your Telegram privacy settings.", "Эти переключатели меняют то, что показывает и разрешает этот телефон. Настройки приватности в самом Telegram они не трогают.")))
 
     case .stealth:
@@ -1126,6 +1141,7 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.compactChatList(strings.text("Compact Chat List", "Компактный список чатов"), settings.compactChatList))
         entries.append(.chatSplitLandscape(strings.text("Split View in Landscape", "Сплит чатов (альбомная)"), settings.chatSplitLandscape))
         entries.append(.amoledMode(strings.text("AMOLED Mode", "AMOLED режим"), settings.amoledMode))
+        entries.append(.settingsIconStyle(strings.text("SF Symbols in Settings", "SF Symbols в настройках"), settings.settingsIconStyle))
         // Telewhite: text sizing is the only thing left to choose here. The accent,
         // bubble and background palettes are gone — the app has one monochrome look now,
         // so offering colours would just be a way to break it.

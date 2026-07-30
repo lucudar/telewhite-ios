@@ -410,6 +410,10 @@ public func currentPresentationDataAndSettings(accountManager: AccountManager<Te
         if telewhiteAmoledModeEnabled() {
             theme = makeTelewhiteAmoledPresentationTheme(theme)
         }
+        // Telewhite: hand the accent to the settings icons. They are static members
+        // with no call site that could pass a theme, so the colour is pushed to them
+        // from here, where the effective theme is known.
+        telewhiteSetSettingsIconAccentColor(theme.list.itemAccentColor)
         
         var effectiveChatWallpaper: TelegramWallpaper = (themeSettings.themeSpecificChatWallpapers[coloredThemeIndex(reference: effectiveTheme, accentColor: storedAccentColors)] ?? themeSettings.themeSpecificChatWallpapers[effectiveTheme.index]) ?? theme.chat.defaultWallpaper
         if case .builtin = effectiveChatWallpaper {
@@ -726,7 +730,7 @@ public func chatServiceBackgroundColor(wallpaper: TelegramWallpaper, mediaBox: M
 }
 
 public func updatedPresentationData(accountManager: AccountManager<TelegramAccountManagerTypes>, applicationInForeground: Signal<Bool, NoError>, systemUserInterfaceStyle: Signal<WindowUserInterfaceStyle, NoError>) -> Signal<PresentationData, NoError> {
-    return combineLatest(accountManager.sharedData(keys: [SharedDataKeys.localizationSettings, ApplicationSpecificSharedDataKeys.presentationThemeSettings, ApplicationSpecificSharedDataKeys.contactSynchronizationSettings]), systemUserInterfaceStyle, telewhiteAmoledModeUpdated())
+    return combineLatest(accountManager.sharedData(keys: [SharedDataKeys.localizationSettings, ApplicationSpecificSharedDataKeys.presentationThemeSettings, ApplicationSpecificSharedDataKeys.contactSynchronizationSettings]), systemUserInterfaceStyle, telewhiteThemeModsUpdated())
     |> mapToSignal { sharedData, systemUserInterfaceStyle, _ -> Signal<PresentationData, NoError> in
         let themeSettings: PresentationThemeSettings
         if let current = sharedData.entries[ApplicationSpecificSharedDataKeys.presentationThemeSettings]?.get(PresentationThemeSettings.self) {
@@ -805,6 +809,8 @@ public func updatedPresentationData(accountManager: AccountManager<TelegramAccou
                         if telewhiteAmoledModeEnabled() {
                             themeValue = makeTelewhiteAmoledPresentationTheme(themeValue)
                         }
+                        // Telewhite: see the note in `currentPresentationDataAndSettings`.
+                        telewhiteSetSettingsIconAccentColor(themeValue.list.itemAccentColor)
                         
                         if autoNightModeTriggered && !switchedToNightModeWallpaper {
                             switch effectiveChatWallpaper {
