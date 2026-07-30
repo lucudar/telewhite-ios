@@ -174,7 +174,7 @@ offline в `ManagedAccountPresence` (пульс каждые 3 с, пока пр
   ~1520 одиночное / ~2200 альбом), а не в `applySentMessage` — тот вызывается уже после ответа
   сервера, из-за чего онлайн светился весь круг запроса и всю загрузку медиа.
 - `invokeAfterMsg` в этом MtProtoKit **отсутствует**, порядок запросов не гарантировать.
-- Неустранимая утечка: сервер пишет `was_online` при о����п��авке, поэтому «был в сети только что»
+- Неустранимая утечка: сервер пишет `was_online` при о������п��авке, поэтому «был в сети только что»
   может проступить, если last seen открыт контактам.
 
 Следствие, важное для ожиданий: **прочтения человека с такой же невидимкой (или AyuGram) на
@@ -257,7 +257,7 @@ Telegram сам показывает время в контекстном мен
   `TelegramPresentationData/Sources/Resources/PresentationResourcesSettings.swift`: игнорирует
   `backgroundColors` и заливает глиф-маску серым `0x9A9AA0`. Сигнатура сохранена, поэтому call
   sites не тронуты. `premium`/`stars`/`premiumGift` рисовались отдельными градиентами —
-  переведены на `renderSettingsIcon`. Цвет фиксированный, а не из темы, потому что это
+  переведены на `renderSettingsIcon`. Цвет фиксированный, �� не из темы, потому что это
   `static let` (вычисляется один раз). `renderAttachAppIcon` (passport/watch/groupRequests)
   оставлен цветным: там реальные картинки, силуэт по альфе вышел бы квадратом.
 - **Иконки приложения.** Настоящая причина сбоя была не в пикере: `PresentationAppIcon.name`
@@ -312,9 +312,18 @@ Telegram сам показывает время в контекстном мен
   сдвинули бы ссылки.
 - **Обход запрета пересылки.** Раньше жил только в `ChatControllerForwardMessages`, поэтому
   «Поделиться», результаты поиска, действия в профиле и контекстное меню его не имели
-  (`.forward(source:` встречается в 8 файлах). Теперь перехват стоит в единственном чокпоинте —
-  `enqueueMessages` в `TelegramCore/.../PendingMessages/EnqueueMessage.swift` (метка цикла
-  `outer:`, рядом такой же перехват `forwardedMessageToBeReuploaded`). Правила этого места:
+  (`.forward(source:` встречается в 8 файлах). **Важно: путей отправки пересылки два, и оба
+  нужно перехватывать.** Основной — `enqueueMessages` в
+  `TelegramCore/.../PendingMessages/EnqueueMessage.swift` (метка цикла `outer:`, рядом такой же
+  перехват `forwardedMessageToBeReuploaded`); через него идёт кнопка «Переслать». Второй —
+  `standaloneSendEnqueueMessages` в `.../PendingMessages/StandaloneSendMessage.swift`, он
+  **не проходит** через `enqueueMessages`, а сам делает `messages.forwardMessages`; через него
+  идут «Поделиться» и быстрая отправка (включая себе в Избранное). Там перехват сделан обёрткой
+  над переименованной `standaloneSendEnqueueMessagesImpl`, а подготовка медиа переиспользуется
+  из `EnqueueMessage` (`telewhiteStrippedResendableMedia` стал internal), чтобы правила не
+  разъехались. Свои отличия у этого пути: `StandaloneSendEnqueueMessage.groupingKey` никто не
+  читает, поэтому альбом там собрать нельзя и каждый элемент уходит отдельным сообщением.
+  Правила основного места:
   переносить у `.forward` и `attributes` (без звука / отложенная / от имени канала), и
   `correlationId` (его ждёт анимация отправки, он уникален — значит только первой копии);
   альбомом (`localGroupingKey`) объединять только фото и файлы, иначе сервер отклонит всю
