@@ -6,6 +6,12 @@ import MtProtoKit
 
 private typealias SignalKitTimer = SwiftSignalKit.Timer
 
+// Telewhite: "Timed Messages Do Not Disappear". Defaults to off — it makes the client diverge
+// from what the sender intended, so it has to be asked for.
+private func telewhiteKeepTimedMessagesEnabled() -> Bool {
+    return UserDefaults.standard.bool(forKey: "telewhite.mods.keepTimedMessages")
+}
+
 private final class ManagedAutoremoveMessageOperationsHelper {
     var entry: (TimestampBasedMessageAttributesEntry, MetaDisposable)?
     
@@ -82,7 +88,38 @@ func managedAutoremoveMessageOperations(network: Network, postbox: Postbox, isRe
                     Logger.shared.log("Autoremove", "Performing autoremove for \(entry.messageId), isRemove: \(isRemove)")
 
                     if let message = transaction.getMessage(entry.messageId) {
-                        if message.id.peerId.namespace == Namespaces.Peer.SecretChat || isRemove {
+                        if telewhiteKeepTimedMessagesEnabled() && message.id.peerId.namespace != Namespaces.Peer.SecretChat {
+                            // Telewhite: the timer fired, but we keep the message instead of acting on it.
+                            // Secret chats stay untouched on purpose, same boundary as "Preserve Deleted
+                            // Messages": there the deletion is part of the end-to-end contract.
+                            //
+                            // The pending attribute has to be cleared even though we do nothing, otherwise
+                            // this entry stays the head of the queue forever and every later message stops
+                            // being processed — the mod would keep working by accident, and turning it off
+                            // would leave a backlog.
+                            transaction.clearTimestampBasedAttribute(id: entry.messageId, tag: tag)
+                            // Drop the countdown too, so the bubble does not show a timer that already
+                            // expired and will never fire again.
+                            transaction.updateMessage(message.id, update: { currentMessage in
+                                var updatedAttributes = currentMessage.attributes
+                                guard let index = updatedAttributes.firstIndex(where: { $0 is AutoclearTimeoutMessageAttribute }) else {
+                                    return .skip
+                                }
+                                updatedAttributes.remove(at: index)
+                                var storeForwardInfo: StoreMessageForwardInfo?
+                                if let forwardInfo = currentMessage.forwardInfo {
+                                    storeForwardInfo = StoreMessageForwardInfo(authorId: forwardInfo.author?.id, sourceId: forwardInfo.source?.id, sourceMessageId: forwardInfo.sourceMessageId, date: forwardInfo.date, authorSignature: forwardInfo.authorSignature, psaType: forwardInfo.psaType, flags: forwardInfo.flags)
+                                }
+                                return .update(StoreMessage(id: currentMessage.id, customStableId: nil, globallyUniqueId: currentMessage.globallyUniqueId, groupingKey: currentMessage.groupingKey, threadId: currentMessage.threadId, timestamp: currentMessage.timestamp, flags: StoreMessageFlags(currentMessage.flags), tags: currentMessage.tags, globalTags: currentMessage.globalTags, localTags: currentMessage.localTags, forwardInfo: storeForwardInfo, authorId: currentMessage.author?.id, text: currentMessage.text, attributes: updatedAttributes, media: currentMessage.media))
+                            })
+                            if isRemove {
+                                // This one would have vanished completely, so badge it exactly like a
+                                // message the sender deleted. The other branch only blanks the media, and
+                                // that message stays visible with its content — badging it would be a lie.
+                                telewhiteMarkMessagesDeleted(transaction: transaction, ids: [entry.messageId])
+                            }
+                            Logger.shared.log("Autoremove", "Telewhite: keeping \(entry.messageId) instead of autoremoving, isRemove: \(isRemove)")
+                        } else if message.id.peerId.namespace == Namespaces.Peer.SecretChat || isRemove {
                             _internal_deleteMessages(transaction: transaction, mediaBox: postbox.mediaBox, ids: [entry.messageId])
                         } else {
                             transaction.updateMessage(message.id, update: { currentMessage in
