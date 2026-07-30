@@ -410,9 +410,13 @@ public final class ChatMessageInteractiveFileNode: ASDisplayNode {
         let telewhiteOpenRouterKey = UserDefaults.standard.string(forKey: "telewhite.mods.openRouterApiKey") ?? ""
         let canUseTelewhiteOpenRouterTranscription = !telewhiteOpenRouterKey.isEmpty
         let telewhiteTranslateVoice = UserDefaults.standard.bool(forKey: "telewhite.mods.translateVoiceMessages")
+        // Telewhite: on-device recognition, so there is no Premium check to satisfy and no
+        // trial to run out. Kept separate from the OpenRouter flag because this one needs no
+        // key and no network, and it must also suppress the "subscribe to Premium" prompt below.
+        let telewhiteLocalTranscription = UserDefaults.standard.bool(forKey: "telewhite.mods.localTranscription")
         
         let transcriptionText = self.forcedAudioTranscriptionText ?? transcribedText(message: EngineMessage(message))
-        if transcriptionText == nil && !arguments.associatedData.alwaysDisplayTranscribeButton.providedByGroupBoost && !canUseTelewhiteOpenRouterTranscription && !telewhiteTranslateVoice {
+        if transcriptionText == nil && !arguments.associatedData.alwaysDisplayTranscribeButton.providedByGroupBoost && !canUseTelewhiteOpenRouterTranscription && !telewhiteTranslateVoice && !telewhiteLocalTranscription {
             if premiumConfiguration.audioTransciptionTrialCount > 0 {
                 if !arguments.associatedData.isPremium {
                     if self.presentAudioTranscriptionTooltip(finished: false) {
@@ -471,9 +475,11 @@ public final class ChatMessageInteractiveFileNode: ASDisplayNode {
                 self.audioTranscriptionState = .inProgress
                 self.requestUpdateLayout(true)
                 
-                if context.sharedContext.immediateExperimentalUISettings.localTranscription || canUseTelewhiteOpenRouterTranscription || telewhiteTranslateVoice {
+                if context.sharedContext.immediateExperimentalUISettings.localTranscription || canUseTelewhiteOpenRouterTranscription || telewhiteTranslateVoice || telewhiteLocalTranscription {
                     let appLocale = presentationData.strings.baseLanguageCode
-                    let useOpenRouterTranscription = canUseTelewhiteOpenRouterTranscription && !context.sharedContext.immediateExperimentalUISettings.localTranscription
+                    // Telewhite: an explicitly requested on-device transcript wins over the key,
+                    // same as the experimental switch does — the user asked for the phone to do it.
+                    let useOpenRouterTranscription = canUseTelewhiteOpenRouterTranscription && !context.sharedContext.immediateExperimentalUISettings.localTranscription && !telewhiteLocalTranscription
                     
                     let signal: Signal<LocallyTranscribedAudio?, NoError> = context.engine.data.get(TelegramEngine.EngineData.Item.Messages.Message(id: message.id))
                     |> mapToSignal { message -> Signal<String?, NoError> in
@@ -854,6 +860,11 @@ public final class ChatMessageInteractiveFileNode: ASDisplayNode {
                 } else if arguments.message.id.peerId.namespace != Namespaces.Peer.SecretChat && !isViewOnceMessage && !arguments.presentationData.isPreview {
                     let premiumConfiguration = PremiumConfiguration.with(appConfiguration: arguments.context.currentAppConfiguration.with { $0 })
                     if arguments.associatedData.isPremium || arguments.associatedData.alwaysDisplayTranscribeButton.providedByGroupBoost {
+                        displayTranscribe = true
+                    } else if UserDefaults.standard.bool(forKey: "telewhite.mods.localTranscription") {
+                        // Telewhite: recognition happens on the phone, so none of the server-side
+                        // limits below apply — no trial counter, no duration cap, and outgoing
+                        // messages get the button too.
                         displayTranscribe = true
                     } else if premiumConfiguration.audioTransciptionTrialCount > 0 {
                         if arguments.incoming {

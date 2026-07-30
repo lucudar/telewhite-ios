@@ -39,6 +39,12 @@ public class AdPeer: Equatable {
 }
 
 func _internal_searchAdPeers(account: Account, query: String) -> Signal<[AdPeer], NoError> {
+    // Telewhite: the same switch that removes sponsored posts inside channels. Returning an
+    // empty list before the request also stops every keystroke in search from telling the
+    // server what is being typed for ad-matching purposes.
+    if telewhiteHideSponsoredContentEnabled() {
+        return .single([])
+    }
     return account.network.request(Api.functions.contacts.getSponsoredPeers(q: query))
     |> map(Optional.init)
     |> `catch` { _ in

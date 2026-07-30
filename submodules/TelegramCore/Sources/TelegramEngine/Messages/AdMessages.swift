@@ -3,6 +3,15 @@ import Postbox
 import SwiftSignalKit
 import TelegramApi
 
+// Telewhite: shared by the two places the server can hand us ads — sponsored posts inside a
+// channel (this file) and promoted chats in search results (AdPeers.swift).
+// Defaults to true when the key was never written, matching the switch in the mods menu:
+// plain bool(forKey:) would return false and quietly leave ads on until the user toggled
+// something.
+func telewhiteHideSponsoredContentEnabled() -> Bool {
+    return UserDefaults.standard.object(forKey: "telewhite.mods.hideSponsoredContent") as? Bool ?? true
+}
+
 private class AdMessagesHistoryContextImpl {
     final class CachedMessage: Equatable, Codable {
         enum CodingKeys: String, CodingKey {
@@ -491,6 +500,12 @@ private class AdMessagesHistoryContextImpl {
             return transaction.getPeer(peerId).flatMap(apiInputPeer)
         }
         |> mapToSignal { inputPeer -> Signal<(interPostInterval: Int32?, startDelay: Int32?, betweenDelay: Int32?, messages: [Message]), NoError> in
+            // Telewhite: with the mod on we report "this channel has no ads" instead of asking
+            // the server. Hiding them later in the UI would still download the creatives and
+            // still let the impression be reported, which is exactly what we do not want.
+            if telewhiteHideSponsoredContentEnabled() {
+                return .single((nil, nil, nil, []))
+            }
             guard let inputPeer else {
                 return .single((nil, nil, nil, []))
             }

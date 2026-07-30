@@ -55,6 +55,8 @@ public struct TelewhiteModsSettings: Equatable {
     public var translateVoiceMessages: Bool
     public var quickForwardToSaved: Bool
     public var showReadDateOnTap: Bool
+    public var localTranscription: Bool
+    public var hideSponsoredContent: Bool
 
     private enum Key {
         static let ghostMode = "telewhite.mods.ghostMode"
@@ -97,6 +99,8 @@ public struct TelewhiteModsSettings: Equatable {
         static let translateVoiceMessages = "telewhite.mods.translateVoiceMessages"
         static let quickForwardToSaved = "telewhite.mods.quickForwardToSaved"
         static let showReadDateOnTap = "telewhite.mods.showReadDateOnTap"
+        static let localTranscription = "telewhite.mods.localTranscription"
+        static let hideSponsoredContent = "telewhite.mods.hideSponsoredContent"
     }
 
     // The language the phone is set to, which is the only sensible guess for "translate
@@ -172,7 +176,12 @@ public struct TelewhiteModsSettings: Equatable {
             translateVoiceMessages: defaults.bool(forKey: Key.translateVoiceMessages),
             quickForwardToSaved: defaults.bool(forKey: Key.quickForwardToSaved),
             // Defaults on: it only reacts to a deliberate tap on your own checkmarks.
-            showReadDateOnTap: defaults.object(forKey: Key.showReadDateOnTap) as? Bool ?? true
+            showReadDateOnTap: defaults.object(forKey: Key.showReadDateOnTap) as? Bool ?? true,
+            // Defaults off: the first transcript asks for the speech recognition permission,
+            // and a permission sheet nobody asked for on first launch reads as a bug.
+            localTranscription: defaults.bool(forKey: Key.localTranscription),
+            // Defaults on: nobody installs a fork to keep the ads.
+            hideSponsoredContent: defaults.object(forKey: Key.hideSponsoredContent) as? Bool ?? true
         )
 
         // Telewhite: the five stealth flags are one switch now, but older builds wrote
@@ -289,6 +298,8 @@ public struct TelewhiteModsSettings: Equatable {
         defaults.set(self.translateVoiceMessages, forKey: Key.translateVoiceMessages)
         defaults.set(self.quickForwardToSaved, forKey: Key.quickForwardToSaved)
         defaults.set(self.showReadDateOnTap, forKey: Key.showReadDateOnTap)
+        defaults.set(self.localTranscription, forKey: Key.localTranscription)
+        defaults.set(self.hideSponsoredContent, forKey: Key.hideSponsoredContent)
         NotificationCenter.default.post(name: TelewhiteModsSettings.didChangeNotification, object: nil)
     }
 
@@ -383,6 +394,8 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case oneTimeMedia(String, Bool)
     case hdPhotos(String, Bool)
     case quickForwardToSaved(String, Bool)
+    case localTranscription(String, Bool)
+    case hideSponsoredContent(String, Bool)
     case showReadDateOnTap(String, Bool)
     case translatorLink(String)
     case messengerInfo(String)
@@ -448,7 +461,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.menu.rawValue
         case .messengerHeader, .preserveDeletedMessages, .backgroundMessageRefresh, .forwardHideNamesByDefault, .showPreviousEditedText, .oneTimeMedia, .hdPhotos, .quickForwardToSaved, .showReadDateOnTap, .translatorLink, .messengerInfo:
             return TelewhiteModsSection.messenger.rawValue
-        case .translatorHeader, .translateMessages, .autoTranslateEnglish, .translationTargetLanguage, .outgoingTranslateButtonEnabled, .translateVoiceMessages, .openRouterApiKey, .translatorInfo:
+        case .translatorHeader, .translateMessages, .autoTranslateEnglish, .translationTargetLanguage, .outgoingTranslateButtonEnabled, .localTranscription, .translateVoiceMessages, .openRouterApiKey, .translatorInfo:
             return TelewhiteModsSection.translator.rawValue
         case .translationLanguageHeader, .translationLanguageOption:
             return TelewhiteModsSection.translationLanguage.rawValue
@@ -456,7 +469,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.privacy.rawValue
         case .stealthHeader, .ghost, .ghostChatButtonEnabled, .stealthInfo:
             return TelewhiteModsSection.stealth.rawValue
-        case .channelsHeader, .channelsDeclutter, .channelsInfo:
+        case .channelsHeader, .channelsDeclutter, .hideSponsoredContent, .channelsInfo:
             return TelewhiteModsSection.channels.rawValue
         case .mediaHeader, .downloadStories, .hideStories, .autoCacheCleanup, .cacheLimit, .mediaInfo:
             return TelewhiteModsSection.media.rawValue
@@ -505,12 +518,14 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 53
         case .outgoingTranslateButtonEnabled:
             return 54
-        case .translateVoiceMessages:
+        case .localTranscription:
             return 55
-        case .openRouterApiKey:
+        case .translateVoiceMessages:
             return 56
-        case .translatorInfo:
+        case .openRouterApiKey:
             return 57
+        case .translatorInfo:
+            return 58
         case .translationLanguageHeader:
             return 60
         case let .translationLanguageOption(index, _, _, _):
@@ -537,8 +552,10 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 400
         case .channelsDeclutter:
             return 401
-        case .channelsInfo:
+        case .hideSponsoredContent:
             return 402
+        case .channelsInfo:
+            return 403
         case .mediaHeader:
             return 500
         case .downloadStories:
@@ -735,6 +752,14 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
         case let .quickForwardToSaved(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.quickForwardToSaved = value
+            }
+        case let .localTranscription(text, value):
+            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
+                settings.localTranscription = value
+            }
+        case let .hideSponsoredContent(text, value):
+            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
+                settings.hideSponsoredContent = value
             }
         case let .debugMenu(text):
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: "", sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
@@ -959,12 +984,14 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
         return text("Adds \"Translate\" to the menu that appears when you hold a message.", "Добавляет пункт «Перевести» в меню, которое открывается долгим нажатием на сообщение.")
     case .outgoingTranslateButtonEnabled:
         return text("Puts a translator button at the top of private chats: tap it and your messages are sent translated, hold it to pick the language.", "Ставит кнопку переводчика в шапку личных чатов: нажатие — ваши сообщения уходят переведёнными, долгое нажатие — выбор языка.")
+    case .localTranscription:
+        return text("Turns voice messages into text without Premium. The phone does the recognition itself, so the audio is not sent anywhere and it works offline. The first time, iOS asks for permission.", "Превращает голосовые в текст без Premium. Распознаёт сам телефон, поэтому звук никуда не отправляется и работает без интернета. При первом включении iOS спросит разрешение.")
     case .translateVoiceMessages:
         return text("Voice messages in other languages get a translation under the transcript.", "Под расшифровкой голосового на чужом языке появляется перевод.")
     case .openRouterApiKey:
         return text("Optional. A free key from openrouter.ai gives better translation and voice transcription. Without it the regular translator is used.", "Необязательно. Бесплатный ключ с openrouter.ai даёт более точный перевод и расшифровку голосовых. Без него работает обычный переводчик.")
     case .protectionBypass:
-        return text("In chats and channels that block saving, you can take screenshots, copy text, forward and save media again.", "В чатах и каналах, где запрещено сохранять, снова работают скриншоты, копирование, пересылка и сохранение медиа.")
+        return text("In chats and channels that block saving, you can take screenshots, copy text, forward and save media again.", "В чатах и каналах, где запрещено сохранять, снова работают скриншоты, копирование, пересылка �� сохранение медиа.")
     case .hidePhoneInSettings:
         return text("Your phone number and @username stop being shown in Settings and on your own profile, so nobody sees them over your shoulder. Other people still see them as usual.", "Ваш номер и @имя перестают показываться в настройках и в вашем профиле — их не увидят, заглянув в ваш экран. Для других людей ничего не меняется.")
     case .showProfileIds:
@@ -975,6 +1002,8 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
         return text("Adds a ghost icon to the top of every chat. It turns invisibility on for that one person, without affecting the rest.", "Добавляет значок-призрак в шапку каждого чата. Он включает невидимку только для этого собеседника, остальных не затрагивает.")
     case .channelsDeclutter:
         return text("Hides reactions, the comments bar and the share button under channel posts, leaving just the post.", "Убирает под постами каналов реакции, панель комментариев и кнопку «Поделиться» — остаётся только сам пост.")
+    case .hideSponsoredContent:
+        return text("Removes sponsored posts inside channels and promoted chats from search results. They are never requested, so they do not load at all.", "Убирает рекламные посты внутри каналов и продвигаемые чаты из результатов поиска. Реклама не запрашивается вообще, поэтому и не загружается.")
     case .downloadStories:
         return text("Adds a save button to other people's stories.", "Добавляет кнопку сохранения в чужих историях.")
     case .hideStories:
@@ -1026,6 +1055,7 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.translationTargetLanguage(strings.text("Translate Into", "Переводить на"), settings.translationTargetLanguage))
         entries.append(.translateMessages(strings.text("\"Translate\" in the Message Menu", "«Перевести» в меню сообщения"), translationSettings.showTranslate))
         entries.append(.outgoingTranslateButtonEnabled(strings.text("Translate What You Send", "Переводить то, что вы пишете"), settings.outgoingTranslateButtonEnabled))
+        entries.append(.localTranscription(strings.text("Voice to Text Without Premium", "Расшифровка голосовых без Premium"), settings.localTranscription))
         entries.append(.translateVoiceMessages(strings.text("Translate Voice Messages", "Переводить голосовые"), settings.translateVoiceMessages))
         entries.append(.openRouterApiKey(strings.text("OpenRouter Key", "Ключ OpenRouter"), settings.openRouterApiKey))
         entries.append(.translatorInfo(strings.text("Translation is free and needs no account. Messages already in your language are never translated.", "Перевод бесплатный и не требует аккаунта. Сообщения, уже написанные на вашем языке, не переводятся.")))
@@ -1044,7 +1074,7 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.privacyHeader(telewhiteTabTitle(.privacy, strings: strings)))
         entries.append(.protectionBypass(strings.text("Allow Saving Everywhere", "Разрешить сохранять везде"), settings.screenshotProtectionBypass || settings.contentRestrictionBypass))
         entries.append(.hidePhoneInSettings(strings.text("Hide My Number and Username", "Скрыть свой номер и юзернейм"), settings.hidePhoneInSettings))
-        entries.append(.showProfileIds(strings.text("Show Numeric IDs", "Показывать числовые ID"), settings.showUserIds || settings.showChatIds || settings.showMessageIds))
+        entries.append(.showProfileIds(strings.text("Show Numeric IDs", "Показывать число��ые ID"), settings.showUserIds || settings.showChatIds || settings.showMessageIds))
         entries.append(.privacyInfo(strings.text("These switches change what this phone shows and allows. They do not change your Telegram privacy settings.", "Эти переключатели меняют то, что показывает и разрешает этот телефон. Настройки приватности в самом Telegram они не трогают.")))
 
     case .stealth:
@@ -1060,6 +1090,7 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
     case .channels:
         entries.append(.channelsHeader(telewhiteTabTitle(.channels, strings: strings)))
         entries.append(.channelsDeclutter(strings.text("Clean Up Posts", "Убрать лишнее под постами"), settings.channelHideReactions || settings.channelHideComments || settings.channelHideShareButton))
+        entries.append(.hideSponsoredContent(strings.text("Hide Ads", "Скрыть рекламу"), settings.hideSponsoredContent))
         entries.append(.channelsInfo(strings.text("Only changes how posts look on this phone. Nobody else is affected.", "Меняет только то, как посты выглядят на этом телефоне. Для остальных ничего не меняется.")))
 
     case .media:
