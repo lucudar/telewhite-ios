@@ -14,14 +14,23 @@ written in Russian (the repository owner's language) and holds what this file do
 
 - current state — which release the owner is running, what landed last, which CI runs failed and why;
 - decisions already made with the owner, and options he explicitly rejected — do not re-propose them;
+- **what is impossible on the client, and why** — the owner asks for bypasses, and several have
+  already been investigated and ruled out (seeing someone else's hidden "last seen", read-receipt
+  anti-detection, age-gated content). The blocker is missing data, not effort. Do not promise these
+  or start the search over;
+- how each mod is wired, including the checkpoints that are easy to miss — several mods have two or
+  three places that must be changed together, and touching only one leaves a mod that half-works;
 - open tasks;
 - hard-won traps that cost real time: UTF-8 corruption in `TelewhiteModsController.swift`, why
   deleting "unused" Xcodes breaks CI, how to tell live code from dead code in this codebase.
 
-Two things worth knowing up front, because both are expensive to rediscover: a release CI run
-takes ~40 minutes, and `-warnings-as-errors` is on — an orphaned local variable fails the build
-an hour after you push it. Release builds run through `.github/workflows/build.yml`, which
-ignores `**.md` and `docs/**`, so documentation commits never trigger a build.
+Three things worth knowing up front, because all of them are expensive to rediscover. A release CI
+run takes ~40 minutes (29-50 depending on Bazel cache hits), so guessing is costly.
+`-warnings-as-errors` is on — an orphaned local variable fails the build an hour after you push it.
+And the owner wants commits pushed **straight to `master`**; before pushing, diff against
+`origin/master` first, because the release workflow lands version bumps there. Release builds run
+through `.github/workflows/build.yml`, which ignores `**.md` and `docs/**`, so documentation commits
+never trigger a build.
 
 ## Build
 
