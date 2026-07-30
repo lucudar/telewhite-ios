@@ -116,7 +116,109 @@ public struct StandaloneSendEnqueueMessage {
     }
 }
 
+// Telewhite: rebuild a copy-protected source as plain outgoing content for this path. Unlike
+// enqueueMessages, "Share" and quick-share end up in the .forward branch below, which issues a
+// real messages.forwardMessages request — exactly what the server refuses in a protected chat.
+private func telewhiteStandaloneResendableMessages(_ sourceMessage: Message, original: StandaloneSendEnqueueMessage, mediaBox: MediaBox) -> [StandaloneSendEnqueueMessage]? {
+    var resendableMedia: [Media] = []
+    for media in sourceMessage.media {
+        if media is TelegramMediaImage || media is TelegramMediaFile || media is TelegramMediaContact || media is TelegramMediaMap || media is TelegramMediaPoll {
+            guard let stripped = telewhiteStrippedResendableMedia(media, mediaBox: mediaBox) else {
+                return nil
+            }
+            resendableMedia.append(stripped)
+        } else if media is TelegramMediaWebpage || media is TelegramMediaAction {
+            // A webpage is just a preview of a link already present in the text, and an action is
+            // a service event we cannot author. Skipping beats bailing out, so a message that also
+            // carries real media still goes through.
+            continue
+        } else {
+            return nil
+        }
+    }
+
+    let text = StandaloneSendEnqueueMessage.Text(string: sourceMessage.text, entities: sourceMessage.textEntitiesAttribute?.entities ?? [])
+
+    if resendableMedia.isEmpty {
+        if sourceMessage.text.isEmpty {
+            return nil
+        }
+        var message = StandaloneSendEnqueueMessage(content: .text(text: text), replyToMessageId: original.replyToMessageId)
+        message.isSilent = original.isSilent
+        message.sendPaidMessageStars = original.sendPaidMessageStars
+        return [message]
+    }
+
+    // No grouping key is set here on purpose: StandaloneSendEnqueueMessage.groupingKey is never
+    // read back by this path, so an album cannot be assembled and every item simply goes out as
+    // its own message. Setting it would only look like it did something.
+    var result: [StandaloneSendEnqueueMessage] = []
+    var isTextAttached = false
+    for media in resendableMedia {
+        let canCarryText = media is TelegramMediaImage || media is TelegramMediaFile
+        // The caption rides along with the first photo or file only. A poll owns its own question
+        // and a contact or location has no caption at all, so attaching it there would silently
+        // drop the text — it goes out as its own message instead (below).
+        let attachedText = (!isTextAttached && canCarryText) ? text : StandaloneSendEnqueueMessage.Text(string: "", entities: [])
+        if !attachedText.string.isEmpty {
+            isTextAttached = true
+        }
+        var message = StandaloneSendEnqueueMessage(content: .arbitraryMedia(media: .standalone(media: media), text: attachedText), replyToMessageId: original.replyToMessageId)
+        message.isSilent = original.isSilent
+        message.sendPaidMessageStars = original.sendPaidMessageStars
+        result.append(message)
+    }
+
+    if !isTextAttached && !sourceMessage.text.isEmpty {
+        var message = StandaloneSendEnqueueMessage(content: .text(text: text), replyToMessageId: original.replyToMessageId)
+        message.isSilent = original.isSilent
+        message.sendPaidMessageStars = original.sendPaidMessageStars
+        result.append(message)
+    }
+
+    return result
+}
+
 public func standaloneSendEnqueueMessages(
+    accountPeerId: PeerId,
+    postbox: Postbox,
+    network: Network,
+    stateManager: AccountStateManager,
+    auxiliaryMethods: AccountAuxiliaryMethods,
+    peerId: PeerId,
+    threadId: Int64?,
+    messages: [StandaloneSendEnqueueMessage]
+) -> Signal<StandaloneSendMessageStatus, StandaloneSendMessagesError> {
+    let containsForward = messages.contains(where: { message in
+        if case .forward = message.content {
+            return true
+        } else {
+            return false
+        }
+    })
+    // Secret chats are left alone: their content never travels through this cloud send path.
+    guard telewhiteContentRestrictionBypassEnabled(), containsForward, peerId.namespace != Namespaces.Peer.SecretChat else {
+        return standaloneSendEnqueueMessagesImpl(accountPeerId: accountPeerId, postbox: postbox, network: network, stateManager: stateManager, auxiliaryMethods: auxiliaryMethods, peerId: peerId, threadId: threadId, messages: messages)
+    }
+
+    return postbox.transaction { transaction -> [StandaloneSendEnqueueMessage] in
+        var result: [StandaloneSendEnqueueMessage] = []
+        for message in messages {
+            if case let .forward(forwardValue) = message.content, let sourceMessage = transaction.getMessage(forwardValue.sourceId), sourceMessage.isCopyProtected(), let expanded = telewhiteStandaloneResendableMessages(sourceMessage, original: message, mediaBox: postbox.mediaBox) {
+                result.append(contentsOf: expanded)
+            } else {
+                result.append(message)
+            }
+        }
+        return result
+    }
+    |> castError(StandaloneSendMessagesError.self)
+    |> mapToSignal { messages -> Signal<StandaloneSendMessageStatus, StandaloneSendMessagesError> in
+        return standaloneSendEnqueueMessagesImpl(accountPeerId: accountPeerId, postbox: postbox, network: network, stateManager: stateManager, auxiliaryMethods: auxiliaryMethods, peerId: peerId, threadId: threadId, messages: messages)
+    }
+}
+
+private func standaloneSendEnqueueMessagesImpl(
     accountPeerId: PeerId,
     postbox: Postbox,
     network: Network,

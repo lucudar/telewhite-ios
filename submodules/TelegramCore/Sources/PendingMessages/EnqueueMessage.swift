@@ -256,7 +256,9 @@ func telewhiteContentRestrictionBypassEnabled() -> Bool {
 // still leaving the media fetchable — an earlier version instead blanked out the
 // cloud file reference, which produced a resource nothing could ever download.
 // Returns nil when the message carries no re-sendable media (caller sends text).
-private func telewhiteStrippedResendableMedia(_ media: Media, mediaBox: MediaBox) -> Media? {
+// Not private: "Share" and quick-share send through standaloneSendEnqueueMessages, a separate
+// path that issues its own forwardMessages request and needs the very same media preparation.
+func telewhiteStrippedResendableMedia(_ media: Media, mediaBox: MediaBox) -> Media? {
     if let image = media as? TelegramMediaImage {
         // Only the largest representation is what actually gets uploaded, so that is the one
         // worth repointing at the cached bytes; the smaller ones stay as they are, since they
