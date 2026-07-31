@@ -1031,8 +1031,6 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
         return text("Turn the phone sideways and the chat list stays next to the open chat, like on a computer.", "Поверните телефон горизонтально — список чатов останется рядом с открытым чатом, как на компьютере.")
     case .amoledMode:
         return text("Makes the dark theme pure black. On OLED screens black pixels are switched off, so it also saves battery.", "Делает тёмную тему полностью чёрной. На OLED-экранах чёрные пиксели не светятся, поэтому расходуется меньше заряда.")
-    case .settingsIconStyle:
-        return text("Draws the icons in Settings as system symbols in the theme colour, matching this menu.", "Рисует иконки в настройках системными символами в цвете темы — как в этом меню.")
     default:
         return nil
     }

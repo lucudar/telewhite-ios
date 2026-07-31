@@ -13,18 +13,12 @@ import SwiftSignalKit
 // The settings glyphs follow the same accent-driven visual language as the rest
 // of the app, and the cache keeps redraws cheap.
 
-public func telewhiteSettingsIconStyleEnabled() -> Bool {
-    return UserDefaults.standard.bool(forKey: "telewhite.mods.settingsIconStyle")
-}
-
 // The accent color is written here by the presentation-data pipeline whenever the
 // theme is built or rebuilt.
 //
-// It cannot simply be passed in as an argument: every entry of
-// `PresentationResourcesSettings` is a `static let`, evaluated once on first
-// access, so there is no call site that could hand a theme over — and the 177
-// call sites across 20 files stay untouched, which is the whole point of routing
-// through the single `renderSettingsIcon` hook.
+// It cannot simply be passed in as an argument: `renderSettingsIcon` is a free
+// function reached from 177 call sites across 20 files, none of which hand a
+// theme over. Pushing the accent here keeps every one of them untouched.
 private let telewhiteSettingsAccentLock = NSLock()
 private var telewhiteSettingsAccentColorValue: UIColor?
 
@@ -126,9 +120,9 @@ private let telewhiteSettingsIconSymbols: [String: [String]] = [
     "Earn": ["arrow.up.circle.fill", "arrow.up"],
 
     // Help and account
-    "Bot": ["desktopcomputer", "app.fill"],
-    "Chatbot": ["desktopcomputer", "app.fill"],
-    "Support": ["lifepreserver.fill", "questionmark.circle.fill"],
+    "Bot": ["cpu.fill", "cpu"],
+    "Chatbot": ["cpu.fill", "cpu"],
+    "Support": ["person.crop.circle.badge.questionmark", "questionmark.circle.fill"],
     "Faq": ["questionmark.circle.fill", "questionmark.circle"],
     "Tips": ["lightbulb.fill", "lightbulb"],
     "ChangePhone": ["phone.arrow.up.right.fill", "phone.fill"],
@@ -180,13 +174,9 @@ private func telewhiteSettingsIconSymbolNames(bundleImageName name: String) -> [
     return telewhiteSettingsIconSymbols[String(last)]
 }
 
-// Returns nil when the switch is off, the name has no mapping, or the symbol is
-// missing on this OS — every one of those falls back to the original bitmap, so a
+// Returns nil when the name has no mapping or the symbol is missing on this OS — every one of those falls back to the original bitmap, so a
 // gap shows the old glyph rather than an empty row.
 func telewhiteRenderSettingsSymbolIcon(name: String, size: CGSize) -> UIImage? {
-    guard telewhiteSettingsIconStyleEnabled() else {
-        return nil
-    }
     guard let symbolNames = telewhiteSettingsIconSymbolNames(bundleImageName: name) else {
         return nil
     }
@@ -230,7 +220,7 @@ func telewhiteRenderSettingsSymbolIcon(name: String, size: CGSize) -> UIImage? {
 // The bitmap path is cached too. Every `PresentationResourcesSettings` entry is a
 // computed property now (a `static let` is evaluated once and could never react to
 // the switch), so without this the glyph would be re-rasterised on every row draw —
-// a regression for the default, switch-off state.
+// a regression on every settings screen.
 private let telewhiteSettingsBitmapCache: NSCache<NSString, UIImage> = {
     let cache = NSCache<NSString, UIImage>()
     cache.countLimit = 200
@@ -260,7 +250,7 @@ func telewhiteCachedSettingsBitmapIcon(name: String, scaleFactor: CGFloat, gener
 public func telewhiteThemeModsUpdated() -> Signal<[Bool], NoError> {
     return (Signal<[Bool], NoError> { subscriber in
         let flags: () -> [Bool] = {
-            return [telewhiteAmoledModeEnabled(), telewhiteSettingsIconStyleEnabled()]
+            return [telewhiteAmoledModeEnabled()]
         }
         subscriber.putNext(flags())
         let observer = NotificationCenter.default.addObserver(forName: Notification.Name("TelewhiteModsSettingsDidChange"), object: nil, queue: .main, using: { _ in
