@@ -11,6 +11,7 @@ import PromptUI
 import TelegramCore
 import TelegramUIPreferences
 import TranslateUI
+import ThemeAccentColorScreen
 
 public struct TelewhiteModsSettings: Equatable {
     public static let didChangeNotification = Notification.Name("TelewhiteModsSettingsDidChange")
@@ -328,19 +329,24 @@ private final class TelewhiteModsControllerArguments {
     let openTab: (TelewhiteModsTab) -> Void
     let openDebug: () -> Void
     let promptOpenRouterKey: () -> Void
+    // Telewhite: reopens the stock accent color picker (palette + hue slider) that
+    // ThemeSettingsController already ships, instead of writing a second one.
+    let openAccentColorPicker: () -> Void
 
     init(
         updateSettings: @escaping ((TelewhiteModsSettings) -> TelewhiteModsSettings) -> Void,
         updateTranslationSettings: @escaping (@escaping (TranslationSettings) -> TranslationSettings) -> Void,
         openTab: @escaping (TelewhiteModsTab) -> Void = { _ in },
         openDebug: @escaping () -> Void = {},
-        promptOpenRouterKey: @escaping () -> Void = {}
+        promptOpenRouterKey: @escaping () -> Void = {},
+        openAccentColorPicker: @escaping () -> Void = {}
     ) {
         self.updateSettings = updateSettings
         self.updateTranslationSettings = updateTranslationSettings
         self.openTab = openTab
         self.openDebug = openDebug
         self.promptOpenRouterKey = promptOpenRouterKey
+        self.openAccentColorPicker = openAccentColorPicker
     }
 }
 
@@ -447,6 +453,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case mediaInfo(String)
 
     case appearanceHeader(String)
+    case accentColorLink(String, UIColor)
     case chatTextLink(String)
     case compactChatList(String, Bool)
     case chatSplitLandscape(String, Bool)
@@ -480,7 +487,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.channels.rawValue
         case .mediaHeader, .downloadStories, .hideStories, .autoCacheCleanup, .cacheLimit, .mediaInfo:
             return TelewhiteModsSection.media.rawValue
-        case .appearanceHeader, .compactChatList, .chatSplitLandscape, .amoledMode, .chatTextLink, .appearanceInfo:
+        case .appearanceHeader, .accentColorLink, .compactChatList, .chatSplitLandscape, .amoledMode, .chatTextLink, .appearanceInfo:
             return TelewhiteModsSection.appearance.rawValue
         case .chatTextHeader, .chatFontSizeOption, .chatTextInfo:
             return TelewhiteModsSection.chatText.rawValue
@@ -582,6 +589,8 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 599
         case .appearanceHeader:
             return 700
+        case .accentColorLink:
+            return 701
         case .compactChatList:
             return 702
         case .chatSplitLandscape:
@@ -791,6 +800,12 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
                 settings.showChatIds = value
                 settings.showMessageIds = value
             }
+        case let .accentColorLink(text, color):
+            // Telewhite: the swatch shows the color that is actually applied, not a
+            // static placeholder, so this row can be read at a glance.
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: "", labelStyle: .color(color), sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+                arguments.openAccentColorPicker()
+            })
         case let .chatTextLink(text):
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: "", labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                 arguments.openTab(.chatText)
@@ -1036,7 +1051,7 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
     }
 }
 
-private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteModsSettings, translationSettings: TranslationSettings, strings: TelewhiteModsStrings) -> [TelewhiteModsEntry] {
+private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteModsSettings, translationSettings: TranslationSettings, strings: TelewhiteModsStrings, accentColor: UIColor) -> [TelewhiteModsEntry] {
     var entries: [TelewhiteModsEntry] = []
 
     switch tab {
@@ -1123,14 +1138,15 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
 
     case .appearance:
         entries.append(.appearanceHeader(telewhiteTabTitle(.appearance, strings: strings)))
+        // Telewhite: reopens ThemeAccentColorController — the same palette + hue-slider
+        // picker the stock theme screen uses — so the color is genuinely user-driven
+        // rather than fixed to one accent.
+        entries.append(.accentColorLink(strings.text("Accent Color", "Акцентный цвет"), accentColor))
         entries.append(.compactChatList(strings.text("Compact Chat List", "Компактный список чатов"), settings.compactChatList))
         entries.append(.chatSplitLandscape(strings.text("Split View in Landscape", "Сплит чатов (альбомная)"), settings.chatSplitLandscape))
         entries.append(.amoledMode(strings.text("AMOLED Mode", "AMOLED режим"), settings.amoledMode))
-        // Telewhite: text sizing is the only thing left to choose here. The accent,
-        // bubble and background palettes are gone — the app has one monochrome look now,
-        // so offering colours would just be a way to break it.
         entries.append(.chatTextLink(strings.text("Chat Text", "Текст в чате")))
-        entries.append(.appearanceInfo(strings.text("Telewhite uses a single monochrome look, so there is nothing to recolor. AMOLED mode deepens the background to true black.", "Telewhite использует единый монохромный вид, поэтому перекрашивать нечего. AMOLED-режим делает фон полностью чёрным.")))
+        entries.append(.appearanceInfo(strings.text("Pick your own accent color by hand from the palette or the hue slider. AMOLED mode deepens the background to true black.", "Выбирайте акцентный цвет вручную — по палитре или ползунком оттенка. AMOLED-режим делает фон полностью чёрным.")))
 
     case .chatText:
         entries.append(.chatTextHeader(strings.text("Chat Text", "Текст в чате")))
@@ -1262,6 +1278,25 @@ private func telewhiteModsSectionController(context: AccountContext, tab: Telewh
             }
         )
         presentControllerImpl?(prompt)
+    }, openAccentColorPicker: {
+        // Telewhite: mirrors ThemePickerController's own "change accent color" flow —
+        // read the theme actually in effect (respecting auto night mode), then push the
+        // stock picker on it. `create: false` edits the live theme in place instead of
+        // forking a new one, so this behaves like a plain color setting, not "make a
+        // custom theme".
+        let _ = (context.sharedContext.accountManager.transaction { transaction -> PresentationThemeReference in
+            let settings = transaction.getSharedData(ApplicationSpecificSharedDataKeys.presentationThemeSettings)?.get(PresentationThemeSettings.self) ?? PresentationThemeSettings.defaultSettings
+            let autoNightModeTriggered = context.sharedContext.currentPresentationData.with { $0 }.autoNightModeTriggered
+            if autoNightModeTriggered {
+                return settings.automaticThemeSwitchSetting.theme
+            } else {
+                return settings.theme
+            }
+        }
+        |> deliverOnMainQueue).start(next: { themeReference in
+            let controller = ThemeAccentColorController(context: context, mode: .colors(themeReference: themeReference, create: false))
+            pushControllerImpl?(controller)
+        })
     })
 
     let translationSettings = context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.translationSettings])
@@ -1274,7 +1309,7 @@ private func telewhiteModsSectionController(context: AccountContext, tab: Telewh
     |> map { presentationData, settings, translationSettings -> (ItemListControllerState, (ItemListNodeState, Any)) in
         let strings = TelewhiteModsStrings(presentationData: presentationData)
         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(telewhiteTabTitle(tab, strings: strings)), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back), animateChanges: false)
-        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: telewhiteModsEntries(tab: tab, settings: settings, translationSettings: translationSettings, strings: strings), style: .blocks, animateChanges: false)
+        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: telewhiteModsEntries(tab: tab, settings: settings, translationSettings: translationSettings, strings: strings, accentColor: presentationData.theme.list.itemAccentColor), style: .blocks, animateChanges: false)
         return (controllerState, (listState, arguments as Any))
     }
 
