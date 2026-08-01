@@ -11,7 +11,6 @@ import PromptUI
 import TelegramCore
 import TelegramUIPreferences
 import TranslateUI
-import ThemeAccentColorScreen
 
 public struct TelewhiteModsSettings: Equatable {
     public static let didChangeNotification = Notification.Name("TelewhiteModsSettingsDidChange")
@@ -880,6 +879,50 @@ private struct TelewhiteModsStrings {
     }
 }
 
+// Accepts what someone would actually type: with or without "#" or "0x", and the
+// three-digit shorthand. Returns nil rather than a fallback colour so a typo leaves the
+// current colour alone instead of silently repainting the app.
+private func telewhiteParseHexColor(_ input: String) -> Int64? {
+    var cleaned = input.trimmingCharacters(in: .whitespacesAndNewlines)
+    if cleaned.hasPrefix("#") {
+        cleaned = String(cleaned.dropFirst())
+    }
+    if cleaned.hasPrefix("0x") || cleaned.hasPrefix("0X") {
+        cleaned = String(cleaned.dropFirst(2))
+    }
+    if cleaned.count == 3 {
+        cleaned = cleaned.map { "\($0)\($0)" }.joined()
+    }
+    guard cleaned.count == 6, let value = UInt32(cleaned, radix: 16) else {
+        return nil
+    }
+    return Int64(value)
+}
+
+// Telewhite: one entry point for both colour rows. iOS 15 and up get the system picker
+// (wheel, sliders, HEX field, eyedropper); 13 and 14 have no such picker, so they fall
+// back to typing a HEX code rather than the row doing nothing at all.
+private func telewhitePickColor(context: AccountContext, title: String, initialColor: Int64?, present: (ViewController) -> Void, apply: @escaping (Int64) -> Void) {
+    if #available(iOS 15.0, *) {
+        TelewhiteColorPickerPresenter.present(context: context, title: title, initialColor: initialColor, apply: apply)
+        return
+    }
+    let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+    let strings = TelewhiteModsStrings(presentationData: presentationData)
+    let initialText = initialColor.flatMap { String(format: "#%06X", UInt32(truncatingIfNeeded: $0) & 0xffffff) } ?? ""
+    let prompt = promptController(context: context, text: title,
+        subtitle: strings.text("Enter a HEX code, e.g. #1E90FF", "Введите HEX-код, например #1E90FF"),
+        value: initialText, placeholder: "#RRGGBB", characterLimit: 9,
+        apply: { value in
+            guard let value = value, let parsed = telewhiteParseHexColor(value) else {
+                return
+            }
+            apply(parsed)
+        }
+    )
+    present(prompt)
+}
+
 private var telewhiteMenuIconCache: [String: UIImage] = [:]
 
 // Telewhite: glyphs for the Mods menu rows. These were hand-drawn bezier paths that
@@ -1152,18 +1195,17 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
 
     case .appearance:
         entries.append(.appearanceHeader(telewhiteTabTitle(.appearance, strings: strings)))
-        // Telewhite: reopens ThemeAccentColorController — the same palette + hue-slider
-        // picker the stock theme screen uses — so the color is genuinely user-driven
-        // rather than fixed to one accent.
+        // Telewhite: opens the iOS colour picker — wheel, sliders, HEX field, eyedropper —
+        // so the accent is mixed by hand rather than chosen from a fixed set.
         entries.append(.accentColorLink(strings.text("Accent Color", "Акцентный цвет"), accentColor))
-        // Telewhite: no preset swatches — tapping opens the picker and you mix your own
-        // outgoing bubble color there.
+        // Telewhite: no preset swatches — tapping opens the same picker and you mix your
+        // own outgoing bubble colour there.
         entries.append(.bubbleColorLink(strings.text("Outgoing Bubble Color", "Цвет исходящих сообщений"), bubbleColor))
         entries.append(.compactChatList(strings.text("Compact Chat List", "Компактный список чатов"), settings.compactChatList))
         entries.append(.chatSplitLandscape(strings.text("Split View in Landscape", "Сплит чатов (альбомная)"), settings.chatSplitLandscape))
         entries.append(.amoledMode(strings.text("AMOLED Mode", "AMOLED режим"), settings.amoledMode))
         entries.append(.chatTextLink(strings.text("Chat Text", "Текст в чате")))
-        entries.append(.appearanceInfo(strings.text("Pick your own accent color and outgoing bubble color by hand from the palette or the hue slider. AMOLED mode deepens the background to true black.", "Выбирайте акцентный цвет и цвет исходящих сообщений вручную — по палитре или ползунком оттенка. AMOLED-режим делает фон полностью чёрным.")))
+        entries.append(.appearanceInfo(strings.text("Tap a colour row to mix your own shade — colour wheel, sliders, HEX or the eyedropper. AMOLED mode deepens the background to true black.", "Нажмите на строку цвета и подберите свой оттенок — колесо, ползунки, HEX или пипетка. AMOLED-режим делает фон полностью чёрным.")))
 
     case .chatText:
         entries.append(.chatTextHeader(strings.text("Chat Text", "Текст в чате")))
@@ -1296,40 +1338,71 @@ private func telewhiteModsSectionController(context: AccountContext, tab: Telewh
         )
         presentControllerImpl?(prompt)
     }, openAccentColorPicker: {
-        // Telewhite: mirrors ThemePickerController's own "change accent color" flow —
-        // read the theme actually in effect (respecting auto night mode), then push the
-        // stock picker on it. `create: false` edits the live theme in place instead of
-        // forking a new one, so this behaves like a plain color setting, not "make a
-        // custom theme".
-        let _ = (context.sharedContext.accountManager.transaction { transaction -> PresentationThemeReference in
+        // Telewhite: the system picker instead of the stock palette screen, and the value
+        // written straight into the theme settings. Routing this through
+        // ThemeAccentColorController(.colors(create: false)) looked right but silently did
+        // nothing on a builtin theme, which is the default.
+        let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+        let strings = TelewhiteModsStrings(presentationData: presentationData)
+        let _ = (context.sharedContext.accountManager.transaction { transaction -> (PresentationThemeReference, PresentationThemeAccentColor?) in
             let settings = transaction.getSharedData(ApplicationSpecificSharedDataKeys.presentationThemeSettings)?.get(PresentationThemeSettings.self) ?? PresentationThemeSettings.defaultSettings
             let autoNightModeTriggered = context.sharedContext.currentPresentationData.with { $0 }.autoNightModeTriggered
-            if autoNightModeTriggered {
-                return settings.automaticThemeSwitchSetting.theme
-            } else {
-                return settings.theme
-            }
+            let reference = autoNightModeTriggered ? settings.automaticThemeSwitchSetting.theme : settings.theme
+            return (reference, settings.themeSpecificAccentColors[reference.index])
         }
-        |> deliverOnMainQueue).start(next: { themeReference in
-            let controller = ThemeAccentColorController(context: context, mode: .colors(themeReference: themeReference, create: false))
-            pushControllerImpl?(controller)
+        |> deliverOnMainQueue).start(next: { themeReference, currentColors in
+            let initialColor = currentColors?.accentColor.flatMap { Int64($0) } ?? Int64(presentationData.theme.list.itemAccentColor.rgb)
+            telewhitePickColor(context: context, title: strings.text("Accent Color", "Акцентный цвет"), initialColor: initialColor, present: { controller in
+                presentControllerImpl?(controller)
+            }, apply: { value in
+                let _ = updatePresentationThemeSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
+                    var themeSpecificAccentColors = current.themeSpecificAccentColors
+                    let existing = themeSpecificAccentColors[themeReference.index]
+                    // Preserve the bubble colour the other row may have set; only the accent
+                    // changes here.
+                    themeSpecificAccentColors[themeReference.index] = PresentationThemeAccentColor(index: existing?.index ?? -1, baseColor: existing?.baseColor ?? .custom, accentColor: UInt32(truncatingIfNeeded: value), bubbleColors: existing?.bubbleColors ?? [], wallpaper: existing?.wallpaper)
+                    return current.withUpdatedThemeSpecificAccentColors(themeSpecificAccentColors)
+                }).start()
+            })
         })
     }, openBubbleColorPicker: {
-        // Telewhite: the very same stock picker as the accent row, only opened on its
-        // Messages section — that section is what edits the outgoing bubble color, and it
-        // goes through the normal theme pipeline, so no extra setting is stored.
-        let _ = (context.sharedContext.accountManager.transaction { transaction -> PresentationThemeReference in
+        // Telewhite: the system picker, not the stock Telegram screen. The stock one leads
+        // with a palette of ready-made circles, which is exactly what this row is meant to
+        // replace: tap, pick your own colour, done.
+        //
+        // The colour is stored as the theme's own bubbleColors rather than as a separate
+        // Telewhite setting. That is the field the theme pipeline already reads
+        // (PresentationData.swift: themeSpecificAccentColors -> customBubbleColors ->
+        // makePresentationTheme), so the bubble repaints through the normal path with no
+        // extra plumbing. Note this cannot go through ThemeAccentColorController's
+        // .colors(create: false) mode: for a builtin theme that path ends in
+        // `apply = .complete()` and silently saves nothing.
+        let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+        let strings = TelewhiteModsStrings(presentationData: presentationData)
+        let _ = (context.sharedContext.accountManager.transaction { transaction -> (PresentationThemeReference, PresentationThemeAccentColor?) in
             let settings = transaction.getSharedData(ApplicationSpecificSharedDataKeys.presentationThemeSettings)?.get(PresentationThemeSettings.self) ?? PresentationThemeSettings.defaultSettings
             let autoNightModeTriggered = context.sharedContext.currentPresentationData.with { $0 }.autoNightModeTriggered
-            if autoNightModeTriggered {
-                return settings.automaticThemeSwitchSetting.theme
-            } else {
-                return settings.theme
-            }
+            let reference = autoNightModeTriggered ? settings.automaticThemeSwitchSetting.theme : settings.theme
+            return (reference, settings.themeSpecificAccentColors[reference.index])
         }
-        |> deliverOnMainQueue).start(next: { themeReference in
-            let controller = ThemeAccentColorController(context: context, mode: .colors(themeReference: themeReference, create: false), initialSection: .messages)
-            pushControllerImpl?(controller)
+        |> deliverOnMainQueue).start(next: { themeReference, currentColors in
+            // Seed the picker with the bubble currently on screen, so opening it does not
+            // jump to an unrelated colour before anything is chosen.
+            let initialColor = currentColors?.customBubbleColors.first.flatMap { Int64($0) }
+                ?? Int64(presentationData.theme.chat.message.outgoing.bubble.withWallpaper.fill.first?.rgb ?? presentationData.theme.list.itemAccentColor.rgb)
+            telewhitePickColor(context: context, title: strings.text("Outgoing Bubble Color", "Цвет исходящих сообщений"), initialColor: initialColor, present: { controller in
+                presentControllerImpl?(controller)
+            }, apply: { value in
+                let _ = updatePresentationThemeSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
+                    var themeSpecificAccentColors = current.themeSpecificAccentColors
+                    let existing = themeSpecificAccentColors[themeReference.index]
+                    // Keep whatever accent the theme already carries; only the bubble is
+                    // being changed here. `index: -1` and `.custom` are what the stock code
+                    // uses for a hand-picked colour that belongs to no preset slot.
+                    themeSpecificAccentColors[themeReference.index] = PresentationThemeAccentColor(index: existing?.index ?? -1, baseColor: existing?.baseColor ?? .custom, accentColor: existing?.accentColor, bubbleColors: [UInt32(truncatingIfNeeded: value)], wallpaper: existing?.wallpaper)
+                    return current.withUpdatedThemeSpecificAccentColors(themeSpecificAccentColors)
+                }).start()
+            })
         })
     })
 
