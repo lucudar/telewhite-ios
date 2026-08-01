@@ -973,6 +973,14 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
                 // highlight on a sideloaded build and no way to clear the override.
                 var icons = [
                     PresentationAppIcon(name: "Blue", imageName: "BlueIcon", isDefault: true),
+                    // Icon Composer bundle: registered by actool as an alternate icon, so
+                    // `name` is the .icon folder name. It ships no PNG of its own, and the
+                    // picker row is drawn with UIImage(named:), so point imageName at the
+                    // TelewhiteGlassDark artwork instead. Real glass needs iOS 26; on older
+                    // systems setAlternateIconName fails and the two PNG sets below stay.
+                    PresentationAppIcon(name: "TelewhiteGlass", imageName: "TelewhiteGlassDark"),
+                    PresentationAppIcon(name: "TelewhiteGlassDark", imageName: "TelewhiteGlassDark"),
+                    PresentationAppIcon(name: "TelewhiteGlassLight", imageName: "TelewhiteGlassLight"),
                     PresentationAppIcon(name: "TelewhiteGhost", imageName: "TelewhiteGhost"),
                     PresentationAppIcon(name: "TelewhiteWhite", imageName: "TelewhiteWhite"),
                     PresentationAppIcon(name: "TelewhiteNeon", imageName: "TelewhiteNeon"),

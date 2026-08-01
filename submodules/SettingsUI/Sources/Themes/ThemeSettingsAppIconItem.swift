@@ -442,6 +442,22 @@ class ThemeSettingsAppIconItemNode: ListViewItemNode, ItemListItemNode {
                                 default:
                                     name = icon.name
                             }
+
+                            // The three glass rows share one artwork, so imageName cannot
+                            // tell them apart — label them by the plist key instead.
+                            switch icon.name {
+                                case "TelewhiteGlass":
+                                    name = "Glass"
+                                    bordered = false
+                                case "TelewhiteGlassDark":
+                                    name = "Glass Dark"
+                                    bordered = false
+                                case "TelewhiteGlassLight":
+                                    name = "Glass Light"
+                                    bordered = false
+                                default:
+                                    break
+                            }
                         
                             imageNode.setup(theme: item.theme, icon: image, title: NSAttributedString(string: name, font: selected ? selectedTextFont : textFont, textColor: selected  ? item.theme.list.itemAccentColor : item.theme.list.itemPrimaryTextColor, paragraphAlignment: .center), locked: !item.isPremium && icon.isPremium, color: item.theme.list.itemPrimaryTextColor, bordered: bordered, selected: selected, action: {
                                 item.updated(icon)
