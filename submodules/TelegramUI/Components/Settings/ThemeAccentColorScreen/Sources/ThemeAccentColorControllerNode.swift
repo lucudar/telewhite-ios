@@ -30,7 +30,9 @@ private func generateMaskImage(color: UIColor) -> UIImage? {
     })
 }
  
-enum ThemeColorSection: Int {
+// Telewhite: public so callers outside this module (the mods screen) can open the
+// picker straight on a given section instead of always landing on Background.
+public enum ThemeColorSection: Int {
     case background
     case accent
     case messages

@@ -332,6 +332,9 @@ private final class TelewhiteModsControllerArguments {
     // Telewhite: reopens the stock accent color picker (palette + hue slider) that
     // ThemeSettingsController already ships, instead of writing a second one.
     let openAccentColorPicker: () -> Void
+    // Telewhite: same stock picker, opened on its Messages section, which is what
+    // actually edits the outgoing bubble color.
+    let openBubbleColorPicker: () -> Void
 
     init(
         updateSettings: @escaping ((TelewhiteModsSettings) -> TelewhiteModsSettings) -> Void,
@@ -339,7 +342,8 @@ private final class TelewhiteModsControllerArguments {
         openTab: @escaping (TelewhiteModsTab) -> Void = { _ in },
         openDebug: @escaping () -> Void = {},
         promptOpenRouterKey: @escaping () -> Void = {},
-        openAccentColorPicker: @escaping () -> Void = {}
+        openAccentColorPicker: @escaping () -> Void = {},
+        openBubbleColorPicker: @escaping () -> Void = {}
     ) {
         self.updateSettings = updateSettings
         self.updateTranslationSettings = updateTranslationSettings
@@ -347,6 +351,7 @@ private final class TelewhiteModsControllerArguments {
         self.openDebug = openDebug
         self.promptOpenRouterKey = promptOpenRouterKey
         self.openAccentColorPicker = openAccentColorPicker
+        self.openBubbleColorPicker = openBubbleColorPicker
     }
 }
 
@@ -454,6 +459,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
 
     case appearanceHeader(String)
     case accentColorLink(String, UIColor)
+    case bubbleColorLink(String, UIColor)
     case chatTextLink(String)
     case compactChatList(String, Bool)
     case chatSplitLandscape(String, Bool)
@@ -487,7 +493,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.channels.rawValue
         case .mediaHeader, .downloadStories, .hideStories, .autoCacheCleanup, .cacheLimit, .mediaInfo:
             return TelewhiteModsSection.media.rawValue
-        case .appearanceHeader, .accentColorLink, .compactChatList, .chatSplitLandscape, .amoledMode, .chatTextLink, .appearanceInfo:
+        case .appearanceHeader, .accentColorLink, .bubbleColorLink, .compactChatList, .chatSplitLandscape, .amoledMode, .chatTextLink, .appearanceInfo:
             return TelewhiteModsSection.appearance.rawValue
         case .chatTextHeader, .chatFontSizeOption, .chatTextInfo:
             return TelewhiteModsSection.chatText.rawValue
@@ -591,14 +597,16 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 700
         case .accentColorLink:
             return 701
-        case .compactChatList:
+        case .bubbleColorLink:
             return 702
-        case .chatSplitLandscape:
+        case .compactChatList:
             return 703
-        case .amoledMode:
+        case .chatSplitLandscape:
             return 704
-        case .chatTextLink:
+        case .amoledMode:
             return 705
+        case .chatTextLink:
+            return 706
         case .appearanceInfo:
             return 790
         // The chat text screen is its own section, so its ids only have to rise among
@@ -805,6 +813,12 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             // static placeholder, so this row can be read at a glance.
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: "", labelStyle: .color(color), sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                 arguments.openAccentColorPicker()
+            })
+        case let .bubbleColorLink(text, color):
+            // Telewhite: the swatch mirrors the outgoing bubble currently in use, so the
+            // row reads as "this is your color" rather than a generic link.
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: "", labelStyle: .color(color), sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+                arguments.openBubbleColorPicker()
             })
         case let .chatTextLink(text):
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: "", labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
@@ -1051,7 +1065,7 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
     }
 }
 
-private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteModsSettings, translationSettings: TranslationSettings, strings: TelewhiteModsStrings, accentColor: UIColor) -> [TelewhiteModsEntry] {
+private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteModsSettings, translationSettings: TranslationSettings, strings: TelewhiteModsStrings, accentColor: UIColor, bubbleColor: UIColor) -> [TelewhiteModsEntry] {
     var entries: [TelewhiteModsEntry] = []
 
     switch tab {
@@ -1142,11 +1156,14 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         // picker the stock theme screen uses — so the color is genuinely user-driven
         // rather than fixed to one accent.
         entries.append(.accentColorLink(strings.text("Accent Color", "Акцентный цвет"), accentColor))
+        // Telewhite: no preset swatches — tapping opens the picker and you mix your own
+        // outgoing bubble color there.
+        entries.append(.bubbleColorLink(strings.text("Outgoing Bubble Color", "Цвет исходящих сообщений"), bubbleColor))
         entries.append(.compactChatList(strings.text("Compact Chat List", "Компактный список чатов"), settings.compactChatList))
         entries.append(.chatSplitLandscape(strings.text("Split View in Landscape", "Сплит чатов (альбомная)"), settings.chatSplitLandscape))
         entries.append(.amoledMode(strings.text("AMOLED Mode", "AMOLED режим"), settings.amoledMode))
         entries.append(.chatTextLink(strings.text("Chat Text", "Текст в чате")))
-        entries.append(.appearanceInfo(strings.text("Pick your own accent color by hand from the palette or the hue slider. AMOLED mode deepens the background to true black.", "Выбирайте акцентный цвет вручную — по палитре или ползунком оттенка. AMOLED-режим делает фон полностью чёрным.")))
+        entries.append(.appearanceInfo(strings.text("Pick your own accent color and outgoing bubble color by hand from the palette or the hue slider. AMOLED mode deepens the background to true black.", "Выбирайте акцентный цвет и цвет исходящих сообщений вручную — по палитре или ползунком оттенка. AMOLED-режим делает фон полностью чёрным.")))
 
     case .chatText:
         entries.append(.chatTextHeader(strings.text("Chat Text", "Текст в чате")))
@@ -1297,6 +1314,23 @@ private func telewhiteModsSectionController(context: AccountContext, tab: Telewh
             let controller = ThemeAccentColorController(context: context, mode: .colors(themeReference: themeReference, create: false))
             pushControllerImpl?(controller)
         })
+    }, openBubbleColorPicker: {
+        // Telewhite: the very same stock picker as the accent row, only opened on its
+        // Messages section — that section is what edits the outgoing bubble color, and it
+        // goes through the normal theme pipeline, so no extra setting is stored.
+        let _ = (context.sharedContext.accountManager.transaction { transaction -> PresentationThemeReference in
+            let settings = transaction.getSharedData(ApplicationSpecificSharedDataKeys.presentationThemeSettings)?.get(PresentationThemeSettings.self) ?? PresentationThemeSettings.defaultSettings
+            let autoNightModeTriggered = context.sharedContext.currentPresentationData.with { $0 }.autoNightModeTriggered
+            if autoNightModeTriggered {
+                return settings.automaticThemeSwitchSetting.theme
+            } else {
+                return settings.theme
+            }
+        }
+        |> deliverOnMainQueue).start(next: { themeReference in
+            let controller = ThemeAccentColorController(context: context, mode: .colors(themeReference: themeReference, create: false), initialSection: .messages)
+            pushControllerImpl?(controller)
+        })
     })
 
     let translationSettings = context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.translationSettings])
@@ -1309,7 +1343,7 @@ private func telewhiteModsSectionController(context: AccountContext, tab: Telewh
     |> map { presentationData, settings, translationSettings -> (ItemListControllerState, (ItemListNodeState, Any)) in
         let strings = TelewhiteModsStrings(presentationData: presentationData)
         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(telewhiteTabTitle(tab, strings: strings)), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back), animateChanges: false)
-        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: telewhiteModsEntries(tab: tab, settings: settings, translationSettings: translationSettings, strings: strings, accentColor: presentationData.theme.list.itemAccentColor), style: .blocks, animateChanges: false)
+        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: telewhiteModsEntries(tab: tab, settings: settings, translationSettings: translationSettings, strings: strings, accentColor: presentationData.theme.list.itemAccentColor, bubbleColor: presentationData.theme.chat.message.outgoing.bubble.withWallpaper.fill.first ?? presentationData.theme.list.itemAccentColor), style: .blocks, animateChanges: false)
         return (controllerState, (listState, arguments as Any))
     }
 

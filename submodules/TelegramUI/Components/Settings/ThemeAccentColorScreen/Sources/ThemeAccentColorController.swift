@@ -64,13 +64,16 @@ public final class ThemeAccentColorController: ViewController {
     
     public var completion: (() -> Void)?
     
-    public init(context: AccountContext, mode: ThemeAccentColorControllerMode, resultMode: ResultMode = .default) {
+    // Telewhite: `initialSection` defaults to .background, so every existing call site
+    // behaves exactly as before. The mods screen passes .messages to open the picker
+    // directly on the outgoing bubble color.
+    public init(context: AccountContext, mode: ThemeAccentColorControllerMode, resultMode: ResultMode = .default, initialSection: ThemeColorSection = .background) {
         self.context = context
         self.mode = mode
         self.resultMode = resultMode
         self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
-        
-        let section: ThemeColorSection = .background
+
+        let section: ThemeColorSection = initialSection
         self.section = section
         
         self.segmentedTitleView = ItemListControllerSegmentedTitleView(theme: self.presentationData.theme, segments: [
