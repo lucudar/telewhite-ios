@@ -198,11 +198,6 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         super.containerLayoutUpdated(layout, transition: transition)
     }
     
-    // Telewhite: the Calls tab is gone for good — not hidden behind a switch, removed. The
-    // `showCallsTab` argument and the stock CallListSettings that feeds it are left in place
-    // so nothing upstream has to change; the tab is simply never appended. The controller
-    // itself is still built and retained, because tabBarActivateSearch and friends still
-    // reference it.
     public func addRootControllers(showCallsTab: Bool) {
         let tabBarController = TabBarControllerImpl(theme: self.presentationData.theme, strings: self.presentationData.strings)
         tabBarController.navigationPresentation = .master
@@ -219,7 +214,10 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
             self?.openChatsController(activateSearch: false)
         }
         controllers.append(contactsController)
-        
+
+        if showCallsTab {
+            controllers.append(callListController)
+        }
         controllers.append(chatListController)
         
         var restoreSettignsController: (ViewController & SettingsController)?
@@ -257,6 +255,9 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         }
         var controllers: [ViewController] = []
         controllers.append(self.contactsController!)
+        if showCallsTab {
+            controllers.append(self.callListController!)
+        }
         controllers.append(self.chatListController!)
         controllers.append(self.accountSettingsController!)
         
