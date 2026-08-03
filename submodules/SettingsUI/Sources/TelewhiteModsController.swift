@@ -49,6 +49,8 @@ public struct TelewhiteModsSettings: Equatable {
     public var autoCacheCleanup: Bool
     public var cacheLimitGigabytes: Int32
     public var speedBoost: Int32
+    public var settingsIconVariant: Int32
+    public var chatListRows: Int32
     public var channelHideReactions: Bool
     public var channelHideComments: Bool
     public var channelHideShareButton: Bool
@@ -95,6 +97,8 @@ public struct TelewhiteModsSettings: Equatable {
         static let autoCacheCleanup = "telewhite.mods.autoCacheCleanup"
         static let cacheLimitGigabytes = "telewhite.mods.cacheLimitGigabytes"
         static let speedBoost = "telewhite.mods.speedBoost"
+        static let settingsIconVariant = "telewhite.mods.settingsIconVariant"
+        static let chatListRows = "telewhite.mods.chatListRows"
         static let channelHideReactions = "telewhite.mods.channelHideReactions"
         static let channelHideComments = "telewhite.mods.channelHideComments"
         static let channelHideShareButton = "telewhite.mods.channelHideShareButton"
@@ -174,6 +178,8 @@ public struct TelewhiteModsSettings: Equatable {
             autoCacheCleanup: defaults.bool(forKey: Key.autoCacheCleanup),
             cacheLimitGigabytes: max(1, (defaults.object(forKey: Key.cacheLimitGigabytes) as? NSNumber)?.int32Value ?? 5),
             speedBoost: min(2, max(0, (defaults.object(forKey: Key.speedBoost) as? NSNumber)?.int32Value ?? 0)),
+            settingsIconVariant: min(3, max(0, (defaults.object(forKey: Key.settingsIconVariant) as? NSNumber)?.int32Value ?? 0)),
+            chatListRows: min(3, max(1, (defaults.object(forKey: Key.chatListRows) as? NSNumber)?.int32Value ?? 2)),
             channelHideReactions: defaults.bool(forKey: Key.channelHideReactions),
             channelHideComments: defaults.bool(forKey: Key.channelHideComments),
             channelHideShareButton: defaults.bool(forKey: Key.channelHideShareButton),
@@ -300,6 +306,8 @@ public struct TelewhiteModsSettings: Equatable {
         defaults.set(self.autoCacheCleanup, forKey: Key.autoCacheCleanup)
         defaults.set(self.cacheLimitGigabytes, forKey: Key.cacheLimitGigabytes)
         defaults.set(self.speedBoost, forKey: Key.speedBoost)
+        defaults.set(self.settingsIconVariant, forKey: Key.settingsIconVariant)
+        defaults.set(self.chatListRows, forKey: Key.chatListRows)
         defaults.set(self.channelHideReactions, forKey: Key.channelHideReactions)
         defaults.set(self.channelHideComments, forKey: Key.channelHideComments)
         defaults.set(self.channelHideShareButton, forKey: Key.channelHideShareButton)
@@ -465,6 +473,8 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case appearanceHeader(String)
     case accentColorLink(String, UIColor)
     case bubbleColorLink(String, UIColor)
+    case chatListRows(Int32, String, Int32, Bool)
+    case settingsIconVariant(Int32, String, Int32, Bool)
     case chatTextLink(String)
     case compactChatList(String, Bool)
     case chatSplitLandscape(String, Bool)
@@ -498,7 +508,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.channels.rawValue
         case .mediaHeader, .downloadStories, .hideStories, .autoCacheCleanup, .cacheLimit, .speedBoostEnabled, .speedBoostLevel, .mediaInfo:
             return TelewhiteModsSection.media.rawValue
-        case .appearanceHeader, .accentColorLink, .bubbleColorLink, .compactChatList, .chatSplitLandscape, .amoledMode, .chatTextLink, .appearanceInfo:
+        case .appearanceHeader, .accentColorLink, .bubbleColorLink, .compactChatList, .chatListRows, .chatSplitLandscape, .amoledMode, .settingsIconVariant, .chatTextLink, .appearanceInfo:
             return TelewhiteModsSection.appearance.rawValue
         case .chatTextHeader, .chatFontSizeOption, .chatTextInfo:
             return TelewhiteModsSection.chatText.rawValue
@@ -610,12 +620,16 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 702
         case .compactChatList:
             return 703
+        case let .chatListRows(index, _, _, _):
+            return 704 + index
         case .chatSplitLandscape:
-            return 704
+            return 710
         case .amoledMode:
-            return 705
+            return 711
+        case let .settingsIconVariant(index, _, _, _):
+            return 712 + index
         case .chatTextLink:
-            return 706
+            return 720
         case .appearanceInfo:
             return 790
         // The chat text screen is its own section, so its ids only have to rise among
@@ -880,6 +894,22 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.amoledMode = value
             }
+        case let .chatListRows(_, text, value, selected):
+            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: text, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
+                arguments.updateSettings { current in
+                    var updated = current
+                    updated.chatListRows = value
+                    return updated
+                }
+            })
+        case let .settingsIconVariant(_, text, value, selected):
+            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: text, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
+                arguments.updateSettings { current in
+                    var updated = current
+                    updated.settingsIconVariant = value
+                    return updated
+                }
+            })
         case let .pushStatus(text, value):
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: value, labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .none, action: nil)
         case let .pushToken(text, value):
@@ -1237,10 +1267,41 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         // own outgoing bubble colour there.
         entries.append(.bubbleColorLink(strings.text("Outgoing Bubble Color", "Цвет исходящих сообщений"), bubbleColor))
         entries.append(.compactChatList(strings.text("Compact Chat List", "Компактный список чатов"), settings.compactChatList))
+        // Telewhite: rows under the chat name. Two is the stock layout, so the default
+        // changes nothing for anyone who never opens this screen.
+        for (index, rows) in [Int32(1), 2, 3].enumerated() {
+            let title: String
+            switch rows {
+            case 1:
+                title = strings.text("Chat List: One Line", "Список чатов: одна строка")
+            case 3:
+                title = strings.text("Chat List: Three Lines", "Список чатов: три строки")
+            default:
+                title = strings.text("Chat List: Two Lines", "Список чатов: две строки")
+            }
+            entries.append(.chatListRows(Int32(index), title, rows, settings.chatListRows == rows))
+        }
         entries.append(.chatSplitLandscape(strings.text("Split View in Landscape", "Сплит чатов (альбомная)"), settings.chatSplitLandscape))
         entries.append(.amoledMode(strings.text("AMOLED Mode", "AMOLED режим"), settings.amoledMode))
+        // Telewhite: the icon style is offered rather than decided. All four are the
+        // same symbol table drawn differently, so shipping the choice costs no more
+        // than shipping one opinion — see TelewhiteSettingsIcons.swift.
+        for (index, variant) in [Int32(0), 1, 2, 3].enumerated() {
+            let title: String
+            switch variant {
+            case 1:
+                title = strings.text("Icons: Outlined", "Иконки: контурные")
+            case 2:
+                title = strings.text("Icons: Thin, Gray", "Иконки: тонкие серые")
+            case 3:
+                title = strings.text("Icons: In a Ring", "Иконки: в кольце")
+            default:
+                title = strings.text("Icons: Solid", "Иконки: заливкой")
+            }
+            entries.append(.settingsIconVariant(Int32(index), title, variant, settings.settingsIconVariant == variant))
+        }
         entries.append(.chatTextLink(strings.text("Chat Text", "Текст в чате")))
-        entries.append(.appearanceInfo(strings.text("Tap a colour row to mix your own shade — colour wheel, sliders, HEX or the eyedropper. AMOLED mode deepens the background to true black.", "Нажмите на строку цвета и подберите свой оттенок — колесо, ползунки, HEX или пипетка. AMOLED-режим делает фон полностью чёрным.")))
+        entries.append(.appearanceInfo(strings.text("Tap a colour row to mix your own shade — colour wheel, sliders, HEX or the eyedropper. AMOLED mode deepens the background to true black. The icon rows restyle every glyph in Settings; the change shows up straight away, no restart.", "Нажмите на строку цвета и подберите свой оттенок — колесо, ползунки, HEX или пипетка. AMOLED-режим делает фон полностью чёрным. Строки с иконками меняют вид всех значков в настройках — результат виден сразу, перезапуск не нужен.")))
 
     case .chatText:
         entries.append(.chatTextHeader(strings.text("Chat Text", "Текст в чате")))

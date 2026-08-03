@@ -13,6 +13,21 @@ import SwiftSignalKit
 // The settings glyphs follow the same accent-driven visual language as the rest
 // of the app, and the cache keeps redraws cheap.
 
+// Which of the four looks the rows are drawn in. Picked in Appearance rather than
+// decided here: a 40 minute CI run per opinion is too slow a loop to iterate on
+// taste, and all four are one render function apart.
+public enum TelewhiteSettingsIconVariant: Int32 {
+    case filled = 0
+    case outline = 1
+    case thin = 2
+    case ringed = 3
+}
+
+func telewhiteSettingsIconVariant() -> TelewhiteSettingsIconVariant {
+    let raw = (UserDefaults.standard.object(forKey: "telewhite.mods.settingsIconVariant") as? NSNumber)?.int32Value ?? 0
+    return TelewhiteSettingsIconVariant(rawValue: raw) ?? .filled
+}
+
 // The accent color is written here by the presentation-data pipeline whenever the
 // theme is built or rebuilt.
 //
@@ -181,17 +196,46 @@ func telewhiteRenderSettingsSymbolIcon(name: String, size: CGSize) -> UIImage? {
         return nil
     }
 
-    let color = telewhiteSettingsIconAccentColor() ?? UIColor(rgb: 0x9A9AA0)
-    let cacheKey = "\(name)-\(color.argb)" as NSString
+    let variant = telewhiteSettingsIconVariant()
+
+    // The quiet variant drops the accent for the neutral gray the rows used before
+    // symbols arrived; the rest stay accent-tinted.
+    let color: UIColor
+    switch variant {
+    case .filled, .outline, .ringed:
+        color = telewhiteSettingsIconAccentColor() ?? UIColor(rgb: 0x9A9AA0)
+    case .thin:
+        color = UIColor(rgb: 0x9A9AA0)
+    }
+
+    let cacheKey = "\(name)-\(color.argb)-\(variant.rawValue)" as NSString
     if let cached = telewhiteSettingsIconCache.object(forKey: cacheKey) {
         return cached
     }
 
+    // Hollow variants want the un-filled symbol of the same name, which is exactly
+    // the primary with ".fill" dropped — SF Symbols ships the pair as one glyph in
+    // two weights of ink. The table's second entry is not that: it is a fallback for
+    // a symbol missing on this OS, and is often a different picture ("Channel" falls
+    // back from megaphone.fill to speaker.wave.2.fill). Hollow names are tried first
+    // and the original list still follows, so a name with no hollow twin — "globe",
+    // "faceid", "speedometer" — keeps working untouched.
+    var candidateNames = symbolNames
+    if variant != .filled {
+        candidateNames = symbolNames.compactMap { $0.hasSuffix(".fill") ? String($0.dropLast(5)) : nil } + symbolNames
+    }
+
     // 20pt on the 30x30 canvas the settings rows use. The Mods menu uses 19pt on a
-    // 29x29 canvas, which is the same optical weight.
-    let configuration = UIImage.SymbolConfiguration(pointSize: 20.0, weight: .regular)
+    // 29x29 canvas, which is the same optical weight. The ringed variant shrinks the
+    // glyph to clear the ring drawn around it.
+    // 13pt inside a 25pt ring: the widest glyphs in the table ("person.3",
+    // "laptopcomputer.and.iphone") run about 1.6x their point size across, so anything
+    // larger pokes through the stroke.
+    let pointSize: CGFloat = variant == .ringed ? 13.0 : 20.0
+    let weight: UIImage.SymbolWeight = variant == .thin ? .light : .regular
+    let configuration = UIImage.SymbolConfiguration(pointSize: pointSize, weight: weight)
     var symbol: UIImage?
-    for symbolName in symbolNames {
+    for symbolName in candidateNames {
         if let candidate = UIImage(systemName: symbolName, withConfiguration: configuration) {
             symbol = candidate
             break
@@ -204,7 +248,15 @@ func telewhiteRenderSettingsSymbolIcon(name: String, size: CGSize) -> UIImage? {
     // Centre the glyph on the fixed canvas: symbol widths differ, and the icon
     // column has to stay aligned down the list.
     let renderer = UIGraphicsImageRenderer(size: size)
-    let image = renderer.image { _ in
+    let image = renderer.image { context in
+        if variant == .ringed {
+            // Inset by half the line width so the stroke lands inside the canvas
+            // rather than straddling its edge.
+            let ringRect = CGRect(origin: .zero, size: size).insetBy(dx: 2.5, dy: 2.5)
+            context.cgContext.setStrokeColor(color.cgColor)
+            context.cgContext.setLineWidth(1.0)
+            context.cgContext.strokeEllipse(in: ringRect)
+        }
         let tinted = symbol.withTintColor(color, renderingMode: .alwaysOriginal)
         tinted.draw(in: CGRect(
             x: floor((size.width - tinted.size.width) * 0.5),
@@ -250,7 +302,14 @@ func telewhiteCachedSettingsBitmapIcon(name: String, scaleFactor: CGFloat, gener
 public func telewhiteThemeModsUpdated() -> Signal<[Bool], NoError> {
     return (Signal<[Bool], NoError> { subscriber in
         let flags: () -> [Bool] = {
-            return [telewhiteAmoledModeEnabled()]
+            // The icon variant and the chat list row count are Int32, but this signal is
+            // typed [Bool] and read by `updatedPresentationData`; emitting one flag per
+            // value keeps that call site untouched while still firing on every change.
+            // The row count is not a theme value, but rebuilding the presentation data is
+            // what makes the chat list re-lay out, so it belongs here.
+            let variant = telewhiteSettingsIconVariant().rawValue
+            let chatListRows = (UserDefaults.standard.object(forKey: "telewhite.mods.chatListRows") as? NSNumber)?.intValue ?? 2
+            return [telewhiteAmoledModeEnabled(), variant == 1, variant == 2, variant == 3, chatListRows == 1, chatListRows == 3]
         }
         subscriber.putNext(flags())
         let observer = NotificationCenter.default.addObserver(forName: Notification.Name("TelewhiteModsSettingsDidChange"), object: nil, queue: .main, using: { _ in

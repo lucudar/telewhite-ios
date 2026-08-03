@@ -3655,11 +3655,20 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                 textMaxWidth -= 18.0
             }
             
+            // Telewhite: how many rows sit under the chat name. Stock is 2, and the row
+            // height is budgeted for exactly that — either an author line plus one line of
+            // preview, or two lines of preview when there is no author. Anything that
+            // takes a row of its own (author, tags, a forum thread) therefore leaves one
+            // row fewer for the preview itself, which is what the stock 2-or-1 below
+            // expresses. Raising the count has to move the height budget with it or the
+            // extra line is simply clipped.
+            let telewhiteChatListRows = max(1, min(3, (UserDefaults.standard.object(forKey: "telewhite.mods.chatListRows") as? NSNumber)?.intValue ?? 2))
+
             let textLineSpacing: CGFloat = min(0.2, item.presentationData.fontSize.itemListBaseFontSize * 0.2 / 17.0)
             let (textLayout, textApply) = textLayout(TextNodeLayoutArguments(
                 attributedString: textAttributedString,
                 backgroundColor: nil,
-                maximumNumberOfLines: (authorAttributedString == nil && itemTags.isEmpty && forumThread == nil && topForumTopicItems.isEmpty) ? 2 : 1,
+                maximumNumberOfLines: (authorAttributedString == nil && itemTags.isEmpty && forumThread == nil && topForumTopicItems.isEmpty) ? telewhiteChatListRows : max(1, telewhiteChatListRows - 1),
                 truncationType: .end,
                 constrainedSize: CGSize(width: textMaxWidth, height: .greatestFiniteMagnitude),
                 alignment: .natural,
@@ -3866,7 +3875,8 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                 itemHeight += 20.0
             } else {
                 itemHeight += titleLayout.size.height
-                itemHeight += measureLayout.size.height * 3.0
+                // The title plus the rows under it; stock 2 keeps the original 3.0.
+                itemHeight += measureLayout.size.height * CGFloat(1 + telewhiteChatListRows)
                 itemHeight += titleSpacing
                 itemHeight += authorSpacing
             }
