@@ -1,6 +1,12 @@
 import Foundation
 import UIKit
 import SwiftSignalKit
+
+// Telewhite: read straight from the defaults, the way the other hooks in chat code do — it is
+// consulted once per send, not in any loop.
+private func telewhiteConfirmMediaRecordingSend() -> Bool {
+    return UserDefaults.standard.bool(forKey: "telewhite.mods.confirmVoiceSend")
+}
 import Display
 import AsyncDisplayKit
 import TelegramCore
@@ -688,14 +694,48 @@ extension ChatControllerImpl {
         repeatPeriod: Int32? = nil,
         viewOnce: Bool = false,
         messageEffect: ChatSendMessageEffect? = nil,
-        postpone: Bool = false
+        postpone: Bool = false,
+        telewhiteConfirmed: Bool = false
     ) {
         self.chatDisplayNode.updateRecordedMediaDeleted(false)
-        
+
         guard let recordedMediaPreview = self.presentationInterfaceState.interfaceState.mediaDraftState else {
             return
         }
-        
+
+        // Telewhite: ask before a voice message or a round video actually goes. Recording is a
+        // press-and-hold gesture, so letting go in the wrong place has already sent it. Both
+        // kinds pass through here on their way out, which is why the question sits at the top
+        // rather than in each branch below.
+        if !telewhiteConfirmed, telewhiteConfirmMediaRecordingSend() {
+            var isVideo = false
+            switch recordedMediaPreview {
+            case .video:
+                isVideo = true
+            default:
+                isVideo = false
+            }
+            let isRussian = self.presentationData.strings.baseLanguageCode.hasPrefix("ru")
+            self.present(
+                textAlertController(
+                    context: self.context,
+                    title: isVideo
+                        ? (isRussian ? "Отправить кружок?" : "Send this video message?")
+                        : (isRussian ? "Отправить голосовое?" : "Send this voice message?"),
+                    text: isRussian
+                        ? "Запись можно сначала прослушать или удалить."
+                        : "You can play it back or delete it first.",
+                    actions: [
+                        TextAlertAction(type: .genericAction, title: self.presentationData.strings.Common_Cancel, action: {}),
+                        TextAlertAction(type: .defaultAction, title: isRussian ? "Отправить" : "Send", action: { [weak self] in
+                            self?.sendMediaRecording(silentPosting: silentPosting, scheduleTime: scheduleTime, repeatPeriod: repeatPeriod, viewOnce: viewOnce, messageEffect: messageEffect, postpone: postpone, telewhiteConfirmed: true)
+                        })
+                    ]
+                ), in: .window(.root)
+            )
+            return
+        }
+
         switch recordedMediaPreview {
         case let .audio(audio):
             self.audioRecorder.set(.single(nil))

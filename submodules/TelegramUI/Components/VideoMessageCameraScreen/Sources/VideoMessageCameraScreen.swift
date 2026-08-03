@@ -1,6 +1,18 @@
 import Foundation
 import UIKit
 import Display
+
+// Telewhite: how long a round video may be. Stock Telegram stops at a minute, and that
+// minute is a client-side constant, not something the server hands down — the recorder simply
+// calls onStop when it is reached. Raising it is therefore possible, but it has never been
+// tested against the server, so it stays behind a switch and off by default: if a longer
+// round video is refused on upload, turning the switch back is the whole fix.
+//
+// The progress ring divides by the same value, so the ring still fills exactly as the limit
+// is reached.
+public func telewhiteRoundVideoMaxDuration() -> Double {
+    return UserDefaults.standard.bool(forKey: "telewhite.mods.longRoundVideos") ? 300.0 : 60.0
+}
 import AsyncDisplayKit
 import ComponentFlow
 import SwiftSignalKit
@@ -434,7 +446,7 @@ private final class VideoMessageCameraScreenComponent: CombinedComponent {
                             if isFirstRecording {
                                 controller.node.setupLiveUpload(filePath: recordingData.filePath)
                             }
-                            if duration > 59.5 {
+                            if duration > telewhiteRoundVideoMaxDuration() - 0.5 {
                                 controller.onStop()
                             }
                         }
@@ -1544,7 +1556,7 @@ public class VideoMessageCameraScreen: ViewController {
             }
             
             self.progressView.frame = previewBounds
-            self.progressView.value = CGFloat(self.cameraState.duration / 60.0)
+            self.progressView.value = CGFloat(self.cameraState.duration / telewhiteRoundVideoMaxDuration())
             
             transition.setAlpha(view: self.additionalPreviewView, alpha: self.cameraState.position == .front ? 1.0 : 0.0)
             

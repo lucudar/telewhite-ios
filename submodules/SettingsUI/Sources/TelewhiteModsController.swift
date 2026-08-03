@@ -48,6 +48,8 @@ public struct TelewhiteModsSettings: Equatable {
     public var autoCacheCleanup: Bool
     public var cacheLimitGigabytes: Int32
     public var speedBoost: Int32
+    public var longRoundVideos: Bool
+    public var confirmVoiceSend: Bool
     public var settingsIconVariant: Int32
     public var chatListRows: Int32
     public var translateButtonInChat: Bool
@@ -98,6 +100,8 @@ public struct TelewhiteModsSettings: Equatable {
         static let autoCacheCleanup = "telewhite.mods.autoCacheCleanup"
         static let cacheLimitGigabytes = "telewhite.mods.cacheLimitGigabytes"
         static let speedBoost = "telewhite.mods.speedBoost"
+        static let longRoundVideos = "telewhite.mods.longRoundVideos"
+        static let confirmVoiceSend = "telewhite.mods.confirmVoiceSend"
         static let settingsIconVariant = "telewhite.mods.settingsIconVariant"
         static let chatListRows = "telewhite.mods.chatListRows"
         static let translateButtonInChat = "telewhite.mods.translateButtonInChat"
@@ -186,6 +190,8 @@ public struct TelewhiteModsSettings: Equatable {
             autoCacheCleanup: defaults.bool(forKey: Key.autoCacheCleanup),
             cacheLimitGigabytes: max(1, (defaults.object(forKey: Key.cacheLimitGigabytes) as? NSNumber)?.int32Value ?? 5),
             speedBoost: min(2, max(0, (defaults.object(forKey: Key.speedBoost) as? NSNumber)?.int32Value ?? 0)),
+            longRoundVideos: defaults.bool(forKey: Key.longRoundVideos),
+            confirmVoiceSend: defaults.bool(forKey: Key.confirmVoiceSend),
             settingsIconVariant: min(3, max(0, (defaults.object(forKey: Key.settingsIconVariant) as? NSNumber)?.int32Value ?? 0)),
             chatListRows: min(3, max(1, (defaults.object(forKey: Key.chatListRows) as? NSNumber)?.int32Value ?? 2)),
             translateButtonInChat: defaults.object(forKey: Key.translateButtonInChat) as? Bool ?? true,
@@ -314,6 +320,8 @@ public struct TelewhiteModsSettings: Equatable {
         defaults.set(self.autoCacheCleanup, forKey: Key.autoCacheCleanup)
         defaults.set(self.cacheLimitGigabytes, forKey: Key.cacheLimitGigabytes)
         defaults.set(self.speedBoost, forKey: Key.speedBoost)
+        defaults.set(self.longRoundVideos, forKey: Key.longRoundVideos)
+        defaults.set(self.confirmVoiceSend, forKey: Key.confirmVoiceSend)
         defaults.set(self.settingsIconVariant, forKey: Key.settingsIconVariant)
         defaults.set(self.chatListRows, forKey: Key.chatListRows)
         defaults.set(self.translateButtonInChat, forKey: Key.translateButtonInChat)
@@ -480,6 +488,8 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case cacheLimit(Int32, String, Int32, Bool)
     case speedBoostEnabled(String, Bool)
     case speedBoostLevel(Int32, String, Int32, Bool)
+    case longRoundVideos(String, Bool)
+    case confirmVoiceSend(String, Bool)
     case mediaInfo(String)
 
     case appearanceHeader(String)
@@ -532,7 +542,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.stealth.rawValue
         case .channelsHeader, .channelsDeclutter, .hideSponsoredContent, .channelsInfo:
             return TelewhiteModsSection.channels.rawValue
-        case .mediaHeader, .downloadStories, .hideStories, .autoCacheCleanup, .cacheLimit, .speedBoostEnabled, .speedBoostLevel, .mediaInfo:
+        case .mediaHeader, .downloadStories, .hideStories, .autoCacheCleanup, .cacheLimit, .speedBoostEnabled, .speedBoostLevel, .longRoundVideos, .confirmVoiceSend, .mediaInfo:
             return TelewhiteModsSection.media.rawValue
         case .appearanceHeader, .accentColorLink, .bubbleColorLink, .chatListLookLink, .chatSplitLandscape, .amoledMode, .settingsIconsLink, .chatTextLink, .appearanceInfo:
             return TelewhiteModsSection.appearance.rawValue
@@ -637,6 +647,10 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 510
         case let .speedBoostLevel(index, _, _, _):
             return 511 + index
+        case .longRoundVideos:
+            return 520
+        case .confirmVoiceSend:
+            return 521
         // Telewhite: stableId must rise in the order rows are appended — ItemListUI
         // asserts it (ItemListControllerNode.swift:449) and its row diff assumes it.
         // The trailing info row therefore sits at the end of the media block, not at 502.
@@ -912,6 +926,14 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
                     return updated
                 }
             })
+        case let .confirmVoiceSend(text, value):
+            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
+                settings.confirmVoiceSend = value
+            }
+        case let .longRoundVideos(text, value):
+            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
+                settings.longRoundVideos = value
+            }
         case let .speedBoostEnabled(text, value):
             // Switching back on lands on the moderate level rather than whichever one was
             // last picked: the higher level is the one worth choosing deliberately.
@@ -1252,6 +1274,10 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
         return text("Adds a save button to other people's stories.", "Добавляет кнопку сохранения в чужих историях.")
     case .hideStories:
         return text("Removes the row of stories above the chat list.", "Убирает ленту историй над списком чатов.")
+    case .confirmVoiceSend:
+        return text("Asks before a recorded voice message or round video is sent. Recording is press-and-hold, so letting go in the wrong place sends it — this puts a question in the way.", "Спрашивает перед отправкой записанного голосового или кружка. Запись идёт удержанием пальца, поэтому отпустил не там — уже улетело; здесь на пути встаёт вопрос.")
+    case .longRoundVideos:
+        return text("Round videos stop at a minute in stock Telegram. This raises the recorder limit to five. That minute is the app's own, not the server's, so a longer one may still be refused on upload — if that happens, switch this back off.", "В обычном Telegram кружок останавливается на минуте. Здесь предел записи поднимается до пяти. Эта минута — ограничение приложения, а не сервера, поэтому длинный кружок всё же может не приняться при отправке. Если так — просто выключите обратно.")
     case .autoCacheCleanup:
         return text("When downloaded photos and videos take up more than the limit, the oldest ones are deleted. Nothing is lost — anything you open again is downloaded from Telegram.", "Когда скачанные фото и видео займут больше лимита, самые старые удаляются. Ничего не теряется — при открытии всё снова скачается из Telegram.")
     case .speedBoostEnabled:
@@ -1357,6 +1383,8 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
                 entries.append(.speedBoostLevel(Int32(index), title, level, settings.speedBoost == level))
             }
         }
+        entries.append(.longRoundVideos(strings.text("Longer Round Videos", "Длинные кружки"), settings.longRoundVideos))
+        entries.append(.confirmVoiceSend(strings.text("Confirm Voice and Round Videos", "Спрашивать перед голосовым и кружком"), settings.confirmVoiceSend))
         entries.append(.mediaInfo(strings.text("Your messages and files in the cloud are never deleted — only the copies downloaded to this phone. Speed Boost asks the server for more pieces at once; on a weak network that can backfire, so lower it if transfers get worse.", "Ваши сообщения и файлы в облаке не удаляются — стираются только копии, скачанные на этот телефон. Ускорение запрашивает у сервера больше кусков сразу; на слабой сети это может выйти боком — тогда снизьте уровень или выключите.")))
 
     case .appearance:
