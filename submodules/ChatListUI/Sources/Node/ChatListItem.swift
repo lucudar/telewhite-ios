@@ -1923,7 +1923,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                 }
             }
             
-            var avatarDiameter = min(60.0, floor(item.presentationData.fontSize.baseDisplaySize * 60.0 / 17.0))
+            var avatarDiameter = TelewhiteChatListDensity.avatarDiameter(min(60.0, floor(item.presentationData.fontSize.baseDisplaySize * 60.0 / 17.0)))
             
             if case let .peer(peerData) = item.content, let customMessageListData = peerData.customMessageListData, customMessageListData.commandPrefix != nil {
                 avatarDiameter = 40.0
@@ -2452,7 +2452,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
             let enableChatListPhotos = true
             
             // if changed, adjust setupItem accordingly
-            var avatarDiameter = min(60.0, floor(item.presentationData.fontSize.baseDisplaySize * 60.0 / 17.0))
+            var avatarDiameter = TelewhiteChatListDensity.avatarDiameter(min(60.0, floor(item.presentationData.fontSize.baseDisplaySize * 60.0 / 17.0)))
             let avatarLeftInset: CGFloat
             
             if case let .peer(peerData) = item.content, let customMessageListData = peerData.customMessageListData, customMessageListData.commandPrefix != nil {
@@ -3880,9 +3880,10 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                 itemHeight += titleSpacing
                 itemHeight += authorSpacing
             }
-            if UserDefaults.standard.bool(forKey: "telewhite.mods.compactChatList") {
-                itemHeight = max(58.0, itemHeight - 8.0)
-            }
+            // Telewhite: density tightens the row vertically. The avatar has already been
+            // scaled by the same setting above, which is what pulls the text column left,
+            // so this only has to handle the height — and keep it clear of the avatar.
+            itemHeight = TelewhiteChatListDensity.itemHeight(itemHeight, avatarDiameter: avatarDiameter)
                         
             let rawContentRect = CGRect(origin: CGPoint(x: 2.0, y: layoutOffset + floor(item.presentationData.fontSize.itemListBaseFontSize * 8.0 / 17.0)), size: CGSize(width: rawContentWidth, height: itemHeight - 12.0 - 9.0))
             

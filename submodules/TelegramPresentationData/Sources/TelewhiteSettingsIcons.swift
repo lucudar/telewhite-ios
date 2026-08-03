@@ -309,7 +309,13 @@ public func telewhiteThemeModsUpdated() -> Signal<[Bool], NoError> {
             // what makes the chat list re-lay out, so it belongs here.
             let variant = telewhiteSettingsIconVariant().rawValue
             let chatListRows = (UserDefaults.standard.object(forKey: "telewhite.mods.chatListRows") as? NSNumber)?.intValue ?? 2
-            return [telewhiteAmoledModeEnabled(), variant == 1, variant == 2, variant == 3, chatListRows == 1, chatListRows == 3]
+            let chatListDensity = (UserDefaults.standard.object(forKey: "telewhite.mods.chatListDensity") as? NSNumber)?.intValue ?? 0
+            return [
+                telewhiteAmoledModeEnabled(),
+                variant == 1, variant == 2, variant == 3,
+                chatListRows == 1, chatListRows == 3,
+                chatListDensity == 1, chatListDensity == 2, chatListDensity == 3
+            ]
         }
         subscriber.putNext(flags())
         let observer = NotificationCenter.default.addObserver(forName: Notification.Name("TelewhiteModsSettingsDidChange"), object: nil, queue: .main, using: { _ in

@@ -27,7 +27,7 @@ public struct TelewhiteModsSettings: Equatable {
     public var hidePhoneInSettings: Bool
     public var hideStories: Bool
     public var ghostStories: Bool
-    public var compactChatList: Bool
+    public var chatListDensity: Int32
     public var chatSplitLandscape: Bool
     public var amoledMode: Bool
     public var showUserIds: Bool
@@ -75,7 +75,9 @@ public struct TelewhiteModsSettings: Equatable {
         static let hidePhoneInSettings = "telewhite.mods.hidePhoneInSettings"
         static let hideStories = "telewhite.mods.hideStories"
         static let ghostStories = "telewhite.mods.ghostStories"
-        static let compactChatList = "telewhite.mods.compactChatList"
+        static let chatListDensity = "telewhite.mods.chatListDensity"
+        // Retired in favour of chatListDensity; still read once to carry the old value over.
+        static let legacyCompactChatList = "telewhite.mods.compactChatList"
         static let chatSplitLandscape = "telewhite.mods.chatSplitLandscape"
         static let amoledMode = "telewhite.mods.amoledMode"
         static let showUserIds = "telewhite.mods.showUserIds"
@@ -143,7 +145,14 @@ public struct TelewhiteModsSettings: Equatable {
             hidePhoneInSettings: defaults.bool(forKey: Key.hidePhoneInSettings),
             hideStories: defaults.bool(forKey: Key.hideStories),
             ghostStories: defaults.bool(forKey: Key.ghostStories),
-            compactChatList: defaults.bool(forKey: Key.compactChatList),
+            chatListDensity: {
+                if let stored = (defaults.object(forKey: Key.chatListDensity) as? NSNumber)?.int32Value {
+                    return min(3, max(0, stored))
+                }
+                // First run after the switch became a scale: "Compact Chat List" was
+                // roughly the first step, so land there instead of silently resetting.
+                return defaults.bool(forKey: Key.legacyCompactChatList) ? 1 : 0
+            }(),
             chatSplitLandscape: defaults.bool(forKey: Key.chatSplitLandscape),
             amoledMode: defaults.bool(forKey: Key.amoledMode),
             showUserIds: defaults.bool(forKey: Key.showUserIds),
@@ -283,7 +292,7 @@ public struct TelewhiteModsSettings: Equatable {
         defaults.set(self.hidePhoneInSettings, forKey: Key.hidePhoneInSettings)
         defaults.set(self.hideStories, forKey: Key.hideStories)
         defaults.set(self.ghostStories, forKey: Key.ghostStories)
-        defaults.set(self.compactChatList, forKey: Key.compactChatList)
+        defaults.set(self.chatListDensity, forKey: Key.chatListDensity)
         defaults.set(self.chatSplitLandscape, forKey: Key.chatSplitLandscape)
         TelewhiteSplitViewSettings.splitInCompactLandscape = self.chatSplitLandscape
         defaults.set(self.amoledMode, forKey: Key.amoledMode)
@@ -476,7 +485,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case chatListRows(Int32, String, Int32, Bool)
     case settingsIconVariant(Int32, String, Int32, Bool)
     case chatTextLink(String)
-    case compactChatList(String, Bool)
+    case chatListDensity(Int32, String, Int32, Bool)
     case chatSplitLandscape(String, Bool)
     case amoledMode(String, Bool)
     case chatTextHeader(String)
@@ -508,7 +517,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.channels.rawValue
         case .mediaHeader, .downloadStories, .hideStories, .autoCacheCleanup, .cacheLimit, .speedBoostEnabled, .speedBoostLevel, .mediaInfo:
             return TelewhiteModsSection.media.rawValue
-        case .appearanceHeader, .accentColorLink, .bubbleColorLink, .compactChatList, .chatListRows, .chatSplitLandscape, .amoledMode, .settingsIconVariant, .chatTextLink, .appearanceInfo:
+        case .appearanceHeader, .accentColorLink, .bubbleColorLink, .chatListDensity, .chatListRows, .chatSplitLandscape, .amoledMode, .settingsIconVariant, .chatTextLink, .appearanceInfo:
             return TelewhiteModsSection.appearance.rawValue
         case .chatTextHeader, .chatFontSizeOption, .chatTextInfo:
             return TelewhiteModsSection.chatText.rawValue
@@ -618,10 +627,10 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 701
         case .bubbleColorLink:
             return 702
-        case .compactChatList:
-            return 703
+        case let .chatListDensity(index, _, _, _):
+            return 703 + index
         case let .chatListRows(index, _, _, _):
-            return 704 + index
+            return 707 + index
         case .chatSplitLandscape:
             return 710
         case .amoledMode:
@@ -882,10 +891,14 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.hideStories = value
             }
-        case let .compactChatList(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.compactChatList = value
-            }
+        case let .chatListDensity(_, text, value, selected):
+            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: text, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
+                arguments.updateSettings { current in
+                    var updated = current
+                    updated.chatListDensity = value
+                    return updated
+                }
+            })
         case let .chatSplitLandscape(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.chatSplitLandscape = value
@@ -1153,8 +1166,8 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
         return text("When downloaded photos and videos take up more than the limit, the oldest ones are deleted. Nothing is lost — anything you open again is downloaded from Telegram.", "Когда скачанные фото и видео займут больше лимита, самые старые удаляются. Ничего не теряется — при открытии всё снова скачается из Telegram.")
     case .speedBoostEnabled:
         return text("Downloads and uploads media in more pieces at a time. Helps most on a fast connection; on a weak one it can make things slower.", "Качает и отправляет медиа большим числом кусков сразу. Сильнее всего помогает на быстром соединении; на слабом может, наоборот, замедлить.")
-    case .compactChatList:
-        return text("Chat rows become shorter, so more chats fit on the screen.", "Строки чатов становятся ниже — на экране помещается больше чатов.")
+    case .chatListDensity:
+        return text("Shrinks the avatar and tightens the row, so more chats fit on the screen. The text column follows the avatar, so the row gets narrower as well as shorter.", "Уменьшает аватарку и поджимает строку — на экране помещается больше чатов. Текст сдвигается вслед за аватаркой, поэтому строка становится не только ниже, но и уже.")
     case .chatSplitLandscape:
         return text("Turn the phone sideways and the chat list stays next to the open chat, like on a computer.", "Поверните телефон горизонтально — список чатов останется рядом с открытым чатом, как на компьютере.")
     case .amoledMode:
@@ -1266,7 +1279,22 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         // Telewhite: no preset swatches — tapping opens the same picker and you mix your
         // own outgoing bubble colour there.
         entries.append(.bubbleColorLink(strings.text("Outgoing Bubble Color", "Цвет исходящих сообщений"), bubbleColor))
-        entries.append(.compactChatList(strings.text("Compact Chat List", "Компактный список чатов"), settings.compactChatList))
+        // Telewhite: how tightly the chat list is packed. Level 0 is stock Telegram, so
+        // the default leaves the list exactly as it was.
+        for (index, density) in [Int32(0), 1, 2, 3].enumerated() {
+            let title: String
+            switch density {
+            case 1:
+                title = strings.text("Chat List: Snug", "Список чатов: плотнее")
+            case 2:
+                title = strings.text("Chat List: Tight", "Список чатов: плотно")
+            case 3:
+                title = strings.text("Chat List: Tightest", "Список чатов: очень плотно")
+            default:
+                title = strings.text("Chat List: Roomy", "Список чатов: просторно")
+            }
+            entries.append(.chatListDensity(Int32(index), title, density, settings.chatListDensity == density))
+        }
         // Telewhite: rows under the chat name. Two is the stock layout, so the default
         // changes nothing for anyone who never opens this screen.
         for (index, rows) in [Int32(1), 2, 3].enumerated() {
