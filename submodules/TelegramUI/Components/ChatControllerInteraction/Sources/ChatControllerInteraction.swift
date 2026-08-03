@@ -38,7 +38,11 @@ public func telewhiteMessageTranslationTargetLanguage(fallback baseLang: String)
 // other Telewhite hooks do it: the flag is consulted once per message layout, and routing it
 // through the chat controller would only add wiring that can fall out of sync.
 public func telewhiteTranslateButtonInChatEnabled() -> Bool {
-    return UserDefaults.standard.bool(forKey: "telewhite.mods.translateButtonInChat")
+    // `bool(forKey:)` reports false for a key that was never written, and the mods screen only
+    // writes on save — so on a fresh install the switch read as on while the button never
+    // appeared. Defaults have to be spelled out on both sides, exactly as every other
+    // on-by-default mod here already does.
+    return (UserDefaults.standard.object(forKey: "telewhite.mods.translateButtonInChat") as? Bool) ?? true
 }
 
 public struct ChatInterfaceHighlightedState: Equatable {
