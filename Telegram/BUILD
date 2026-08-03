@@ -941,6 +941,26 @@ sh_binary(
     srcs = [":GenerateAddAlternateIcons"],
 )
 
+genrule(
+    name = "GenerateRestoreTelewhiteGlassIcon",
+    srcs = [
+        "RestoreTelewhiteGlassIcon.source.sh",
+    ],
+    cmd_bash =
+"""
+    cat $(location RestoreTelewhiteGlassIcon.source.sh) > $(location RestoreTelewhiteGlassIcon.sh)
+    chmod +x $(location RestoreTelewhiteGlassIcon.sh)
+""",
+    outs = [
+        "RestoreTelewhiteGlassIcon.sh",
+    ],
+    executable = True,
+    visibility = [
+        "//visibility:public",
+    ]
+)
+
+
 plist_fragment(
     name = "TelegramUIInfoPlist",
     extension = "plist",
@@ -1851,6 +1871,10 @@ ios_application(
         ":embedWatchAppSetting": ":TelegramWatchApp",
         "//conditions:default": None,
     }),
+    # Re-adds the TelewhiteGlass key that alticonstool.py drops when it overwrites
+    # CFBundleAlternateIcons. Runs before codesign, so patching Info.plist is safe.
+    # See Telegram/RestoreTelewhiteGlassIcon.source.sh for the full explanation.
+    ipa_post_processor = ":GenerateRestoreTelewhiteGlassIcon",
     deps = [
         ":Main",
         ":Lib",
