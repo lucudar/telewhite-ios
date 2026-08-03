@@ -43,7 +43,6 @@ public struct TelewhiteModsSettings: Equatable {
     public var outgoingTranslateButtonEnabled: Bool
     public var outgoingTranslationPeerIds: Set<Int64>
     public var outgoingTranslationLanguages: [Int64: String]
-    public var openRouterApiKey: String
     public var forwardHideNamesByDefault: Bool
     public var showPreviousEditedText: Bool
     public var autoCacheCleanup: Bool
@@ -51,6 +50,7 @@ public struct TelewhiteModsSettings: Equatable {
     public var speedBoost: Int32
     public var settingsIconVariant: Int32
     public var chatListRows: Int32
+    public var hideCallsTab: Bool
     public var channelHideReactions: Bool
     public var channelHideComments: Bool
     public var channelHideShareButton: Bool
@@ -93,7 +93,6 @@ public struct TelewhiteModsSettings: Equatable {
         static let outgoingTranslateButtonEnabled = "telewhite.mods.outgoingTranslateButtonEnabled"
         static let outgoingTranslationPeerIds = "telewhite.mods.outgoingTranslationPeerIds"
         static let outgoingTranslationLanguages = "telewhite.mods.outgoingTranslationLanguages"
-        static let openRouterApiKey = "telewhite.mods.openRouterApiKey"
         static let forwardHideNamesByDefault = "telewhite.mods.forwardHideNamesByDefault"
         static let showPreviousEditedText = "telewhite.mods.showPreviousEditedText"
         static let autoCacheCleanup = "telewhite.mods.autoCacheCleanup"
@@ -101,6 +100,7 @@ public struct TelewhiteModsSettings: Equatable {
         static let speedBoost = "telewhite.mods.speedBoost"
         static let settingsIconVariant = "telewhite.mods.settingsIconVariant"
         static let chatListRows = "telewhite.mods.chatListRows"
+        static let hideCallsTab = "telewhite.mods.hideCallsTab"
         static let channelHideReactions = "telewhite.mods.channelHideReactions"
         static let channelHideComments = "telewhite.mods.channelHideComments"
         static let channelHideShareButton = "telewhite.mods.channelHideShareButton"
@@ -181,7 +181,6 @@ public struct TelewhiteModsSettings: Equatable {
                 }
                 return result
             }(),
-            openRouterApiKey: defaults.string(forKey: Key.openRouterApiKey) ?? "",
             forwardHideNamesByDefault: defaults.bool(forKey: Key.forwardHideNamesByDefault),
             showPreviousEditedText: defaults.object(forKey: Key.showPreviousEditedText) as? Bool ?? true,
             autoCacheCleanup: defaults.bool(forKey: Key.autoCacheCleanup),
@@ -189,6 +188,7 @@ public struct TelewhiteModsSettings: Equatable {
             speedBoost: min(2, max(0, (defaults.object(forKey: Key.speedBoost) as? NSNumber)?.int32Value ?? 0)),
             settingsIconVariant: min(3, max(0, (defaults.object(forKey: Key.settingsIconVariant) as? NSNumber)?.int32Value ?? 0)),
             chatListRows: min(3, max(1, (defaults.object(forKey: Key.chatListRows) as? NSNumber)?.int32Value ?? 2)),
+            hideCallsTab: defaults.bool(forKey: Key.hideCallsTab),
             channelHideReactions: defaults.bool(forKey: Key.channelHideReactions),
             channelHideComments: defaults.bool(forKey: Key.channelHideComments),
             channelHideShareButton: defaults.bool(forKey: Key.channelHideShareButton),
@@ -309,7 +309,6 @@ public struct TelewhiteModsSettings: Equatable {
         defaults.set(self.outgoingTranslateButtonEnabled, forKey: Key.outgoingTranslateButtonEnabled)
         defaults.set(self.outgoingTranslationPeerIds.map { NSNumber(value: $0) }, forKey: Key.outgoingTranslationPeerIds)
         defaults.set(Dictionary(uniqueKeysWithValues: self.outgoingTranslationLanguages.map { (String($0.key), $0.value) }), forKey: Key.outgoingTranslationLanguages)
-        defaults.set(self.openRouterApiKey, forKey: Key.openRouterApiKey)
         defaults.set(self.forwardHideNamesByDefault, forKey: Key.forwardHideNamesByDefault)
         defaults.set(self.showPreviousEditedText, forKey: Key.showPreviousEditedText)
         defaults.set(self.autoCacheCleanup, forKey: Key.autoCacheCleanup)
@@ -317,6 +316,7 @@ public struct TelewhiteModsSettings: Equatable {
         defaults.set(self.speedBoost, forKey: Key.speedBoost)
         defaults.set(self.settingsIconVariant, forKey: Key.settingsIconVariant)
         defaults.set(self.chatListRows, forKey: Key.chatListRows)
+        defaults.set(self.hideCallsTab, forKey: Key.hideCallsTab)
         defaults.set(self.channelHideReactions, forKey: Key.channelHideReactions)
         defaults.set(self.channelHideComments, forKey: Key.channelHideComments)
         defaults.set(self.channelHideShareButton, forKey: Key.channelHideShareButton)
@@ -348,7 +348,6 @@ private final class TelewhiteModsControllerArguments {
     let updateTranslationSettings: (@escaping (TranslationSettings) -> TranslationSettings) -> Void
     let openTab: (TelewhiteModsTab) -> Void
     let openDebug: () -> Void
-    let promptOpenRouterKey: () -> Void
     // Telewhite: reopens the stock accent color picker (palette + hue slider) that
     // ThemeSettingsController already ships, instead of writing a second one.
     let openAccentColorPicker: () -> Void
@@ -361,7 +360,6 @@ private final class TelewhiteModsControllerArguments {
         updateTranslationSettings: @escaping (@escaping (TranslationSettings) -> TranslationSettings) -> Void,
         openTab: @escaping (TelewhiteModsTab) -> Void = { _ in },
         openDebug: @escaping () -> Void = {},
-        promptOpenRouterKey: @escaping () -> Void = {},
         openAccentColorPicker: @escaping () -> Void = {},
         openBubbleColorPicker: @escaping () -> Void = {}
     ) {
@@ -369,7 +367,6 @@ private final class TelewhiteModsControllerArguments {
         self.updateTranslationSettings = updateTranslationSettings
         self.openTab = openTab
         self.openDebug = openDebug
-        self.promptOpenRouterKey = promptOpenRouterKey
         self.openAccentColorPicker = openAccentColorPicker
         self.openBubbleColorPicker = openBubbleColorPicker
     }
@@ -386,6 +383,8 @@ private enum TelewhiteModsSection: Int32 {
     case media
     case appearance
     case chatText
+    case chatListLook
+    case settingsIcons
     case developer
 }
 
@@ -406,6 +405,10 @@ private enum TelewhiteModsTab: Int32, Equatable {
     // Telewhite: chat text sizing. Colours and bubble shape used to live here too, but
     // they duplicated the stock Appearance screen, so they were dropped.
     case chatText
+    // Telewhite: density and line count share a screen because both answer the same
+    // question — how much of the chat list fits — and are judged together.
+    case chatListLook
+    case settingsIcons
 }
 
 private enum TelewhiteModsMenuIcon: Int32, Equatable {
@@ -444,7 +447,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case translationTargetLanguage(String, String)
     case outgoingTranslateButtonEnabled(String, Bool)
     case translateVoiceMessages(String, Bool)
-    case openRouterApiKey(String, String)
     case translatorInfo(String)
 
     case translationLanguageHeader(String)
@@ -486,10 +488,21 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     // next on tap. A checkbox per value was eleven rows for three settings and buried
     // everything else on the screen; a sub-screen per setting would have hidden them a tap
     // deep instead. Payload is (title, current value label).
-    case chatListRows(String, String)
-    case settingsIconVariant(String, String)
+    case chatListLookLink(String, String)
+    case settingsIconsLink(String, String)
+    case hideCallsTab(String, Bool)
     case chatTextLink(String)
-    case chatListDensity(String, String)
+
+    // Rows of the two screens those links open.
+    case chatListDensityHeader(String)
+    case chatListDensity(Int32, String, Int32, Bool)
+    case chatListDensityInfo(String)
+    case chatListRowsHeader(String)
+    case chatListRows(Int32, String, Int32, Bool)
+    case chatListRowsInfo(String)
+    case settingsIconsHeader(String)
+    case settingsIconVariant(Int32, String, Int32, Bool)
+    case settingsIconsInfo(String)
     case chatSplitLandscape(String, Bool)
     case amoledMode(String, Bool)
     case chatTextHeader(String)
@@ -509,7 +522,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.menu.rawValue
         case .messengerHeader, .preserveDeletedMessages, .backgroundMessageRefresh, .keepTimedMessages, .forwardHideNamesByDefault, .showPreviousEditedText, .oneTimeMedia, .hdPhotos, .quickForwardToSaved, .showReadDateOnTap, .translatorLink, .messengerInfo:
             return TelewhiteModsSection.messenger.rawValue
-        case .translatorHeader, .translateMessages, .autoTranslateEnglish, .translationTargetLanguage, .outgoingTranslateButtonEnabled, .localTranscription, .translateVoiceMessages, .openRouterApiKey, .translatorInfo:
+        case .translatorHeader, .translateMessages, .autoTranslateEnglish, .translationTargetLanguage, .outgoingTranslateButtonEnabled, .localTranscription, .translateVoiceMessages, .translatorInfo:
             return TelewhiteModsSection.translator.rawValue
         case .translationLanguageHeader, .translationLanguageOption:
             return TelewhiteModsSection.translationLanguage.rawValue
@@ -521,10 +534,14 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.channels.rawValue
         case .mediaHeader, .downloadStories, .hideStories, .autoCacheCleanup, .cacheLimit, .speedBoostEnabled, .speedBoostLevel, .mediaInfo:
             return TelewhiteModsSection.media.rawValue
-        case .appearanceHeader, .accentColorLink, .bubbleColorLink, .chatListDensity, .chatListRows, .chatSplitLandscape, .amoledMode, .settingsIconVariant, .chatTextLink, .appearanceInfo:
+        case .appearanceHeader, .accentColorLink, .bubbleColorLink, .chatListLookLink, .chatSplitLandscape, .amoledMode, .settingsIconsLink, .hideCallsTab, .chatTextLink, .appearanceInfo:
             return TelewhiteModsSection.appearance.rawValue
         case .chatTextHeader, .chatFontSizeOption, .chatTextInfo:
             return TelewhiteModsSection.chatText.rawValue
+        case .chatListDensityHeader, .chatListDensity, .chatListDensityInfo, .chatListRowsHeader, .chatListRows, .chatListRowsInfo:
+            return TelewhiteModsSection.chatListLook.rawValue
+        case .settingsIconsHeader, .settingsIconVariant, .settingsIconsInfo:
+            return TelewhiteModsSection.settingsIcons.rawValue
         case .developerHeader, .pushStatus, .pushToken, .debugMenu, .developerInfo:
             return TelewhiteModsSection.developer.rawValue
         }
@@ -572,8 +589,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 55
         case .translateVoiceMessages:
             return 56
-        case .openRouterApiKey:
-            return 57
         case .translatorInfo:
             return 58
         case .translationLanguageHeader:
@@ -631,16 +646,16 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 701
         case .bubbleColorLink:
             return 702
-        case .chatListDensity:
+        case .chatListLookLink:
             return 703
-        case .chatListRows:
-            return 704
         case .chatSplitLandscape:
             return 710
         case .amoledMode:
             return 711
-        case .settingsIconVariant:
+        case .settingsIconsLink:
             return 712
+        case .hideCallsTab:
+            return 713
         case .chatTextLink:
             return 720
         case .appearanceInfo:
@@ -653,6 +668,26 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 901 + index
         case .chatTextInfo:
             return 950
+        // The two look screens are their own sections, so their ids only have to rise
+        // among themselves.
+        case .chatListDensityHeader:
+            return 1000
+        case let .chatListDensity(index, _, _, _):
+            return 1001 + index
+        case .chatListDensityInfo:
+            return 1009
+        case .chatListRowsHeader:
+            return 1010
+        case let .chatListRows(index, _, _, _):
+            return 1011 + index
+        case .chatListRowsInfo:
+            return 1019
+        case .settingsIconsHeader:
+            return 1100
+        case let .settingsIconVariant(index, _, _, _):
+            return 1101 + index
+        case .settingsIconsInfo:
+            return 1109
         case .developerHeader:
             return 800
         case .pushStatus:
@@ -680,20 +715,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
         })
     }
 
-    // A setting with a handful of values on a single row: the current one is shown on the
-    // right and each tap steps to the next, wrapping round. No arrow, because nothing is
-    // pushed — the change lands immediately and, for all three settings that use this, is
-    // visible on screen straight away.
-    private func stepperItem(presentationData: ItemListPresentationData, arguments: TelewhiteModsControllerArguments, text: String, label: String, step: @escaping (inout TelewhiteModsSettings) -> Void) -> ListViewItem {
-        return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: label, labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .none, action: {
-            arguments.updateSettings { current in
-                var updated = current
-                step(&updated)
-                return updated
-            }
-        })
-    }
-
     func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
         let arguments = arguments as! TelewhiteModsControllerArguments
         switch self {
@@ -701,7 +722,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: telewhiteMenuIcon(icon, color: presentationData.theme.list.itemAccentColor), title: title, titleFont: .bold, label: subtitle, labelStyle: .multilineDetailText, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                 arguments.openTab(tab)
             })
-        case let .messengerHeader(text), let .translatorHeader(text), let .translationLanguageHeader(text), let .privacyHeader(text), let .stealthHeader(text), let .channelsHeader(text), let .mediaHeader(text), let .appearanceHeader(text), let .developerHeader(text), let .chatTextHeader(text):
+        case let .messengerHeader(text), let .translatorHeader(text), let .translationLanguageHeader(text), let .privacyHeader(text), let .stealthHeader(text), let .channelsHeader(text), let .mediaHeader(text), let .appearanceHeader(text), let .developerHeader(text), let .chatTextHeader(text), let .chatListDensityHeader(text), let .chatListRowsHeader(text), let .settingsIconsHeader(text):
             return ItemListSectionHeaderItem(presentationData: presentationData, text: text, sectionId: self.section)
         case let .translationLanguageOption(_, title, code, selected):
             return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: title, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
@@ -817,10 +838,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.outgoingTranslateButtonEnabled = value
             }
-        case let .openRouterApiKey(text, value):
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: value.isEmpty ? "" : "•••" + String(value.suffix(4)), labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
-                arguments.promptOpenRouterKey()
-            })
         case let .hdPhotos(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.hdPhotos = value
@@ -845,7 +862,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: "", sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                 arguments.openDebug()
             })
-        case let .messengerInfo(text), let .translatorInfo(text), let .privacyInfo(text), let .stealthInfo(text), let .channelsInfo(text), let .mediaInfo(text), let .developerInfo(text), let .appearanceInfo(text), let .chatTextInfo(text):
+        case let .messengerInfo(text), let .translatorInfo(text), let .privacyInfo(text), let .stealthInfo(text), let .channelsInfo(text), let .mediaInfo(text), let .developerInfo(text), let .appearanceInfo(text), let .chatTextInfo(text), let .chatListDensityInfo(text), let .chatListRowsInfo(text), let .settingsIconsInfo(text):
             return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
         case let .hidePhoneInSettings(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
@@ -909,10 +926,26 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.hideStories = value
             }
-        case let .chatListDensity(text, label):
-            return self.stepperItem(presentationData: presentationData, arguments: arguments, text: text, label: label) { settings in
-                settings.chatListDensity = (settings.chatListDensity + 1) % 4
+        case let .chatListLookLink(text, label):
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: label, labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+                arguments.openTab(.chatListLook)
+            })
+        case let .settingsIconsLink(text, label):
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: label, labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+                arguments.openTab(.settingsIcons)
+            })
+        case let .hideCallsTab(text, value):
+            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
+                settings.hideCallsTab = value
             }
+        case let .chatListDensity(_, text, value, selected):
+            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: text, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
+                arguments.updateSettings { current in
+                    var updated = current
+                    updated.chatListDensity = value
+                    return updated
+                }
+            })
         case let .chatSplitLandscape(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.chatSplitLandscape = value
@@ -921,15 +954,22 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.amoledMode = value
             }
-        case let .chatListRows(text, label):
-            // 1...3 rather than 0...n, so the step wraps through the modulus differently.
-            return self.stepperItem(presentationData: presentationData, arguments: arguments, text: text, label: label) { settings in
-                settings.chatListRows = settings.chatListRows % 3 + 1
-            }
-        case let .settingsIconVariant(text, label):
-            return self.stepperItem(presentationData: presentationData, arguments: arguments, text: text, label: label) { settings in
-                settings.settingsIconVariant = (settings.settingsIconVariant + 1) % 4
-            }
+        case let .chatListRows(_, text, value, selected):
+            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: text, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
+                arguments.updateSettings { current in
+                    var updated = current
+                    updated.chatListRows = value
+                    return updated
+                }
+            })
+        case let .settingsIconVariant(_, text, value, selected):
+            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: text, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
+                arguments.updateSettings { current in
+                    var updated = current
+                    updated.settingsIconVariant = value
+                    return updated
+                }
+            })
         case let .pushStatus(text, value):
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: value, labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .none, action: nil)
         case let .pushToken(text, value):
@@ -1081,6 +1121,49 @@ private func telewhiteTabTitle(_ tab: TelewhiteModsTab, strings: TelewhiteModsSt
         return strings.text("Translate Into", "Переводить на")
     case .chatText:
         return strings.text("Chat Text", "Текст в чате")
+    case .chatListLook:
+        return strings.text("Chat List", "Список чатов")
+    case .settingsIcons:
+        return strings.text("Settings Icons", "Иконки настроек")
+    }
+}
+
+// One name per value, used both for the option row on the screen and for the summary on
+// the row that opens it, so the two can never drift apart.
+private func telewhiteDensityName(_ value: Int32, strings: TelewhiteModsStrings) -> String {
+    switch value {
+    case 1:
+        return strings.text("Snug", "плотнее")
+    case 2:
+        return strings.text("Tight", "плотно")
+    case 3:
+        return strings.text("Tightest", "очень плотно")
+    default:
+        return strings.text("Roomy", "просторно")
+    }
+}
+
+private func telewhiteRowsName(_ value: Int32, strings: TelewhiteModsStrings) -> String {
+    switch value {
+    case 1:
+        return strings.text("One Line", "одна строка")
+    case 3:
+        return strings.text("Three Lines", "три строки")
+    default:
+        return strings.text("Two Lines", "две строки")
+    }
+}
+
+private func telewhiteIconVariantName(_ value: Int32, strings: TelewhiteModsStrings) -> String {
+    switch value {
+    case 1:
+        return strings.text("Outlined", "контурные")
+    case 2:
+        return strings.text("Thin, Gray", "тонкие серые")
+    case 3:
+        return strings.text("In a Ring", "в кольце")
+    default:
+        return strings.text("Solid", "заливкой")
     }
 }
 
@@ -1149,8 +1232,6 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
         return text("Turns voice messages into text without Premium. The phone does the recognition itself, so the audio is not sent anywhere and it works offline. The first time, iOS asks for permission.", "Превращает голосовые в текст без Premium. Распознаёт сам телефон, поэтому звук никуда не отправляется и работает без интернета. При первом включении iOS спросит разрешение.")
     case .translateVoiceMessages:
         return text("Voice messages in other languages get a translation under the transcript.", "Под расшифровкой голосового на чужом языке появляется перевод.")
-    case .openRouterApiKey:
-        return text("Optional. A free key from openrouter.ai gives better translation and voice transcription. Without it the regular translator is used.", "Необязательно. Бесплатный ключ с openrouter.ai даёт более точный перевод и расшифровку голосовых. Без него работает обычный переводчик.")
     case .protectionBypass:
         return text("In chats and channels that block saving, you can take screenshots, copy text, forward and save media again.", "В чатах и каналах, где запрещено сохранять, снова работают скриншоты, копирование, пересылка и сохранение медиа.")
     case .hidePhoneInSettings:
@@ -1175,6 +1256,8 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
         return text("Downloads and uploads media in more pieces at a time. Helps most on a fast connection; on a weak one it can make things slower.", "Качает и отправляет медиа большим числом кусков сразу. Сильнее всего помогает на быстром соединении; на слабом может, наоборот, замедлить.")
     case .chatSplitLandscape:
         return text("Turn the phone sideways and the chat list stays next to the open chat, like on a computer.", "Поверните телефон горизонтально — список чатов останется рядом с открытым чатом, как на компьютере.")
+    case .hideCallsTab:
+        return text("Removes the Calls tab from the bar at the bottom. Calls still work and the history stays — it is only the tab that goes.", "Убирает вкладку «Звонки» из панели внизу. Звонки продолжают работать, история сохраняется — пропадает только вкладка.")
     case .amoledMode:
         return text("Makes the dark theme pure black. On OLED screens black pixels are switched off, so it also saves battery.", "Делает тёмную тему полностью чёрной. На OLED-экранах чёрные пиксели не светятся, поэтому расходуется меньше заряда.")
     default:
@@ -1219,7 +1302,6 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.outgoingTranslateButtonEnabled(strings.text("Translate What You Send", "Переводить то, что вы пишете"), settings.outgoingTranslateButtonEnabled))
         entries.append(.localTranscription(strings.text("Voice to Text Without Premium", "Расшифровка голосовых без Premium"), settings.localTranscription))
         entries.append(.translateVoiceMessages(strings.text("Translate Voice Messages", "Переводить голосовые"), settings.translateVoiceMessages))
-        entries.append(.openRouterApiKey(strings.text("OpenRouter Key", "Ключ OpenRouter"), settings.openRouterApiKey))
         entries.append(.translatorInfo(strings.text("Translation is free and needs no account. Messages already in your language are never translated.", "Перевод бесплатный и не требует аккаунта. Сообщения, уже написанные на вашем языке, не переводятся.")))
 
     case .translationLanguage:
@@ -1284,51 +1366,34 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         // Telewhite: no preset swatches — tapping opens the same picker and you mix your
         // own outgoing bubble colour there.
         entries.append(.bubbleColorLink(strings.text("Outgoing Bubble Color", "Цвет исходящих сообщений"), bubbleColor))
-        // Telewhite: how tightly the chat list is packed. Level 0 is stock Telegram, so
-        // the default leaves the list exactly as it was.
-        let densityLabel: String
-        switch settings.chatListDensity {
-        case 1:
-            densityLabel = strings.text("Snug", "плотнее")
-        case 2:
-            densityLabel = strings.text("Tight", "плотно")
-        case 3:
-            densityLabel = strings.text("Tightest", "очень плотно")
-        default:
-            densityLabel = strings.text("Roomy", "просторно")
-        }
-        entries.append(.chatListDensity(strings.text("Chat List Density", "Плотность списка чатов"), densityLabel))
-        // Telewhite: rows under the chat name. Two is the stock layout, so the default
-        // changes nothing for anyone who never opens this screen.
-        let rowsLabel: String
-        switch settings.chatListRows {
-        case 1:
-            rowsLabel = strings.text("One Line", "одна строка")
-        case 3:
-            rowsLabel = strings.text("Three Lines", "три строки")
-        default:
-            rowsLabel = strings.text("Two Lines", "две строки")
-        }
-        entries.append(.chatListRows(strings.text("Lines in the Chat List", "Строк в списке чатов"), rowsLabel))
+        // Telewhite: density and line count share one screen; the row summarises both, so
+        // the current look is readable without opening it.
+        entries.append(.chatListLookLink(strings.text("Chat List", "Список чатов"), "\(telewhiteDensityName(settings.chatListDensity, strings: strings)), \(telewhiteRowsName(settings.chatListRows, strings: strings))"))
         entries.append(.chatSplitLandscape(strings.text("Split View in Landscape", "Сплит чатов (альбомная)"), settings.chatSplitLandscape))
         entries.append(.amoledMode(strings.text("AMOLED Mode", "AMOLED режим"), settings.amoledMode))
-        // Telewhite: the icon style is offered rather than decided. All four are the
-        // same symbol table drawn differently, so shipping the choice costs no more
-        // than shipping one opinion — see TelewhiteSettingsIcons.swift.
-        let iconLabel: String
-        switch settings.settingsIconVariant {
-        case 1:
-            iconLabel = strings.text("Outlined", "контурные")
-        case 2:
-            iconLabel = strings.text("Thin, Gray", "тонкие серые")
-        case 3:
-            iconLabel = strings.text("In a Ring", "в кольце")
-        default:
-            iconLabel = strings.text("Solid", "заливкой")
-        }
-        entries.append(.settingsIconVariant(strings.text("Settings Icons", "Иконки настроек"), iconLabel))
+        entries.append(.settingsIconsLink(strings.text("Settings Icons", "Иконки настроек"), telewhiteIconVariantName(settings.settingsIconVariant, strings: strings)))
+        entries.append(.hideCallsTab(strings.text("Hide the Calls Tab", "Скрыть вкладку «Звонки»"), settings.hideCallsTab))
         entries.append(.chatTextLink(strings.text("Chat Text", "Текст в чате")))
-        entries.append(.appearanceInfo(strings.text("Tap a colour row to mix your own shade — colour wheel, sliders, HEX or the eyedropper. Density, lines and icons step to the next value on every tap; each change shows up straight away, so tap until it looks right. Density shrinks the avatar and pulls the text in with it; lines is how much of a message you see under the name.", "Нажмите на строку цвета и подберите свой оттенок — колесо, ползунки, HEX или пипетка. Плотность, строки и иконки переключаются по кругу с каждым нажатием, и результат виден сразу — нажимайте, пока не понравится. Плотность уменьшает аватарку и подтягивает за ней текст, строки — сколько текста сообщения видно под именем.")))
+        entries.append(.appearanceInfo(strings.text("Tap a colour row to mix your own shade — colour wheel, sliders, HEX or the eyedropper. AMOLED mode deepens the background to true black.", "Нажмите на строку цвета и подберите свой оттенок — колесо, ползунки, HEX или пипетка. AMOLED-режим делает фон полностью чёрным.")))
+
+    case .chatListLook:
+        entries.append(.chatListDensityHeader(strings.text("Density", "Плотность")))
+        for (index, density) in [Int32(0), 1, 2, 3].enumerated() {
+            entries.append(.chatListDensity(Int32(index), telewhiteDensityName(density, strings: strings), density, settings.chatListDensity == density))
+        }
+        entries.append(.chatListDensityInfo(strings.text("Shrinks the avatar and tightens the row, so more chats fit on the screen. The text column follows the avatar, so the row gets narrower as well as shorter. \"Roomy\" is stock Telegram.", "Уменьшает аватарку и поджимает строку — на экране помещается больше чатов. Текст сдвигается вслед за аватаркой, поэтому строка становится не только ниже, но и уже. «Просторно» — как в обычном Telegram.")))
+        entries.append(.chatListRowsHeader(strings.text("Lines Under the Name", "Строк под именем")))
+        for (index, rows) in [Int32(1), 2, 3].enumerated() {
+            entries.append(.chatListRows(Int32(index), telewhiteRowsName(rows, strings: strings), rows, settings.chatListRows == rows))
+        }
+        entries.append(.chatListRowsInfo(strings.text("How much of the last message you see. In groups one line goes to the sender's name, so those rows show one line of text fewer. Two lines is stock Telegram.", "Сколько видно от последнего сообщения. В группах одна строка уходит под имя отправителя, поэтому там текста на строку меньше. Две строки — как в обычном Telegram.")))
+
+    case .settingsIcons:
+        entries.append(.settingsIconsHeader(strings.text("Style", "Стиль")))
+        for (index, variant) in [Int32(0), 1, 2, 3].enumerated() {
+            entries.append(.settingsIconVariant(Int32(index), telewhiteIconVariantName(variant, strings: strings), variant, settings.settingsIconVariant == variant))
+        }
+        entries.append(.settingsIconsInfo(strings.text("Changes every icon in Settings at once. \"Solid\" and \"Outlined\" follow the accent colour; \"Thin, Gray\" is the quietest and drops the colour; \"In a Ring\" draws a hairline circle around a smaller glyph. The change shows up straight away, no restart.", "Меняет сразу все значки в настройках. «Заливкой» и «Контурные» следуют акцентному цвету, «Тонкие серые» — самый спокойный вариант без цвета, «В кольце» рисует тонкую окружность вокруг уменьшенного значка. Результат виден сразу, перезапуск не нужен.")))
 
     case .chatText:
         entries.append(.chatTextHeader(strings.text("Chat Text", "Текст в чате")))
@@ -1437,29 +1502,6 @@ private func telewhiteModsSectionController(context: AccountContext, tab: Telewh
         if let debugController = context.sharedContext.makeDebugSettingsController(context: context) {
             pushControllerImpl?(debugController)
         }
-    }, promptOpenRouterKey: {
-        let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-        let strings = TelewhiteModsStrings(presentationData: presentationData)
-        let settings = stateValue.with { $0 }
-        let prompt = promptController(
-            context: context,
-            text: strings.text("OpenRouter API Key", "Ключ OpenRouter API"),
-            subtitle: strings.text("Paste your key from openrouter.ai (starts with sk-or-). Leave empty to use the standard translator.", "Вставьте ключ с openrouter.ai (начинается с sk-or-). Оставьте пустым для стандартного переводчика."),
-            value: settings.openRouterApiKey,
-            placeholder: "sk-or-v1-...",
-            characterLimit: 256,
-            apply: { value in
-                guard let value = value else {
-                    return
-                }
-                updateSettings { current in
-                    var updated = current
-                    updated.openRouterApiKey = value.trimmingCharacters(in: .whitespacesAndNewlines)
-                    return updated
-                }
-            }
-        )
-        presentControllerImpl?(prompt)
     }, openAccentColorPicker: {
         // Telewhite: the system picker instead of the stock palette screen, and the value
         // written straight into the theme settings. Routing this through

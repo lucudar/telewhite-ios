@@ -973,14 +973,11 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
                 // highlight on a sideloaded build and no way to clear the override.
                 var icons = [
                     PresentationAppIcon(name: "Blue", imageName: "BlueIcon", isDefault: true),
-                    // Icon Composer bundle: registered by actool as an alternate icon, so
-                    // `name` is the .icon folder name. It ships no PNG of its own, and the
-                    // picker row is drawn with UIImage(named:), so point imageName at the
-                    // TelewhiteGlassDark artwork instead. Real glass needs iOS 26; on older
-                    // systems setAlternateIconName fails and the two PNG sets below stay.
-                    PresentationAppIcon(name: "TelewhiteGlass", imageName: "TelewhiteGlassDark"),
-                    PresentationAppIcon(name: "TelewhiteGlassDark", imageName: "TelewhiteGlassDark"),
-                    PresentationAppIcon(name: "TelewhiteGlassLight", imageName: "TelewhiteGlassLight"),
+                    // The three glass icons are dropped from the picker on the owner's call:
+                    // the two PNG ones only imitate glass, and the row artwork is identical
+                    // for all three, so the list read as three near-duplicates. The assets
+                    // and the Icon Composer bundle are still in the build — putting a row
+                    // back is one line here.
                     PresentationAppIcon(name: "TelewhiteGhost", imageName: "TelewhiteGhost"),
                     PresentationAppIcon(name: "TelewhiteWhite", imageName: "TelewhiteWhite"),
                     PresentationAppIcon(name: "TelewhiteNeon", imageName: "TelewhiteNeon"),
@@ -1005,11 +1002,11 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
                     PresentationAppIcon(name: "FontAwesomeTelegramIcon", imageName: "FontAwesomeTelegramIcon")
                 ]
                 icons.append(PresentationAppIcon(name: "WhiteFilled", imageName: "WhiteFilledIcon"))
-                
-                icons.append(PresentationAppIcon(name: "Premium", imageName: "Premium", isPremium: true))
-                icons.append(PresentationAppIcon(name: "PremiumTurbo", imageName: "PremiumTurbo", isPremium: true))
-                icons.append(PresentationAppIcon(name: "PremiumBlack", imageName: "PremiumBlack", isPremium: true))
-                
+
+                // The three Premium icons are gone as well: they are gated on a subscription
+                // this build does not have, so every one of them was a row that could be
+                // tapped and refused.
+
                 return icons
             } else {
                 return []

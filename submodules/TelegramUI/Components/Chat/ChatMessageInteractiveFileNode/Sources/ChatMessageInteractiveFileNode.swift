@@ -407,16 +407,14 @@ public final class ChatMessageInteractiveFileNode: ASDisplayNode {
         
         let presentationData = context.sharedContext.currentPresentationData.with { $0 }
         let premiumConfiguration = PremiumConfiguration.with(appConfiguration: arguments.context.currentAppConfiguration.with { $0 })
-        let telewhiteOpenRouterKey = UserDefaults.standard.string(forKey: "telewhite.mods.openRouterApiKey") ?? ""
-        let canUseTelewhiteOpenRouterTranscription = !telewhiteOpenRouterKey.isEmpty
         let telewhiteTranslateVoice = UserDefaults.standard.bool(forKey: "telewhite.mods.translateVoiceMessages")
         // Telewhite: on-device recognition, so there is no Premium check to satisfy and no
-        // trial to run out. Kept separate from the OpenRouter flag because this one needs no
-        // key and no network, and it must also suppress the "subscribe to Premium" prompt below.
+        // trial to run out. It needs no key and no network, and it must also suppress the
+        // "subscribe to Premium" prompt below.
         let telewhiteLocalTranscription = UserDefaults.standard.bool(forKey: "telewhite.mods.localTranscription")
         
         let transcriptionText = self.forcedAudioTranscriptionText ?? transcribedText(message: EngineMessage(message))
-        if transcriptionText == nil && !arguments.associatedData.alwaysDisplayTranscribeButton.providedByGroupBoost && !canUseTelewhiteOpenRouterTranscription && !telewhiteTranslateVoice && !telewhiteLocalTranscription {
+        if transcriptionText == nil && !arguments.associatedData.alwaysDisplayTranscribeButton.providedByGroupBoost && !telewhiteTranslateVoice && !telewhiteLocalTranscription {
             if premiumConfiguration.audioTransciptionTrialCount > 0 {
                 if !arguments.associatedData.isPremium {
                     if self.presentAudioTranscriptionTooltip(finished: false) {
@@ -475,12 +473,9 @@ public final class ChatMessageInteractiveFileNode: ASDisplayNode {
                 self.audioTranscriptionState = .inProgress
                 self.requestUpdateLayout(true)
                 
-                if context.sharedContext.immediateExperimentalUISettings.localTranscription || canUseTelewhiteOpenRouterTranscription || telewhiteTranslateVoice || telewhiteLocalTranscription {
+                if context.sharedContext.immediateExperimentalUISettings.localTranscription || telewhiteTranslateVoice || telewhiteLocalTranscription {
                     let appLocale = presentationData.strings.baseLanguageCode
-                    // Telewhite: an explicitly requested on-device transcript wins over the key,
-                    // same as the experimental switch does — the user asked for the phone to do it.
-                    let useOpenRouterTranscription = canUseTelewhiteOpenRouterTranscription && !context.sharedContext.immediateExperimentalUISettings.localTranscription && !telewhiteLocalTranscription
-                    
+
                     let signal: Signal<LocallyTranscribedAudio?, NoError> = context.engine.data.get(TelegramEngine.EngineData.Item.Messages.Message(id: message.id))
                     |> mapToSignal { message -> Signal<String?, NoError> in
                         guard let message = message else {
@@ -510,11 +505,7 @@ public final class ChatMessageInteractiveFileNode: ASDisplayNode {
                         guard let result = result else {
                             return .single(nil)
                         }
-                        if useOpenRouterTranscription {
-                            return transcribeAudioWithOpenRouter(path: result, apiKey: telewhiteOpenRouterKey)
-                        } else {
-                            return transcribeAudio(path: result, appLocale: appLocale)
-                        }
+                        return transcribeAudio(path: result, appLocale: appLocale)
                     }
                     
                     self.transcribeDisposable = (signal
