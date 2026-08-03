@@ -150,14 +150,13 @@ private final class MultipartUploadManager {
         arc4random_buf(&fileId, 8)
         self.fileId = fileId
         
-        if increaseParallelParts {
-            self.parallelParts = 30
-        } else {
-            self.parallelParts = 3
-        }
-        
+        // Telewhite: Speed Boost may raise the part count and force larger parts; see
+        // TelewhiteSpeedBoost.swift.
+        self.parallelParts = telewhiteBoostedUploadParallelParts(increaseParallelParts ? 30 : 3)
+        let effectiveUseLargerParts = telewhiteBoostedUploadUseLargerParts(useLargerParts)
+
         self.forceNoBigParts = forceNoBigParts
-        self.useLargerParts = useLargerParts
+        self.useLargerParts = effectiveUseLargerParts
         
         self.state = MultipartUploadState(encryptionKey: encryptionKey)
         
@@ -180,7 +179,7 @@ private final class MultipartUploadManager {
             self.defaultPartSize = 512 * 1024
             self.bigTotalParts = nil
             self.bigParts = true
-        } else if useLargerParts {
+        } else if effectiveUseLargerParts {
             self.bigParts = false
             self.defaultPartSize = 256 * 1024
             self.bigTotalParts = nil

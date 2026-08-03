@@ -564,25 +564,31 @@ private final class MultipartFetchManager {
             }
         }
         
+        let selectedPartSize: Int64
+        let selectedParallelParts: Int
         if isStory {
-            self.defaultPartSize = 512 * 1024
-            if let size = size, size > self.defaultPartSize {
-                self.parallelParts = 4
+            selectedPartSize = 512 * 1024
+            if let size = size, size > selectedPartSize {
+                selectedParallelParts = 4
             } else {
-                self.parallelParts = 1
+                selectedParallelParts = 1
             }
         } else if let size = size {
             if size <= 512 * 1024 {
-                self.defaultPartSize = 16 * 1024
-                self.parallelParts = 4 * 4
+                selectedPartSize = 16 * 1024
+                selectedParallelParts = 4 * 4
             } else {
-                self.defaultPartSize = 512 * 1024
-                self.parallelParts = 8
+                selectedPartSize = 512 * 1024
+                selectedParallelParts = 8
             }
         } else {
-            self.parallelParts = 1
-            self.defaultPartSize = 128 * 1024
+            selectedParallelParts = 1
+            selectedPartSize = 128 * 1024
         }
+
+        // Telewhite: Speed Boost may raise either number; see TelewhiteSpeedBoost.swift.
+        self.defaultPartSize = telewhiteBoostedDownloadPartSize(selectedPartSize, fileSize: size)
+        self.parallelParts = telewhiteBoostedDownloadParallelParts(selectedParallelParts)
         
         if let info = parameters?.info as? TelegramCloudMediaResourceFetchInfo {
             self.fileReference = info.reference.apiFileReference

@@ -48,6 +48,7 @@ public struct TelewhiteModsSettings: Equatable {
     public var showPreviousEditedText: Bool
     public var autoCacheCleanup: Bool
     public var cacheLimitGigabytes: Int32
+    public var speedBoost: Int32
     public var channelHideReactions: Bool
     public var channelHideComments: Bool
     public var channelHideShareButton: Bool
@@ -93,6 +94,7 @@ public struct TelewhiteModsSettings: Equatable {
         static let showPreviousEditedText = "telewhite.mods.showPreviousEditedText"
         static let autoCacheCleanup = "telewhite.mods.autoCacheCleanup"
         static let cacheLimitGigabytes = "telewhite.mods.cacheLimitGigabytes"
+        static let speedBoost = "telewhite.mods.speedBoost"
         static let channelHideReactions = "telewhite.mods.channelHideReactions"
         static let channelHideComments = "telewhite.mods.channelHideComments"
         static let channelHideShareButton = "telewhite.mods.channelHideShareButton"
@@ -171,6 +173,7 @@ public struct TelewhiteModsSettings: Equatable {
             showPreviousEditedText: defaults.object(forKey: Key.showPreviousEditedText) as? Bool ?? true,
             autoCacheCleanup: defaults.bool(forKey: Key.autoCacheCleanup),
             cacheLimitGigabytes: max(1, (defaults.object(forKey: Key.cacheLimitGigabytes) as? NSNumber)?.int32Value ?? 5),
+            speedBoost: min(2, max(0, (defaults.object(forKey: Key.speedBoost) as? NSNumber)?.int32Value ?? 0)),
             channelHideReactions: defaults.bool(forKey: Key.channelHideReactions),
             channelHideComments: defaults.bool(forKey: Key.channelHideComments),
             channelHideShareButton: defaults.bool(forKey: Key.channelHideShareButton),
@@ -296,6 +299,7 @@ public struct TelewhiteModsSettings: Equatable {
         defaults.set(self.showPreviousEditedText, forKey: Key.showPreviousEditedText)
         defaults.set(self.autoCacheCleanup, forKey: Key.autoCacheCleanup)
         defaults.set(self.cacheLimitGigabytes, forKey: Key.cacheLimitGigabytes)
+        defaults.set(self.speedBoost, forKey: Key.speedBoost)
         defaults.set(self.channelHideReactions, forKey: Key.channelHideReactions)
         defaults.set(self.channelHideComments, forKey: Key.channelHideComments)
         defaults.set(self.channelHideShareButton, forKey: Key.channelHideShareButton)
@@ -454,6 +458,8 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case hideStories(String, Bool)
     case autoCacheCleanup(String, Bool)
     case cacheLimit(Int32, String, Int32, Bool)
+    case speedBoostEnabled(String, Bool)
+    case speedBoostLevel(Int32, String, Int32, Bool)
     case mediaInfo(String)
 
     case appearanceHeader(String)
@@ -490,7 +496,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.stealth.rawValue
         case .channelsHeader, .channelsDeclutter, .hideSponsoredContent, .channelsInfo:
             return TelewhiteModsSection.channels.rawValue
-        case .mediaHeader, .downloadStories, .hideStories, .autoCacheCleanup, .cacheLimit, .mediaInfo:
+        case .mediaHeader, .downloadStories, .hideStories, .autoCacheCleanup, .cacheLimit, .speedBoostEnabled, .speedBoostLevel, .mediaInfo:
             return TelewhiteModsSection.media.rawValue
         case .appearanceHeader, .accentColorLink, .bubbleColorLink, .compactChatList, .chatSplitLandscape, .amoledMode, .chatTextLink, .appearanceInfo:
             return TelewhiteModsSection.appearance.rawValue
@@ -587,6 +593,10 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 503
         case let .cacheLimit(index, _, _, _):
             return 504 + index
+        case .speedBoostEnabled:
+            return 510
+        case let .speedBoostLevel(index, _, _, _):
+            return 511 + index
         // Telewhite: stableId must rise in the order rows are appended — ItemListUI
         // asserts it (ItemListControllerNode.swift:449) and its row diff assumes it.
         // The trailing info row therefore sits at the end of the media block, not at 502.
@@ -837,6 +847,20 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
                     var updated = current
                     updated.cacheLimitGigabytes = value
                     updated.autoCacheCleanup = true
+                    return updated
+                }
+            })
+        case let .speedBoostEnabled(text, value):
+            // Switching back on lands on the moderate level rather than whichever one was
+            // last picked: the higher level is the one worth choosing deliberately.
+            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
+                settings.speedBoost = value ? 1 : 0
+            }
+        case let .speedBoostLevel(_, text, value, selected):
+            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: text, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
+                arguments.updateSettings { current in
+                    var updated = current
+                    updated.speedBoost = value
                     return updated
                 }
             })
@@ -1097,6 +1121,8 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
         return text("Removes the row of stories above the chat list.", "Убирает ленту историй над списком чатов.")
     case .autoCacheCleanup:
         return text("When downloaded photos and videos take up more than the limit, the oldest ones are deleted. Nothing is lost — anything you open again is downloaded from Telegram.", "Когда скачанные фото и видео займут больше лимита, самые старые удаляются. Ничего не теряется — при открытии всё снова скачается из Telegram.")
+    case .speedBoostEnabled:
+        return text("Downloads and uploads media in more pieces at a time. Helps most on a fast connection; on a weak one it can make things slower.", "Качает и отправляет медиа большим числом кусков сразу. Сильнее всего помогает на быстром соединении; на слабом может, наоборот, замедлить.")
     case .compactChatList:
         return text("Chat rows become shorter, so more chats fit on the screen.", "Строки чатов становятся ниже — на экране помещается больше чатов.")
     case .chatSplitLandscape:
@@ -1191,7 +1217,16 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
                 entries.append(.cacheLimit(Int32(index), strings.text("Keep up to \(limit) GB", "Хранить до \(limit) ГБ"), limit, settings.cacheLimitGigabytes == limit))
             }
         }
-        entries.append(.mediaInfo(strings.text("Your messages and files in the cloud are never deleted — only the copies downloaded to this phone.", "Ваши сообщения и файлы в облаке не удаляются — стираются только копии, скачанные на этот телефон.")))
+        entries.append(.speedBoostEnabled(strings.text("Speed Boost", "Ускорить загрузку"), settings.speedBoost > 0))
+        if settings.speedBoost > 0 {
+            for (index, level) in [Int32(1), 2].enumerated() {
+                let title = level == 1
+                    ? strings.text("Moderate", "Умеренно")
+                    : strings.text("Maximum", "Максимально")
+                entries.append(.speedBoostLevel(Int32(index), title, level, settings.speedBoost == level))
+            }
+        }
+        entries.append(.mediaInfo(strings.text("Your messages and files in the cloud are never deleted — only the copies downloaded to this phone. Speed Boost asks the server for more pieces at once; on a weak network that can backfire, so lower it if transfers get worse.", "Ваши сообщения и файлы в облаке не удаляются — стираются только копии, скачанные на этот телефон. Ускорение запрашивает у сервера больше кусков сразу; на слабой сети это может выйти боком — тогда снизьте уровень или выключите.")))
 
     case .appearance:
         entries.append(.appearanceHeader(telewhiteTabTitle(.appearance, strings: strings)))
