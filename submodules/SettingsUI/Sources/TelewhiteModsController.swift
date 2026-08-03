@@ -482,10 +482,14 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case appearanceHeader(String)
     case accentColorLink(String, UIColor)
     case bubbleColorLink(String, UIColor)
-    case chatListRows(Int32, String, Int32, Bool)
-    case settingsIconVariant(Int32, String, Int32, Bool)
+    // Telewhite: one row each, showing the current value on the right and stepping to the
+    // next on tap. A checkbox per value was eleven rows for three settings and buried
+    // everything else on the screen; a sub-screen per setting would have hidden them a tap
+    // deep instead. Payload is (title, current value label).
+    case chatListRows(String, String)
+    case settingsIconVariant(String, String)
     case chatTextLink(String)
-    case chatListDensity(Int32, String, Int32, Bool)
+    case chatListDensity(String, String)
     case chatSplitLandscape(String, Bool)
     case amoledMode(String, Bool)
     case chatTextHeader(String)
@@ -627,16 +631,16 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 701
         case .bubbleColorLink:
             return 702
-        case let .chatListDensity(index, _, _, _):
-            return 703 + index
-        case let .chatListRows(index, _, _, _):
-            return 707 + index
+        case .chatListDensity:
+            return 703
+        case .chatListRows:
+            return 704
         case .chatSplitLandscape:
             return 710
         case .amoledMode:
             return 711
-        case let .settingsIconVariant(index, _, _, _):
-            return 712 + index
+        case .settingsIconVariant:
+            return 712
         case .chatTextLink:
             return 720
         case .appearanceInfo:
@@ -671,6 +675,20 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             arguments.updateSettings { current in
                 var updated = current
                 apply(&updated, newValue)
+                return updated
+            }
+        })
+    }
+
+    // A setting with a handful of values on a single row: the current one is shown on the
+    // right and each tap steps to the next, wrapping round. No arrow, because nothing is
+    // pushed — the change lands immediately and, for all three settings that use this, is
+    // visible on screen straight away.
+    private func stepperItem(presentationData: ItemListPresentationData, arguments: TelewhiteModsControllerArguments, text: String, label: String, step: @escaping (inout TelewhiteModsSettings) -> Void) -> ListViewItem {
+        return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: label, labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .none, action: {
+            arguments.updateSettings { current in
+                var updated = current
+                step(&updated)
                 return updated
             }
         })
@@ -891,14 +909,10 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.hideStories = value
             }
-        case let .chatListDensity(_, text, value, selected):
-            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: text, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
-                arguments.updateSettings { current in
-                    var updated = current
-                    updated.chatListDensity = value
-                    return updated
-                }
-            })
+        case let .chatListDensity(text, label):
+            return self.stepperItem(presentationData: presentationData, arguments: arguments, text: text, label: label) { settings in
+                settings.chatListDensity = (settings.chatListDensity + 1) % 4
+            }
         case let .chatSplitLandscape(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.chatSplitLandscape = value
@@ -907,22 +921,15 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.amoledMode = value
             }
-        case let .chatListRows(_, text, value, selected):
-            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: text, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
-                arguments.updateSettings { current in
-                    var updated = current
-                    updated.chatListRows = value
-                    return updated
-                }
-            })
-        case let .settingsIconVariant(_, text, value, selected):
-            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: text, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
-                arguments.updateSettings { current in
-                    var updated = current
-                    updated.settingsIconVariant = value
-                    return updated
-                }
-            })
+        case let .chatListRows(text, label):
+            // 1...3 rather than 0...n, so the step wraps through the modulus differently.
+            return self.stepperItem(presentationData: presentationData, arguments: arguments, text: text, label: label) { settings in
+                settings.chatListRows = settings.chatListRows % 3 + 1
+            }
+        case let .settingsIconVariant(text, label):
+            return self.stepperItem(presentationData: presentationData, arguments: arguments, text: text, label: label) { settings in
+                settings.settingsIconVariant = (settings.settingsIconVariant + 1) % 4
+            }
         case let .pushStatus(text, value):
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: value, labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .none, action: nil)
         case let .pushToken(text, value):
@@ -1166,8 +1173,6 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
         return text("When downloaded photos and videos take up more than the limit, the oldest ones are deleted. Nothing is lost — anything you open again is downloaded from Telegram.", "Когда скачанные фото и видео займут больше лимита, самые старые удаляются. Ничего не теряется — при открытии всё снова скачается из Telegram.")
     case .speedBoostEnabled:
         return text("Downloads and uploads media in more pieces at a time. Helps most on a fast connection; on a weak one it can make things slower.", "Качает и отправляет медиа большим числом кусков сразу. Сильнее всего помогает на быстром соединении; на слабом может, наоборот, замедлить.")
-    case .chatListDensity:
-        return text("Shrinks the avatar and tightens the row, so more chats fit on the screen. The text column follows the avatar, so the row gets narrower as well as shorter.", "Уменьшает аватарку и поджимает строку — на экране помещается больше чатов. Текст сдвигается вслед за аватаркой, поэтому строка становится не только ниже, но и уже.")
     case .chatSplitLandscape:
         return text("Turn the phone sideways and the chat list stays next to the open chat, like on a computer.", "Поверните телефон горизонтально — список чатов останется рядом с открытым чатом, как на компьютере.")
     case .amoledMode:
@@ -1281,55 +1286,49 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.bubbleColorLink(strings.text("Outgoing Bubble Color", "Цвет исходящих сообщений"), bubbleColor))
         // Telewhite: how tightly the chat list is packed. Level 0 is stock Telegram, so
         // the default leaves the list exactly as it was.
-        for (index, density) in [Int32(0), 1, 2, 3].enumerated() {
-            let title: String
-            switch density {
-            case 1:
-                title = strings.text("Chat List: Snug", "Список чатов: плотнее")
-            case 2:
-                title = strings.text("Chat List: Tight", "Список чатов: плотно")
-            case 3:
-                title = strings.text("Chat List: Tightest", "Список чатов: очень плотно")
-            default:
-                title = strings.text("Chat List: Roomy", "Список чатов: просторно")
-            }
-            entries.append(.chatListDensity(Int32(index), title, density, settings.chatListDensity == density))
+        let densityLabel: String
+        switch settings.chatListDensity {
+        case 1:
+            densityLabel = strings.text("Snug", "плотнее")
+        case 2:
+            densityLabel = strings.text("Tight", "плотно")
+        case 3:
+            densityLabel = strings.text("Tightest", "очень плотно")
+        default:
+            densityLabel = strings.text("Roomy", "просторно")
         }
+        entries.append(.chatListDensity(strings.text("Chat List Density", "Плотность списка чатов"), densityLabel))
         // Telewhite: rows under the chat name. Two is the stock layout, so the default
         // changes nothing for anyone who never opens this screen.
-        for (index, rows) in [Int32(1), 2, 3].enumerated() {
-            let title: String
-            switch rows {
-            case 1:
-                title = strings.text("Chat List: One Line", "Список чатов: одна строка")
-            case 3:
-                title = strings.text("Chat List: Three Lines", "Список чатов: три строки")
-            default:
-                title = strings.text("Chat List: Two Lines", "Список чатов: две строки")
-            }
-            entries.append(.chatListRows(Int32(index), title, rows, settings.chatListRows == rows))
+        let rowsLabel: String
+        switch settings.chatListRows {
+        case 1:
+            rowsLabel = strings.text("One Line", "одна строка")
+        case 3:
+            rowsLabel = strings.text("Three Lines", "три строки")
+        default:
+            rowsLabel = strings.text("Two Lines", "две строки")
         }
+        entries.append(.chatListRows(strings.text("Lines in the Chat List", "Строк в списке чатов"), rowsLabel))
         entries.append(.chatSplitLandscape(strings.text("Split View in Landscape", "Сплит чатов (альбомная)"), settings.chatSplitLandscape))
         entries.append(.amoledMode(strings.text("AMOLED Mode", "AMOLED режим"), settings.amoledMode))
         // Telewhite: the icon style is offered rather than decided. All four are the
         // same symbol table drawn differently, so shipping the choice costs no more
         // than shipping one opinion — see TelewhiteSettingsIcons.swift.
-        for (index, variant) in [Int32(0), 1, 2, 3].enumerated() {
-            let title: String
-            switch variant {
-            case 1:
-                title = strings.text("Icons: Outlined", "Иконки: контурные")
-            case 2:
-                title = strings.text("Icons: Thin, Gray", "Иконки: тонкие серые")
-            case 3:
-                title = strings.text("Icons: In a Ring", "Иконки: в кольце")
-            default:
-                title = strings.text("Icons: Solid", "Иконки: заливкой")
-            }
-            entries.append(.settingsIconVariant(Int32(index), title, variant, settings.settingsIconVariant == variant))
+        let iconLabel: String
+        switch settings.settingsIconVariant {
+        case 1:
+            iconLabel = strings.text("Outlined", "контурные")
+        case 2:
+            iconLabel = strings.text("Thin, Gray", "тонкие серые")
+        case 3:
+            iconLabel = strings.text("In a Ring", "в кольце")
+        default:
+            iconLabel = strings.text("Solid", "заливкой")
         }
+        entries.append(.settingsIconVariant(strings.text("Settings Icons", "Иконки настроек"), iconLabel))
         entries.append(.chatTextLink(strings.text("Chat Text", "Текст в чате")))
-        entries.append(.appearanceInfo(strings.text("Tap a colour row to mix your own shade — colour wheel, sliders, HEX or the eyedropper. AMOLED mode deepens the background to true black. The icon rows restyle every glyph in Settings; the change shows up straight away, no restart.", "Нажмите на строку цвета и подберите свой оттенок — колесо, ползунки, HEX или пипетка. AMOLED-режим делает фон полностью чёрным. Строки с иконками меняют вид всех значков в настройках — результат виден сразу, перезапуск не нужен.")))
+        entries.append(.appearanceInfo(strings.text("Tap a colour row to mix your own shade — colour wheel, sliders, HEX or the eyedropper. Density, lines and icons step to the next value on every tap; each change shows up straight away, so tap until it looks right. Density shrinks the avatar and pulls the text in with it; lines is how much of a message you see under the name.", "Нажмите на строку цвета и подберите свой оттенок — колесо, ползунки, HEX или пипетка. Плотность, строки и иконки переключаются по кругу с каждым нажатием, и результат виден сразу — нажимайте, пока не понравится. Плотность уменьшает аватарку и подтягивает за ней текст, строки — сколько текста сообщения видно под именем.")))
 
     case .chatText:
         entries.append(.chatTextHeader(strings.text("Chat Text", "Текст в чате")))
