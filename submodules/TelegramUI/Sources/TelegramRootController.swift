@@ -198,15 +198,12 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         super.containerLayoutUpdated(layout, transition: transition)
     }
     
-    // Telewhite: the mod wins over the stock Calls tab setting. Applied here rather than at
-    // the call sites because both entry points funnel through these two functions, so one
-    // gate cannot be bypassed by a caller that forgets it.
-    private var telewhiteHidesCallsTab: Bool {
-        return UserDefaults.standard.bool(forKey: "telewhite.mods.hideCallsTab")
-    }
-
+    // Telewhite: the Calls tab is gone for good — not hidden behind a switch, removed. The
+    // `showCallsTab` argument and the stock CallListSettings that feeds it are left in place
+    // so nothing upstream has to change; the tab is simply never appended. The controller
+    // itself is still built and retained, because tabBarActivateSearch and friends still
+    // reference it.
     public func addRootControllers(showCallsTab: Bool) {
-        let showCallsTab = showCallsTab && !self.telewhiteHidesCallsTab
         let tabBarController = TabBarControllerImpl(theme: self.presentationData.theme, strings: self.presentationData.strings)
         tabBarController.navigationPresentation = .master
         let chatListController = self.context.sharedContext.makeChatListController(context: self.context, location: .chatList(groupId: .root), controlsHistoryPreload: true, hideNetworkActivityStatus: false, previewing: false, enableDebugActions: !GlobalExperimentalSettings.isAppStoreBuild)
@@ -223,9 +220,6 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         }
         controllers.append(contactsController)
         
-        if showCallsTab {
-            controllers.append(callListController)
-        }
         controllers.append(chatListController)
         
         var restoreSettignsController: (ViewController & SettingsController)?
@@ -258,15 +252,11 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
     }
         
     public func updateRootControllers(showCallsTab: Bool) {
-        let showCallsTab = showCallsTab && !self.telewhiteHidesCallsTab
         guard let rootTabController = self.rootTabController as? TabBarControllerImpl else {
             return
         }
         var controllers: [ViewController] = []
         controllers.append(self.contactsController!)
-        if showCallsTab {
-            controllers.append(self.callListController!)
-        }
         controllers.append(self.chatListController!)
         controllers.append(self.accountSettingsController!)
         

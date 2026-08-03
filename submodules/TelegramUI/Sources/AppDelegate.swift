@@ -973,14 +973,13 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
                 // highlight on a sideloaded build and no way to clear the override.
                 var icons = [
                     PresentationAppIcon(name: "Blue", imageName: "BlueIcon", isDefault: true),
-                    // The three glass icons are dropped from the picker on the owner's call:
-                    // the two PNG ones only imitate glass, and the row artwork is identical
-                    // for all three, so the list read as three near-duplicates. The assets
-                    // and the Icon Composer bundle are still in the build — putting a row
-                    // back is one line here.
-                    PresentationAppIcon(name: "TelewhiteGhost", imageName: "TelewhiteGhost"),
-                    PresentationAppIcon(name: "TelewhiteWhite", imageName: "TelewhiteWhite"),
-                    PresentationAppIcon(name: "TelewhiteNeon", imageName: "TelewhiteNeon"),
+                    // The picker is down to the default plus the colour set, on the owner's
+                    // call. Gone: the three glass icons (identical row artwork, and the two
+                    // PNG ones only imitated glass), the three Premium ones (gated on a
+                    // subscription this build does not have, so they could only be tapped and
+                    // refused), the stock shapes — Classic, Classic X, Filled, Filled X,
+                    // Default X, Telegram, and both "new" ones — and Ghost, White and Neon.
+                    // Every asset is still in the build; restoring a row is one line here.
                     PresentationAppIcon(name: "TelewhiteRed", imageName: "TelewhiteRed"),
                     PresentationAppIcon(name: "TelewhiteGreen", imageName: "TelewhiteGreen"),
                     PresentationAppIcon(name: "TelewhiteOrange", imageName: "TelewhiteOrange"),
@@ -991,15 +990,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
                     PresentationAppIcon(name: "TelewhiteMint", imageName: "TelewhiteMint"),
                     PresentationAppIcon(name: "TelewhiteIndigo", imageName: "TelewhiteIndigo"),
                     PresentationAppIcon(name: "TelewhiteBrown", imageName: "TelewhiteBrown"),
-                    PresentationAppIcon(name: "TelewhiteGraphite", imageName: "TelewhiteGraphite"),
-                    PresentationAppIcon(name: "New2", imageName: "New2"),
-                    PresentationAppIcon(name: "New1", imageName: "New1"),
-                    PresentationAppIcon(name: "Black", imageName: "BlackIcon"),
-                    PresentationAppIcon(name: "BlueClassic", imageName: "BlueClassicIcon"),
-                    PresentationAppIcon(name: "BlackClassic", imageName: "BlackClassicIcon"),
-                    PresentationAppIcon(name: "BlueFilled", imageName: "BlueFilledIcon"),
-                    PresentationAppIcon(name: "BlackFilled", imageName: "BlackFilledIcon"),
-                    PresentationAppIcon(name: "FontAwesomeTelegramIcon", imageName: "FontAwesomeTelegramIcon")
+                    PresentationAppIcon(name: "TelewhiteGraphite", imageName: "TelewhiteGraphite")
                 ]
                 icons.append(PresentationAppIcon(name: "WhiteFilled", imageName: "WhiteFilledIcon"))
 

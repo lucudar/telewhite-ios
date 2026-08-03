@@ -50,7 +50,6 @@ public struct TelewhiteModsSettings: Equatable {
     public var speedBoost: Int32
     public var settingsIconVariant: Int32
     public var chatListRows: Int32
-    public var hideCallsTab: Bool
     public var translateButtonInChat: Bool
     public var channelHideReactions: Bool
     public var channelHideComments: Bool
@@ -101,7 +100,6 @@ public struct TelewhiteModsSettings: Equatable {
         static let speedBoost = "telewhite.mods.speedBoost"
         static let settingsIconVariant = "telewhite.mods.settingsIconVariant"
         static let chatListRows = "telewhite.mods.chatListRows"
-        static let hideCallsTab = "telewhite.mods.hideCallsTab"
         static let translateButtonInChat = "telewhite.mods.translateButtonInChat"
         static let channelHideReactions = "telewhite.mods.channelHideReactions"
         static let channelHideComments = "telewhite.mods.channelHideComments"
@@ -190,9 +188,6 @@ public struct TelewhiteModsSettings: Equatable {
             speedBoost: min(2, max(0, (defaults.object(forKey: Key.speedBoost) as? NSNumber)?.int32Value ?? 0)),
             settingsIconVariant: min(3, max(0, (defaults.object(forKey: Key.settingsIconVariant) as? NSNumber)?.int32Value ?? 0)),
             chatListRows: min(3, max(1, (defaults.object(forKey: Key.chatListRows) as? NSNumber)?.int32Value ?? 2)),
-            // Hidden out of the box on the owner's call — the tab was never useful to them.
-            // Still a switch, so it can come back without a rebuild.
-            hideCallsTab: defaults.object(forKey: Key.hideCallsTab) as? Bool ?? true,
             translateButtonInChat: defaults.object(forKey: Key.translateButtonInChat) as? Bool ?? true,
             channelHideReactions: defaults.bool(forKey: Key.channelHideReactions),
             channelHideComments: defaults.bool(forKey: Key.channelHideComments),
@@ -321,7 +316,6 @@ public struct TelewhiteModsSettings: Equatable {
         defaults.set(self.speedBoost, forKey: Key.speedBoost)
         defaults.set(self.settingsIconVariant, forKey: Key.settingsIconVariant)
         defaults.set(self.chatListRows, forKey: Key.chatListRows)
-        defaults.set(self.hideCallsTab, forKey: Key.hideCallsTab)
         defaults.set(self.translateButtonInChat, forKey: Key.translateButtonInChat)
         defaults.set(self.channelHideReactions, forKey: Key.channelHideReactions)
         defaults.set(self.channelHideComments, forKey: Key.channelHideComments)
@@ -497,7 +491,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     // deep instead. Payload is (title, current value label).
     case chatListLookLink(String, String)
     case settingsIconsLink(String, String)
-    case hideCallsTab(String, Bool)
     case chatTextLink(String)
 
     // Rows of the two screens those links open.
@@ -541,7 +534,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.channels.rawValue
         case .mediaHeader, .downloadStories, .hideStories, .autoCacheCleanup, .cacheLimit, .speedBoostEnabled, .speedBoostLevel, .mediaInfo:
             return TelewhiteModsSection.media.rawValue
-        case .appearanceHeader, .accentColorLink, .bubbleColorLink, .chatListLookLink, .chatSplitLandscape, .amoledMode, .settingsIconsLink, .hideCallsTab, .chatTextLink, .appearanceInfo:
+        case .appearanceHeader, .accentColorLink, .bubbleColorLink, .chatListLookLink, .chatSplitLandscape, .amoledMode, .settingsIconsLink, .chatTextLink, .appearanceInfo:
             return TelewhiteModsSection.appearance.rawValue
         case .chatTextHeader, .chatFontSizeOption, .chatTextInfo:
             return TelewhiteModsSection.chatText.rawValue
@@ -663,8 +656,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 711
         case .settingsIconsLink:
             return 712
-        case .hideCallsTab:
-            return 713
         case .chatTextLink:
             return 720
         case .appearanceInfo:
@@ -947,10 +938,6 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: label, labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                 arguments.openTab(.settingsIcons)
             })
-        case let .hideCallsTab(text, value):
-            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
-                settings.hideCallsTab = value
-            }
         case let .chatListDensity(_, text, value, selected):
             return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: text, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
                 arguments.updateSettings { current in
@@ -1271,8 +1258,6 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
         return text("Downloads and uploads media in more pieces at a time. Helps most on a fast connection; on a weak one it can make things slower.", "Качает и отправляет медиа большим числом кусков сразу. Сильнее всего помогает на быстром соединении; на слабом может, наоборот, замедлить.")
     case .chatSplitLandscape:
         return text("Turn the phone sideways and the chat list stays next to the open chat, like on a computer.", "Поверните телефон горизонтально — список чатов останется рядом с открытым чатом, как на компьютере.")
-    case .hideCallsTab:
-        return text("Removes the Calls tab from the bar at the bottom. Calls still work and the history stays — it is only the tab that goes.", "Убирает вкладку «Звонки» из панели внизу. Звонки продолжают работать, история сохраняется — пропадает только вкладка.")
     case .amoledMode:
         return text("Makes the dark theme pure black. On OLED screens black pixels are switched off, so it also saves battery.", "Делает тёмную тему полностью чёрной. На OLED-экранах чёрные пиксели не светятся, поэтому расходуется меньше заряда.")
     default:
@@ -1388,7 +1373,6 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.chatSplitLandscape(strings.text("Split View in Landscape", "Сплит чатов (альбомная)"), settings.chatSplitLandscape))
         entries.append(.amoledMode(strings.text("AMOLED Mode", "AMOLED режим"), settings.amoledMode))
         entries.append(.settingsIconsLink(strings.text("Settings Icons", "Иконки настроек"), telewhiteIconVariantName(settings.settingsIconVariant, strings: strings)))
-        entries.append(.hideCallsTab(strings.text("Hide the Calls Tab", "Скрыть вкладку «Звонки»"), settings.hideCallsTab))
         entries.append(.chatTextLink(strings.text("Chat Text", "Текст в чате")))
         entries.append(.appearanceInfo(strings.text("Tap a colour row to mix your own shade — colour wheel, sliders, HEX or the eyedropper. AMOLED mode deepens the background to true black.", "Нажмите на строку цвета и подберите свой оттенок — колесо, ползунки, HEX или пипетка. AMOLED-режим делает фон полностью чёрным.")))
 

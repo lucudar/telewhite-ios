@@ -802,35 +802,13 @@ final class AuthorizedApplicationContext {
             }
         })
         
-        // Telewhite: the mod lives in UserDefaults, not in shared data, so it has to be
-        // folded in as its own signal — otherwise the tab would only appear or disappear on
-        // the next launch. The notification name is duplicated as a string on purpose: it
-        // belongs to SettingsUI, and reaching for that type from here would be a dependency
-        // the other Telewhite hooks deliberately avoid.
-        let telewhiteHideCallsTabSignal = Signal<Bool, NoError> { subscriber in
-            let emit: () -> Void = {
-                subscriber.putNext(UserDefaults.standard.bool(forKey: "telewhite.mods.hideCallsTab"))
-            }
-            emit()
-            let observer = NotificationCenter.default.addObserver(forName: Notification.Name("TelewhiteModsSettingsDidChange"), object: nil, queue: .main, using: { _ in
-                emit()
-            })
-            return ActionDisposable {
-                NotificationCenter.default.removeObserver(observer)
-            }
-        }
-        |> distinctUntilChanged
-
-        let showCallsTabSignal = combineLatest(
-            context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.callListSettings]),
-            telewhiteHideCallsTabSignal
-        )
-        |> map { sharedData, telewhiteHidesCallsTab -> Bool in
+        let showCallsTabSignal = context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.callListSettings])
+        |> map { sharedData -> Bool in
             var value = CallListSettings.defaultSettings.showTab
             if let settings = sharedData.entries[ApplicationSpecificSharedDataKeys.callListSettings]?.get(CallListSettings.self) {
                 value = settings.showTab
             }
-            return value && !telewhiteHidesCallsTab
+            return value
         }
         self.showCallsTabDisposable = (showCallsTabSignal |> deliverOnMainQueue).start(next: { [weak self] value in
             if let strongSelf = self {
