@@ -416,7 +416,13 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
                         messageEntities = updatingMedia.entities?.entities ?? []
                     }
                     
-                    let translateToLanguage = item.associatedData.translateToLanguage
+                    // Telewhite: with the chat-wide bar off, a message translated on its own
+                    // supplies the target language itself, so the rendering below — which
+                    // already swaps in TranslationMessageAttribute — needs no other change.
+                    var translateToLanguage = item.associatedData.translateToLanguage
+                    if translateToLanguage == nil, item.controllerInteraction.telewhiteTranslatedMessageIds.contains(item.message.id) {
+                        translateToLanguage = telewhiteMessageTranslationTargetLanguage(fallback: item.presentationData.strings.baseLanguageCode)
+                    }
                     var isSummarized = false
                     if item.controllerInteraction.summarizedMessageIds.contains(item.message.id) {
                         isSummarized = true

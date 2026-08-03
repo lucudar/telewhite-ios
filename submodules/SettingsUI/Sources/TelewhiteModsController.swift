@@ -51,6 +51,7 @@ public struct TelewhiteModsSettings: Equatable {
     public var settingsIconVariant: Int32
     public var chatListRows: Int32
     public var hideCallsTab: Bool
+    public var translateButtonInChat: Bool
     public var channelHideReactions: Bool
     public var channelHideComments: Bool
     public var channelHideShareButton: Bool
@@ -101,6 +102,7 @@ public struct TelewhiteModsSettings: Equatable {
         static let settingsIconVariant = "telewhite.mods.settingsIconVariant"
         static let chatListRows = "telewhite.mods.chatListRows"
         static let hideCallsTab = "telewhite.mods.hideCallsTab"
+        static let translateButtonInChat = "telewhite.mods.translateButtonInChat"
         static let channelHideReactions = "telewhite.mods.channelHideReactions"
         static let channelHideComments = "telewhite.mods.channelHideComments"
         static let channelHideShareButton = "telewhite.mods.channelHideShareButton"
@@ -188,7 +190,10 @@ public struct TelewhiteModsSettings: Equatable {
             speedBoost: min(2, max(0, (defaults.object(forKey: Key.speedBoost) as? NSNumber)?.int32Value ?? 0)),
             settingsIconVariant: min(3, max(0, (defaults.object(forKey: Key.settingsIconVariant) as? NSNumber)?.int32Value ?? 0)),
             chatListRows: min(3, max(1, (defaults.object(forKey: Key.chatListRows) as? NSNumber)?.int32Value ?? 2)),
-            hideCallsTab: defaults.bool(forKey: Key.hideCallsTab),
+            // Hidden out of the box on the owner's call — the tab was never useful to them.
+            // Still a switch, so it can come back without a rebuild.
+            hideCallsTab: defaults.object(forKey: Key.hideCallsTab) as? Bool ?? true,
+            translateButtonInChat: defaults.object(forKey: Key.translateButtonInChat) as? Bool ?? true,
             channelHideReactions: defaults.bool(forKey: Key.channelHideReactions),
             channelHideComments: defaults.bool(forKey: Key.channelHideComments),
             channelHideShareButton: defaults.bool(forKey: Key.channelHideShareButton),
@@ -317,6 +322,7 @@ public struct TelewhiteModsSettings: Equatable {
         defaults.set(self.settingsIconVariant, forKey: Key.settingsIconVariant)
         defaults.set(self.chatListRows, forKey: Key.chatListRows)
         defaults.set(self.hideCallsTab, forKey: Key.hideCallsTab)
+        defaults.set(self.translateButtonInChat, forKey: Key.translateButtonInChat)
         defaults.set(self.channelHideReactions, forKey: Key.channelHideReactions)
         defaults.set(self.channelHideComments, forKey: Key.channelHideComments)
         defaults.set(self.channelHideShareButton, forKey: Key.channelHideShareButton)
@@ -447,6 +453,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case translationTargetLanguage(String, String)
     case outgoingTranslateButtonEnabled(String, Bool)
     case translateVoiceMessages(String, Bool)
+    case translateButtonInChat(String, Bool)
     case translatorInfo(String)
 
     case translationLanguageHeader(String)
@@ -522,7 +529,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.menu.rawValue
         case .messengerHeader, .preserveDeletedMessages, .backgroundMessageRefresh, .keepTimedMessages, .forwardHideNamesByDefault, .showPreviousEditedText, .oneTimeMedia, .hdPhotos, .quickForwardToSaved, .showReadDateOnTap, .translatorLink, .messengerInfo:
             return TelewhiteModsSection.messenger.rawValue
-        case .translatorHeader, .translateMessages, .autoTranslateEnglish, .translationTargetLanguage, .outgoingTranslateButtonEnabled, .localTranscription, .translateVoiceMessages, .translatorInfo:
+        case .translatorHeader, .translateMessages, .autoTranslateEnglish, .translationTargetLanguage, .outgoingTranslateButtonEnabled, .localTranscription, .translateVoiceMessages, .translateButtonInChat, .translatorInfo:
             return TelewhiteModsSection.translator.rawValue
         case .translationLanguageHeader, .translationLanguageOption:
             return TelewhiteModsSection.translationLanguage.rawValue
@@ -589,6 +596,8 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 55
         case .translateVoiceMessages:
             return 56
+        case .translateButtonInChat:
+            return 57
         case .translatorInfo:
             return 58
         case .translationLanguageHeader:
@@ -841,6 +850,10 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
         case let .hdPhotos(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.hdPhotos = value
+            }
+        case let .translateButtonInChat(text, value):
+            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
+                settings.translateButtonInChat = value
             }
         case let .translateVoiceMessages(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
@@ -1230,6 +1243,8 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
         return text("Puts a translator button at the top of private chats: tap it and your messages are sent translated, hold it to pick the language.", "Ставит кнопку переводчика в шапку личных чатов: нажатие — ваши сообщения уходят переведёнными, долгое нажатие — выбор языка.")
     case .localTranscription:
         return text("Turns voice messages into text without Premium. The phone does the recognition itself, so the audio is not sent anywhere and it works offline. The first time, iOS asks for permission.", "Превращает голосовые в текст без Premium. Распознаёт сам телефон, поэтому звук никуда не отправляется и работает без интернета. При первом включении iOS спросит разрешение.")
+    case .translateButtonInChat:
+        return text("Puts a small round button beside every incoming message. Tap it and the translation appears inside the bubble; tap again for the original. The stored message is not changed, so copying and forwarding still give the original text.", "Ставит маленькую круглую кнопку рядом с каждым входящим сообщением. Нажали — перевод появляется прямо в пузыре, нажали снова — вернулся оригинал. Само сообщение не меняется, поэтому копирование и пересылка по-прежнему дают исходный текст.")
     case .translateVoiceMessages:
         return text("Voice messages in other languages get a translation under the transcript.", "Под расшифровкой голосового на чужом языке появляется перевод.")
     case .protectionBypass:
@@ -1302,6 +1317,7 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.outgoingTranslateButtonEnabled(strings.text("Translate What You Send", "Переводить то, что вы пишете"), settings.outgoingTranslateButtonEnabled))
         entries.append(.localTranscription(strings.text("Voice to Text Without Premium", "Расшифровка голосовых без Premium"), settings.localTranscription))
         entries.append(.translateVoiceMessages(strings.text("Translate Voice Messages", "Переводить голосовые"), settings.translateVoiceMessages))
+        entries.append(.translateButtonInChat(strings.text("Translate Button on Messages", "Кнопка перевода у сообщений"), settings.translateButtonInChat))
         entries.append(.translatorInfo(strings.text("Translation is free and needs no account. Messages already in your language are never translated.", "Перевод бесплатный и не требует аккаунта. Сообщения, уже написанные на вашем языке, не переводятся.")))
 
     case .translationLanguage:
