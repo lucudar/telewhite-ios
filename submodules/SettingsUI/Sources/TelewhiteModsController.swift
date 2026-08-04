@@ -41,6 +41,9 @@ public struct TelewhiteModsSettings: Equatable {
     public var downloadStories: Bool
     public var chatFontSizeOverride: Int32
     public var outgoingTranslateButtonEnabled: Bool
+    public var outgoingTranslateInPrivate: Bool
+    public var outgoingTranslateInGroups: Bool
+    public var outgoingTranslateInBots: Bool
     public var outgoingTranslationPeerIds: Set<Int64>
     public var outgoingTranslationLanguages: [Int64: String]
     public var forwardHideNamesByDefault: Bool
@@ -93,6 +96,9 @@ public struct TelewhiteModsSettings: Equatable {
         static let downloadStories = "telewhite.mods.downloadStories"
         static let chatFontSizeOverride = "telewhite.mods.chatFontSizeOverride"
         static let outgoingTranslateButtonEnabled = "telewhite.mods.outgoingTranslateButtonEnabled"
+        static let outgoingTranslateInPrivate = "telewhite.mods.outgoingTranslateInPrivate"
+        static let outgoingTranslateInGroups = "telewhite.mods.outgoingTranslateInGroups"
+        static let outgoingTranslateInBots = "telewhite.mods.outgoingTranslateInBots"
         static let outgoingTranslationPeerIds = "telewhite.mods.outgoingTranslationPeerIds"
         static let outgoingTranslationLanguages = "telewhite.mods.outgoingTranslationLanguages"
         static let forwardHideNamesByDefault = "telewhite.mods.forwardHideNamesByDefault"
@@ -173,6 +179,9 @@ public struct TelewhiteModsSettings: Equatable {
             downloadStories: defaults.bool(forKey: Key.downloadStories),
             chatFontSizeOverride: (defaults.object(forKey: Key.chatFontSizeOverride) as? NSNumber)?.int32Value ?? 0,
             outgoingTranslateButtonEnabled: defaults.object(forKey: Key.outgoingTranslateButtonEnabled) as? Bool ?? true,
+            outgoingTranslateInPrivate: defaults.object(forKey: Key.outgoingTranslateInPrivate) as? Bool ?? true,
+            outgoingTranslateInGroups: defaults.object(forKey: Key.outgoingTranslateInGroups) as? Bool ?? true,
+            outgoingTranslateInBots: defaults.object(forKey: Key.outgoingTranslateInBots) as? Bool ?? true,
             outgoingTranslationPeerIds: Set((defaults.array(forKey: Key.outgoingTranslationPeerIds) as? [NSNumber] ?? []).map { $0.int64Value }),
             outgoingTranslationLanguages: {
                 var result: [Int64: String] = [:]
@@ -313,6 +322,9 @@ public struct TelewhiteModsSettings: Equatable {
         defaults.set(self.downloadStories, forKey: Key.downloadStories)
         defaults.set(self.chatFontSizeOverride, forKey: Key.chatFontSizeOverride)
         defaults.set(self.outgoingTranslateButtonEnabled, forKey: Key.outgoingTranslateButtonEnabled)
+        defaults.set(self.outgoingTranslateInPrivate, forKey: Key.outgoingTranslateInPrivate)
+        defaults.set(self.outgoingTranslateInGroups, forKey: Key.outgoingTranslateInGroups)
+        defaults.set(self.outgoingTranslateInBots, forKey: Key.outgoingTranslateInBots)
         defaults.set(self.outgoingTranslationPeerIds.map { NSNumber(value: $0) }, forKey: Key.outgoingTranslationPeerIds)
         defaults.set(Dictionary(uniqueKeysWithValues: self.outgoingTranslationLanguages.map { (String($0.key), $0.value) }), forKey: Key.outgoingTranslationLanguages)
         defaults.set(self.forwardHideNamesByDefault, forKey: Key.forwardHideNamesByDefault)
@@ -454,6 +466,9 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case autoTranslateEnglish(String, Bool)
     case translationTargetLanguage(String, String)
     case outgoingTranslateButtonEnabled(String, Bool)
+    case outgoingTranslateInPrivate(String, Bool)
+    case outgoingTranslateInGroups(String, Bool)
+    case outgoingTranslateInBots(String, Bool)
     case translateVoiceMessages(String, Bool)
     case translateButtonInChat(String, Bool)
     case translatorInfo(String)
@@ -532,7 +547,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.menu.rawValue
         case .messengerHeader, .preserveDeletedMessages, .backgroundMessageRefresh, .keepTimedMessages, .forwardHideNamesByDefault, .showPreviousEditedText, .oneTimeMedia, .hdPhotos, .quickForwardToSaved, .showReadDateOnTap, .translatorLink, .messengerInfo:
             return TelewhiteModsSection.messenger.rawValue
-        case .translatorHeader, .translateMessages, .autoTranslateEnglish, .translationTargetLanguage, .outgoingTranslateButtonEnabled, .localTranscription, .translateVoiceMessages, .translateButtonInChat, .translatorInfo:
+        case .translatorHeader, .translateMessages, .autoTranslateEnglish, .translationTargetLanguage, .outgoingTranslateButtonEnabled, .outgoingTranslateInPrivate, .outgoingTranslateInGroups, .outgoingTranslateInBots, .localTranscription, .translateVoiceMessages, .translateButtonInChat, .translatorInfo:
             return TelewhiteModsSection.translator.rawValue
         case .translationLanguageHeader, .translationLanguageOption:
             return TelewhiteModsSection.translationLanguage.rawValue
@@ -595,14 +610,20 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 53
         case .outgoingTranslateButtonEnabled:
             return 54
-        case .localTranscription:
+        case .outgoingTranslateInPrivate:
             return 55
-        case .translateVoiceMessages:
+        case .outgoingTranslateInGroups:
             return 56
-        case .translateButtonInChat:
+        case .outgoingTranslateInBots:
             return 57
+        case .localTranscription:
+            return 70
+        case .translateVoiceMessages:
+            return 71
+        case .translateButtonInChat:
+            return 72
         case .translatorInfo:
-            return 58
+            return 80
         case .translationLanguageHeader:
             return 60
         case let .translationLanguageOption(index, _, _, _):
@@ -848,6 +869,18 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: telewhiteLanguageDisplayName(value), labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                 arguments.openTab(.translationLanguage)
             })
+        case let .outgoingTranslateInPrivate(text, value):
+            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
+                settings.outgoingTranslateInPrivate = value
+            }
+        case let .outgoingTranslateInGroups(text, value):
+            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
+                settings.outgoingTranslateInGroups = value
+            }
+        case let .outgoingTranslateInBots(text, value):
+            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
+                settings.outgoingTranslateInBots = value
+            }
         case let .outgoingTranslateButtonEnabled(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.outgoingTranslateButtonEnabled = value
@@ -1326,6 +1359,11 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.translationTargetLanguage(strings.text("Translate Into", "Переводить на"), settings.translationTargetLanguage))
         entries.append(.translateMessages(strings.text("\"Translate\" in the Message Menu", "«Перевести» в меню сообщения"), translationSettings.showTranslate))
         entries.append(.outgoingTranslateButtonEnabled(strings.text("Translate What You Send", "Переводить то, что вы пишете"), settings.outgoingTranslateButtonEnabled))
+        if settings.outgoingTranslateButtonEnabled {
+            entries.append(.outgoingTranslateInPrivate(strings.text("    In Private Chats", "    В личных чатах"), settings.outgoingTranslateInPrivate))
+            entries.append(.outgoingTranslateInGroups(strings.text("    In Groups and Channels", "    В группах и каналах"), settings.outgoingTranslateInGroups))
+            entries.append(.outgoingTranslateInBots(strings.text("    In Bots", "    В ботах"), settings.outgoingTranslateInBots))
+        }
         entries.append(.localTranscription(strings.text("Voice to Text Without Premium", "Расшифровка голосовых без Premium"), settings.localTranscription))
         entries.append(.translateVoiceMessages(strings.text("Translate Voice Messages", "Переводить голосовые"), settings.translateVoiceMessages))
         entries.append(.translateButtonInChat(strings.text("Translate Button on Messages", "Кнопка перевода у сообщений"), settings.translateButtonInChat))

@@ -501,25 +501,37 @@ func quaternaryRightNavigationButtonForChatInterfaceState(context: AccountContex
     guard let chatMainPeer = presentationInterfaceState.renderedPeer?.chatMainPeer, chatMainPeer.id != context.account.peerId, !chatMainPeer.id.isSecretChat else {
         return nil
     }
+    // Telewhite: read before the peer switch, because which kind of chat this is now decides
+    // which of the three switches applies.
+    let settings = TelewhiteModsSettings.current
+    guard settings.outgoingTranslateButtonEnabled else {
+        return nil
+    }
     switch chatMainPeer {
     case let user as TelegramUser:
         // isGenericUser excludes bots along with deleted accounts, Replies and the Telegram
         // Notifications service. Bots are let back in by hand — you write to them in your own
         // language exactly as you do to people — while the rest stay out.
-        guard user.isGenericUser || user.botInfo != nil else {
-            return nil
+        if user.botInfo != nil {
+            guard settings.outgoingTranslateInBots else {
+                return nil
+            }
+        } else {
+            guard user.isGenericUser, settings.outgoingTranslateInPrivate else {
+                return nil
+            }
         }
     case _ as TelegramGroup:
-        break
+        guard settings.outgoingTranslateInGroups else {
+            return nil
+        }
     case let channel as TelegramChannel:
-        guard channel.hasPermission(.sendSomething) else {
+        // A supergroup and a broadcast channel arrive as the same type here, so both follow
+        // the group switch; posting rights are still required either way.
+        guard channel.hasPermission(.sendSomething), settings.outgoingTranslateInGroups else {
             return nil
         }
     default:
-        return nil
-    }
-    let settings = TelewhiteModsSettings.current
-    guard settings.outgoingTranslateButtonEnabled else {
         return nil
     }
 
