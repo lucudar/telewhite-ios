@@ -24,6 +24,10 @@ import GlassBackgroundComponent
 import ComponentFlow
 import ComponentDisplayAdapters
 
+private func telewhiteRoundVideoTrimMaxDuration() -> Double {
+    return UserDefaults.standard.bool(forKey: "telewhite.mods.longRoundVideos") ? 300.0 : 60.0
+}
+
 #if SWIFT_PACKAGE
 extension AudioWaveformNode: CustomMediaPlayerScrubbingForegroundNode {
 }
@@ -535,7 +539,12 @@ public final class ChatRecordingPreviewInputPanelNodeImpl: ChatInputPanelNode {
                                 generationTimestamp: 0,
                                 position: 0,
                                 minDuration: 1.0,
-                                maxDuration: 60.0,
+                                // Telewhite: the trimmer had its own minute, so a five-minute
+                                // recording could only ever have a one-minute slice cut out of
+                                // it. Same key as the recorder's limit in
+                                // VideoMessageCameraScreen.swift; read here directly because
+                                // this module does not depend on that one.
+                                maxDuration: telewhiteRoundVideoTrimMaxDuration(),
                                 isPlaying: false,
                                 tracks: [
                                     MediaScrubberComponent.Track(
