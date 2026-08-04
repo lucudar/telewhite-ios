@@ -503,9 +503,10 @@ func quaternaryRightNavigationButtonForChatInterfaceState(context: AccountContex
     }
     switch chatMainPeer {
     case let user as TelegramUser:
-        // isGenericUser already excludes bots, deleted accounts, Replies and the
-        // Telegram Notifications service.
-        guard user.isGenericUser else {
+        // isGenericUser excludes bots along with deleted accounts, Replies and the Telegram
+        // Notifications service. Bots are let back in by hand — you write to them in your own
+        // language exactly as you do to people — while the rest stay out.
+        guard user.isGenericUser || user.botInfo != nil else {
             return nil
         }
     case _ as TelegramGroup:
