@@ -615,7 +615,12 @@ public final class ChatHistoryListNodeImpl: ListViewImpl, ChatHistoryNode, ChatH
     // account earned its rate limit. translateMessageIds now tracks both sets itself, so
     // this interval only needs to be slow enough to stop the storm while still retrying a
     // message whose request genuinely failed.
-    private let translationProcessingManager = ChatMessageThrottledProcessingManager(submitInterval: 5.0)
+    // Telewhite: the default delay is a full second, so a foreign message sat untranslated
+    // for a beat after it appeared — long enough to read the original and give up. 0.2 is
+    // the value the mention and reaction managers above already use for the same reason.
+    // submitInterval stays at 5.0: that one bounds how often the SAME message is offered
+    // again, and lowering it would re-ask for messages already in flight.
+    private let translationProcessingManager = ChatMessageThrottledProcessingManager(delay: 0.2, submitInterval: 5.0)
     private let refreshStoriesProcessingManager = ChatMessageThrottledProcessingManager()
     private let factCheckProcessingManager = ChatMessageThrottledProcessingManager(submitInterval: 1.0)
     private let inlineGroupCallsProcessingManager = ChatMessageThrottledProcessingManager(submitInterval: 1.0)

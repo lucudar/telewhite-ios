@@ -20,7 +20,10 @@ public enum TelewhiteGoogleTranslate {
     // translated once. NSCache is thread-safe and evicts itself under memory pressure.
     private static let cache: NSCache<NSString, NSString> = {
         let cache = NSCache<NSString, NSString>()
-        cache.countLimit = 600
+        // Telewhite: 600 was one long chat. Scrolling back through a second one evicted the
+        // first, so returning to it re-translated everything already seen. These are short
+        // strings; 3000 of them is a rounding error next to the media cache.
+        cache.countLimit = 3000
         return cache
     }()
     
