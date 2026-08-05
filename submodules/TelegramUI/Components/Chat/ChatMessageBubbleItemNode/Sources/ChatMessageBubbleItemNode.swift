@@ -757,10 +757,6 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
     private var mediaInfoNode: ChatMessageStarsMediaInfoNode?
     
     private var summarizeButtonNode: ChatMessageShareButton?
-    // Telewhite: the per-message translate button. A node of its own rather than a slot in
-    // the share button, because the share button is absent from exactly the chats where
-    // translating matters most — private ones.
-    private var telewhiteTranslateButtonNode: ChatMessageShareButton?
     private var shareButtonNode: ChatMessageShareButton?
     
     private let messageAccessibilityArea: AccessibilityAreaNode
@@ -1321,9 +1317,6 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
                     return .fail
                 }
 
-                if let telewhiteTranslateButtonNode = strongSelf.telewhiteTranslateButtonNode, telewhiteTranslateButtonNode.frame.contains(point) {
-                    return .fail
-                }
                 
                 if let shareButtonNode = strongSelf.shareButtonNode, shareButtonNode.frame.contains(point) {
                     return .fail
@@ -1957,30 +1950,6 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             needsShareButton = false
         }
 
-        // Telewhite: the per-message translate button. Incoming text only — outgoing has its
-        // own translator, and a message without text has nothing to translate. Secret chats
-        // are excluded for the same reason the rest of the translation stack excludes them:
-        // the text must not leave the device.
-        var needsTelewhiteTranslateButton = false
-        if telewhiteTranslateButtonInChatEnabled(), incoming, !isPreview, !isAd, !item.message.text.isEmpty, item.message.id.peerId.namespace != Namespaces.Peer.SecretChat, !Namespaces.Message.allNonRegular.contains(item.message.id.namespace) {
-            needsTelewhiteTranslateButton = true
-            if let subject = item.associatedData.subject, case .messageOptions = subject {
-                needsTelewhiteTranslateButton = false
-            }
-            for attribute in item.content.firstMessage.attributes {
-                if let attribute = attribute as? RestrictedContentMessageAttribute, attribute.platformText(platform: "ios", contentSettings: item.context.currentContentSettings.with { $0 }) != nil {
-                    needsTelewhiteTranslateButton = false
-                }
-            }
-            // Telewhite: and not on text that is already in the language the button would
-            // translate into — tapping it there handed the same sentence back. The verdict
-            // comes from the detector the automatic translation uses, so the button and the
-            // translation panel agree on what counts as "already in your language"; it is
-            // asked last because it is the only test here that has to look at the text.
-            if needsTelewhiteTranslateButton, telewhiteTextIsAlreadyInLanguage(item.message.text, toLang: telewhiteMessageTranslationTargetLanguage(fallback: item.presentationData.strings.baseLanguageCode)) {
-                needsTelewhiteTranslateButton = false
-            }
-        }
 
         /*if isInlinePage {
             needsShareButton = false
@@ -3769,7 +3738,6 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
                 mediaInfoOrigin: mediaInfoOrigin,
                 mediaInfoSizeAndApply: mediaInfoSizeApply,
                 needsSummarizeButton: needsSummarizeButton,
-                needsTelewhiteTranslateButton: needsTelewhiteTranslateButton,
                 needsShareButton: needsShareButton,
                 shareButtonOffset: shareButtonOffset,
                 avatarOffset: avatarOffset,
@@ -3873,7 +3841,6 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         mediaInfoOrigin: CGPoint?,
         mediaInfoSizeAndApply: (CGSize, (Bool) -> ChatMessageStarsMediaInfoNode?),
         needsSummarizeButton: Bool,
-        needsTelewhiteTranslateButton: Bool,
         needsShareButton: Bool,
         shareButtonOffset: CGPoint?,
         avatarOffset: CGFloat?,
@@ -4007,7 +3974,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         // sets aside for the share/summarize button, which lives in the same gutter and
         // draws above the badge.
         let telewhiteBadgeSelectionOffset: CGFloat = (item.controllerInteraction.selectionState != nil && incoming) ? 42.0 : 0.0
-        strongSelf.updateTelewhiteDeletedBadge(isDeleted: isTelewhiteDeleted, contentFrame: backgroundFrame, containerWidth: params.width - params.rightInset - telewhiteBadgeSelectionOffset, isIncoming: incoming, reservedGutterWidth: (needsShareButton || needsSummarizeButton || needsTelewhiteTranslateButton) ? 45.0 : 0.0)
+        strongSelf.updateTelewhiteDeletedBadge(isDeleted: isTelewhiteDeleted, contentFrame: backgroundFrame, containerWidth: params.width - params.rightInset - telewhiteBadgeSelectionOffset, isIncoming: incoming, reservedGutterWidth: (needsShareButton || needsSummarizeButton) ? 45.0 : 0.0)
         // The overlay darkens the whole bubble shape, so it may only appear when the whole
         // bubble is really gone.
         if isTelewhiteFullyDeleted, !hideBackground {
@@ -5285,19 +5252,6 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             summarizeButtonNode.removeFromSupernode()
         }
 
-        if needsTelewhiteTranslateButton {
-            if strongSelf.telewhiteTranslateButtonNode == nil {
-                let translateButtonNode = ChatMessageShareButton()
-                strongSelf.telewhiteTranslateButtonNode = translateButtonNode
-                strongSelf.insertSubnode(translateButtonNode, belowSubnode: strongSelf.messageAccessibilityArea)
-                translateButtonNode.pressed = { [weak strongSelf] in
-                    strongSelf?.toggleTelewhiteTranslation()
-                }
-            }
-        } else if let translateButtonNode = strongSelf.telewhiteTranslateButtonNode {
-            strongSelf.telewhiteTranslateButtonNode = nil
-            translateButtonNode.removeFromSupernode()
-        }
 
         if needsShareButton {
             if strongSelf.shareButtonNode == nil {
@@ -5516,36 +5470,6 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
                 animation.animator.updateAlpha(layer: summarizeButtonNode.layer, alpha: (isCurrentlyPlayingMedia || isSidePanelOpen) ? 0.0 : 1.0, completion: nil)
                 animation.animator.updateScale(layer: summarizeButtonNode.layer, scale: (isCurrentlyPlayingMedia || isSidePanelOpen) ? 0.001 : 1.0, completion: nil)
             }
-            if let telewhiteTranslateButtonNode = strongSelf.telewhiteTranslateButtonNode {
-                let buttonSize = telewhiteTranslateButtonNode.update(presentationData: item.presentationData, controllerInteraction: item.controllerInteraction, chatLocation: item.chatLocation, subject: item.associatedData.subject, message: EngineMessage(item.message), accountPeerId: item.context.account.peerId, disableComments: disablesComments, isTranslate: true)
-
-                var buttonFrame = CGRect(origin: CGPoint(x: !incoming ? backgroundFrame.minX - buttonSize.width - 8.0 : backgroundFrame.maxX + 8.0, y: backgroundFrame.maxY - buttonSize.height - 1.0), size: buttonSize)
-
-                if let shareButtonOffset = shareButtonOffset {
-                    if incoming {
-                        buttonFrame.origin.x = shareButtonOffset.x
-                    }
-                    buttonFrame.origin.y = buttonFrame.origin.y + shareButtonOffset.y - (buttonSize.height - 30.0)
-                } else if !disablesComments {
-                    buttonFrame.origin.y = buttonFrame.origin.y - (buttonSize.height - 30.0)
-                }
-
-                // Both this and the share button hang off the bottom of the bubble, so when
-                // the share button is there too this one stacks above it.
-                if needsShareButton {
-                    buttonFrame.origin.y -= buttonSize.height + 6.0
-                }
-
-                if isSidePanelOpen {
-                    buttonFrame.origin.x -= buttonFrame.width * 0.5
-                    buttonFrame.origin.y += buttonFrame.height * 0.5
-                }
-
-                animation.animator.updatePosition(layer: telewhiteTranslateButtonNode.layer, position: buttonFrame.center, completion: nil)
-                animation.animator.updateBounds(layer: telewhiteTranslateButtonNode.layer, bounds: CGRect(origin: CGPoint(), size: buttonFrame.size), completion: nil)
-                animation.animator.updateAlpha(layer: telewhiteTranslateButtonNode.layer, alpha: (isCurrentlyPlayingMedia || isSidePanelOpen) ? 0.0 : 1.0, completion: nil)
-                animation.animator.updateScale(layer: telewhiteTranslateButtonNode.layer, scale: (isCurrentlyPlayingMedia || isSidePanelOpen) ? 0.001 : 1.0, completion: nil)
-            }
             if let shareButtonNode = strongSelf.shareButtonNode {
                 let buttonSize = shareButtonNode.update(presentationData: item.presentationData, controllerInteraction: item.controllerInteraction, chatLocation: item.chatLocation, subject: item.associatedData.subject, message: EngineMessage(item.message), accountPeerId: item.context.account.peerId, disableComments: disablesComments)
                 
@@ -5603,36 +5527,6 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
                 animation.animator.updateBounds(layer: summarizeButtonNode.layer, bounds: CGRect(origin: CGPoint(), size: buttonFrame.size), completion: nil)
                 animation.animator.updateAlpha(layer: summarizeButtonNode.layer, alpha: (isCurrentlyPlayingMedia || isSidePanelOpen) ? 0.0 : 1.0, completion: nil)
                 animation.animator.updateScale(layer: summarizeButtonNode.layer, scale: (isCurrentlyPlayingMedia || isSidePanelOpen) ? 0.001 : 1.0, completion: nil)
-            }
-            if let telewhiteTranslateButtonNode = strongSelf.telewhiteTranslateButtonNode {
-                let buttonSize = telewhiteTranslateButtonNode.update(presentationData: item.presentationData, controllerInteraction: item.controllerInteraction, chatLocation: item.chatLocation, subject: item.associatedData.subject, message: EngineMessage(item.message), accountPeerId: item.context.account.peerId, disableComments: disablesComments, isTranslate: true)
-
-                var buttonFrame = CGRect(origin: CGPoint(x: !incoming ? backgroundFrame.minX - buttonSize.width - 8.0 : backgroundFrame.maxX + 8.0, y: backgroundFrame.maxY - buttonSize.height - 1.0), size: buttonSize)
-
-                if let shareButtonOffset = shareButtonOffset {
-                    if incoming {
-                        buttonFrame.origin.x = shareButtonOffset.x
-                    }
-                    buttonFrame.origin.y = buttonFrame.origin.y + shareButtonOffset.y - (buttonSize.height - 30.0)
-                } else if !disablesComments {
-                    buttonFrame.origin.y = buttonFrame.origin.y - (buttonSize.height - 30.0)
-                }
-
-                // Both this and the share button hang off the bottom of the bubble, so when
-                // the share button is there too this one stacks above it.
-                if needsShareButton {
-                    buttonFrame.origin.y -= buttonSize.height + 6.0
-                }
-
-                if isSidePanelOpen {
-                    buttonFrame.origin.x -= buttonFrame.width * 0.5
-                    buttonFrame.origin.y += buttonFrame.height * 0.5
-                }
-
-                animation.animator.updatePosition(layer: telewhiteTranslateButtonNode.layer, position: buttonFrame.center, completion: nil)
-                animation.animator.updateBounds(layer: telewhiteTranslateButtonNode.layer, bounds: CGRect(origin: CGPoint(), size: buttonFrame.size), completion: nil)
-                animation.animator.updateAlpha(layer: telewhiteTranslateButtonNode.layer, alpha: (isCurrentlyPlayingMedia || isSidePanelOpen) ? 0.0 : 1.0, completion: nil)
-                animation.animator.updateScale(layer: telewhiteTranslateButtonNode.layer, scale: (isCurrentlyPlayingMedia || isSidePanelOpen) ? 0.001 : 1.0, completion: nil)
             }
             if let shareButtonNode = strongSelf.shareButtonNode {
                 let buttonSize = shareButtonNode.update(presentationData: item.presentationData, controllerInteraction: item.controllerInteraction, chatLocation: item.chatLocation, subject: item.associatedData.subject, message: EngineMessage(item.message), accountPeerId: item.context.account.peerId, disableComments: disablesComments)
@@ -6683,9 +6577,6 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             return summarizeButtonNode.view.hitTest(self.view.convert(point, to: summarizeButtonNode.view), with: event)
         }
 
-        if let telewhiteTranslateButtonNode = self.telewhiteTranslateButtonNode, telewhiteTranslateButtonNode.frame.contains(point) {
-            return telewhiteTranslateButtonNode.view.hitTest(self.view.convert(point, to: telewhiteTranslateButtonNode.view), with: event)
-        }
         
         if let shareButtonNode = self.shareButtonNode, shareButtonNode.frame.contains(point) {
             return shareButtonNode.view.hitTest(self.view.convert(point, to: shareButtonNode.view), with: event)
@@ -7421,13 +7312,6 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             summarizeButtonNode.updateAbsoluteRect(summarizeButtonNodeFrame, within: containerSize)
         }
 
-        if let telewhiteTranslateButtonNode = self.telewhiteTranslateButtonNode {
-            var translateButtonNodeFrame = telewhiteTranslateButtonNode.frame
-            translateButtonNodeFrame.origin.x += rect.minX
-            translateButtonNodeFrame.origin.y += rect.minY
-
-            telewhiteTranslateButtonNode.updateAbsoluteRect(translateButtonNodeFrame, within: containerSize)
-        }
         
         if let shareButtonNode = self.shareButtonNode {
             var shareButtonNodeFrame = shareButtonNode.frame
@@ -7786,52 +7670,6 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         self.updateVisibility(isScroll: false)
     }
     
-    // Telewhite: translate this one message, or fold it back to the original. The id lives in
-    // controllerInteraction exactly as a summarized message does, and the text node reads it
-    // to decide which text to draw. The translation itself lands in the stock
-    // TranslationMessageAttribute, so the stored message is never rewritten — copying,
-    // forwarding and search keep seeing the original.
-    private func toggleTelewhiteTranslation() {
-        guard let item = self.item else {
-            return
-        }
-
-        let toLang = telewhiteMessageTranslationTargetLanguage(fallback: item.presentationData.strings.baseLanguageCode)
-
-        if item.controllerInteraction.telewhiteTranslatedMessageIds.contains(item.message.id) {
-            item.controllerInteraction.telewhiteTranslatedMessageIds.remove(item.message.id)
-            let _ = item.controllerInteraction.requestMessageUpdate(item.message.id, false, nil)
-        } else {
-            item.controllerInteraction.telewhiteTranslatedMessageIds.insert(item.message.id)
-            let _ = item.controllerInteraction.requestMessageUpdate(item.message.id, false, nil)
-
-            var hasTranslation = false
-            for attribute in item.message.attributes {
-                if let attribute = attribute as? TranslationMessageAttribute, !attribute.text.isEmpty, attribute.toLang == toLang {
-                    hasTranslation = true
-                    break
-                }
-            }
-            if !hasTranslation {
-                let messageId = item.message.id
-                let _ = (item.context.engine.messages.translateMessages(messageIds: [messageId], fromLang: nil, toLang: toLang, enableLocalIfPossible: false)
-                |> deliverOnMainQueue).start(error: { [weak self] _ in
-                    // Nothing arrived, so fold the message back rather than leaving it stuck
-                    // on the loading state.
-                    guard let self, let item = self.item else {
-                        return
-                    }
-                    item.controllerInteraction.telewhiteTranslatedMessageIds.remove(messageId)
-                    let _ = item.controllerInteraction.requestMessageUpdate(messageId, false, nil)
-                }, completed: { [weak self] in
-                    guard let self, let item = self.item else {
-                        return
-                    }
-                    let _ = item.controllerInteraction.requestMessageUpdate(messageId, false, nil)
-                })
-            }
-        }
-    }
 
     private func toggleSummarization() {
         guard let item = self.item else {

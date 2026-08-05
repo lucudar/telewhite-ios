@@ -106,7 +106,7 @@ public class ChatMessageShareButton: ASDisplayNode {
         self.morePressed?()
     }
     
-    public func update(presentationData: ChatPresentationData, controllerInteraction: ChatControllerInteraction, chatLocation: ChatLocation, subject: ChatControllerSubject?, message: EngineMessage, accountPeerId: EnginePeer.Id, disableComments: Bool = false, isSummarize: Bool = false, isTranslate: Bool = false) -> CGSize {
+    public func update(presentationData: ChatPresentationData, controllerInteraction: ChatControllerInteraction, chatLocation: ChatLocation, subject: ChatControllerSubject?, message: EngineMessage, accountPeerId: EnginePeer.Id, disableComments: Bool = false, isSummarize: Bool = false) -> CGSize {
         var isReplies = false
         var isNavigate = false
         var replyCount = 0
@@ -151,9 +151,7 @@ public class ChatMessageShareButton: ASDisplayNode {
             var updatedIconImage: UIImage?
             var updatedBottomIconImage: UIImage?
             var updatedIconOffset = CGPoint()
-            if isTranslate {
-                updatedIconImage = PresentationResourcesChat.telewhiteChatFreeTranslateButtonIcon(presentationData.theme.theme, wallpaper: presentationData.theme.wallpaper)
-            } else if isSummarize {
+            if isSummarize {
                 if isExpand {
                     updatedIconImage = PresentationResourcesChat.chatFreeExpandButtonIcon(presentationData.theme.theme, wallpaper: presentationData.theme.wallpaper)
                 } else {

@@ -1148,14 +1148,6 @@ public struct PresentationResourcesChat {
         })
     }
     
-    // Telewhite: the glyph for the per-message translate button beside a bubble. Reuses the
-    // context-menu artwork, tinted the same way the other free buttons are so it sits right
-    // on any wallpaper.
-    public static func telewhiteChatFreeTranslateButtonIcon(_ theme: PresentationTheme, wallpaper: TelegramWallpaper) -> UIImage? {
-        return theme.image(PresentationResourceKey.telewhiteChatFreeTranslateButtonIcon.rawValue, { _ in
-            return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Translate"), color: bubbleVariableColor(variableColor: theme.chat.message.shareButtonForegroundColor, wallpaper: wallpaper))
-        })
-    }
 
     public static func chatFreeCloseButtonIcon(_ theme: PresentationTheme, wallpaper: TelegramWallpaper) -> UIImage? {
         return theme.image(PresentationResourceKey.chatFreeCloseButtonIcon.rawValue, { _ in

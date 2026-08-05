@@ -157,31 +157,3 @@ public func telewhiteShouldSkipTranslation(_ text: String, toLang: String, recog
     let detected = telewhiteNormalizeLanguageCode(best.key.rawValue.lowercased())
     return detected == target
 }
-
-// Telewhite: the same question, asked from message layout instead of from the translation
-// pipeline. Layout runs off the main thread, once per bubble and again on every relayout,
-// so this wrapper adds the two things the batch path does not need: a cache, and a lock
-// around the shared recognizer — the class accumulates state per instance, and two chats
-// detecting at once through one instance is the bug the comment above warns about.
-private let telewhiteDetectionLock = NSLock()
-private let telewhiteDetectionRecognizer = NLLanguageRecognizer()
-private let telewhiteDetectionCache: NSCache<NSString, NSNumber> = {
-    let cache = NSCache<NSString, NSNumber>()
-    cache.countLimit = 512
-    return cache
-}()
-
-public func telewhiteTextIsAlreadyInLanguage(_ text: String, toLang: String) -> Bool {
-    // The detector only ever looks at the first 200 characters, so the key may too — and a
-    // long message then costs one short key instead of one the size of the message.
-    let sample = String(text.prefix(200))
-    let key = "\(telewhiteNormalizeLanguageCode(toLang.lowercased()))|\(sample)" as NSString
-    if let cached = telewhiteDetectionCache.object(forKey: key) {
-        return cached.boolValue
-    }
-    telewhiteDetectionLock.lock()
-    let result = telewhiteShouldSkipTranslation(text, toLang: toLang, recognizer: telewhiteDetectionRecognizer)
-    telewhiteDetectionLock.unlock()
-    telewhiteDetectionCache.setObject(NSNumber(value: result), forKey: key)
-    return result
-}

@@ -17,33 +17,6 @@ import WallpaperBackgroundNode
 import AnimationCache
 import MultiAnimationRenderer
 
-// Telewhite: the language a single tapped message is translated into. It lives here because
-// the bubble node (which asks for the translation) and the text node (which renders it) must
-// agree on the answer, and both already depend on this module — neither can see TranslateUI,
-// where the chat-wide equivalent lives.
-//
-// Deliberately falls back to the interface language rather than to a fixed "ru": the same
-// mistake was already made and fixed in telewhiteTranslationTargetLanguage(fallback:), where
-// an unset setting had an English-interface user's German chats translated into Russian. The
-// supported-language folding that function also does is not repeated here, because both call
-// sites of this one compare against each other, never against that function.
-public func telewhiteMessageTranslationTargetLanguage(fallback baseLang: String) -> String {
-    if let stored = UserDefaults.standard.string(forKey: "telewhite.mods.translationTargetLanguage"), !stored.isEmpty {
-        return stored
-    }
-    return baseLang
-}
-
-// Read straight from the defaults rather than carried in on the interaction, the way the
-// other Telewhite hooks do it: the flag is consulted once per message layout, and routing it
-// through the chat controller would only add wiring that can fall out of sync.
-public func telewhiteTranslateButtonInChatEnabled() -> Bool {
-    // `bool(forKey:)` reports false for a key that was never written, and the mods screen only
-    // writes on save — so on a fresh install the switch read as on while the button never
-    // appeared. Defaults have to be spelled out on both sides, exactly as every other
-    // on-by-default mod here already does.
-    return (UserDefaults.standard.object(forKey: "telewhite.mods.translateButtonInChat") as? Bool) ?? true
-}
 
 public struct ChatInterfaceHighlightedState: Equatable {
     public struct Quote: Equatable {
@@ -373,10 +346,6 @@ public final class ChatControllerInteraction: ChatControllerInteractionProtocol 
     public var chatIsRotated: Bool = true
     public var canReadHistory: Bool = false
     public var summarizedMessageIds: Set<EngineMessage.Id> = Set()
-    // Telewhite: messages the user translated one at a time, by the button beside the
-    // bubble. Modelled on summarizedMessageIds above — the chat-wide translation bar is a
-    // separate thing and stays in associatedData.
-    public var telewhiteTranslatedMessageIds: Set<EngineMessage.Id> = Set()
     public var focusedTextInputIsMedia: Bool = false
     public var focusedPollAddOptionMessageId: EngineMessage.Id?
     
