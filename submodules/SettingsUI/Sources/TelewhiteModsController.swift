@@ -405,6 +405,8 @@ private enum TelewhiteModsSection: Int32 {
     case chatText
     case chatListLook
     case settingsIcons
+    case cacheLimit
+    case speedBoost
     case developer
 }
 
@@ -429,6 +431,11 @@ private enum TelewhiteModsTab: Int32, Equatable {
     // question — how much of the chat list fits — and are judged together.
     case chatListLook
     case settingsIcons
+    // Telewhite: the storage limit and the speed level were four and two rows unfolding
+    // inside Media. Both are one choice each, and a choice belongs behind a row that
+    // shows its answer — the same shape as Chat List and Settings Icons above.
+    case cacheLimit
+    case speedBoost
 }
 
 private enum TelewhiteModsMenuIcon: Int32, Equatable {
@@ -500,9 +507,15 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case downloadStories(String, Bool)
     case hideStories(String, Bool)
     case autoCacheCleanup(String, Bool)
+    case autoCacheCleanupLink(String, String)
+    case cacheLimitHeader(String)
     case cacheLimit(Int32, String, Int32, Bool)
+    case cacheLimitInfo(String)
+    case speedBoostLink(String, String)
+    case speedBoostHeader(String)
     case speedBoostEnabled(String, Bool)
     case speedBoostLevel(Int32, String, Int32, Bool)
+    case speedBoostInfo(String)
     case longRoundVideos(String, Bool)
     case confirmVoiceSend(String, Bool)
     case mediaInfo(String)
@@ -557,8 +570,12 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.stealth.rawValue
         case .channelsHeader, .channelsDeclutter, .hideSponsoredContent, .channelsInfo:
             return TelewhiteModsSection.channels.rawValue
-        case .mediaHeader, .downloadStories, .hideStories, .autoCacheCleanup, .cacheLimit, .speedBoostEnabled, .speedBoostLevel, .longRoundVideos, .confirmVoiceSend, .mediaInfo:
+        case .mediaHeader, .downloadStories, .hideStories, .autoCacheCleanupLink, .speedBoostLink, .longRoundVideos, .confirmVoiceSend, .mediaInfo:
             return TelewhiteModsSection.media.rawValue
+        case .autoCacheCleanup, .cacheLimitHeader, .cacheLimit, .cacheLimitInfo:
+            return TelewhiteModsSection.cacheLimit.rawValue
+        case .speedBoostEnabled, .speedBoostHeader, .speedBoostLevel, .speedBoostInfo:
+            return TelewhiteModsSection.speedBoost.rawValue
         case .appearanceHeader, .accentColorLink, .bubbleColorLink, .chatListLookLink, .chatSplitLandscape, .amoledMode, .settingsIconsLink, .chatTextLink, .appearanceInfo:
             return TelewhiteModsSection.appearance.rawValue
         case .chatTextHeader, .chatFontSizeOption, .chatTextInfo:
@@ -660,14 +677,10 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 501
         case .hideStories:
             return 502
-        case .autoCacheCleanup:
+        case .autoCacheCleanupLink:
             return 503
-        case let .cacheLimit(index, _, _, _):
-            return 504 + index
-        case .speedBoostEnabled:
+        case .speedBoostLink:
             return 510
-        case let .speedBoostLevel(index, _, _, _):
-            return 511 + index
         case .longRoundVideos:
             return 520
         case .confirmVoiceSend:
@@ -723,6 +736,25 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 1101 + index
         case .settingsIconsInfo:
             return 1109
+        // Two more screens of their own, so again the ids only have to rise among
+        // themselves. The switch comes first on each: with it off there is nothing to
+        // choose, and the header and options are simply not appended.
+        case .autoCacheCleanup:
+            return 1200
+        case .cacheLimitHeader:
+            return 1201
+        case let .cacheLimit(index, _, _, _):
+            return 1202 + index
+        case .cacheLimitInfo:
+            return 1209
+        case .speedBoostEnabled:
+            return 1220
+        case .speedBoostHeader:
+            return 1221
+        case let .speedBoostLevel(index, _, _, _):
+            return 1222 + index
+        case .speedBoostInfo:
+            return 1229
         case .developerHeader:
             return 800
         case .pushStatus:
@@ -757,7 +789,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: telewhiteMenuIcon(icon, color: presentationData.theme.list.itemAccentColor), title: title, titleFont: .bold, label: subtitle, labelStyle: .multilineDetailText, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                 arguments.openTab(tab)
             })
-        case let .messengerHeader(text), let .translatorHeader(text), let .translationLanguageHeader(text), let .privacyHeader(text), let .stealthHeader(text), let .channelsHeader(text), let .mediaHeader(text), let .appearanceHeader(text), let .developerHeader(text), let .chatTextHeader(text), let .chatListDensityHeader(text), let .chatListRowsHeader(text), let .settingsIconsHeader(text):
+        case let .messengerHeader(text), let .translatorHeader(text), let .translationLanguageHeader(text), let .privacyHeader(text), let .stealthHeader(text), let .channelsHeader(text), let .mediaHeader(text), let .appearanceHeader(text), let .developerHeader(text), let .chatTextHeader(text), let .chatListDensityHeader(text), let .chatListRowsHeader(text), let .settingsIconsHeader(text), let .cacheLimitHeader(text), let .speedBoostHeader(text):
             return ItemListSectionHeaderItem(presentationData: presentationData, text: text, sectionId: self.section)
         case let .translationLanguageOption(_, title, code, selected):
             return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: title, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
@@ -913,7 +945,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: "", sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                 arguments.openDebug()
             })
-        case let .messengerInfo(text), let .translatorInfo(text), let .privacyInfo(text), let .stealthInfo(text), let .channelsInfo(text), let .mediaInfo(text), let .developerInfo(text), let .appearanceInfo(text), let .chatTextInfo(text), let .chatListDensityInfo(text), let .chatListRowsInfo(text), let .settingsIconsInfo(text):
+        case let .messengerInfo(text), let .translatorInfo(text), let .privacyInfo(text), let .stealthInfo(text), let .channelsInfo(text), let .mediaInfo(text), let .developerInfo(text), let .appearanceInfo(text), let .chatTextInfo(text), let .chatListDensityInfo(text), let .chatListRowsInfo(text), let .settingsIconsInfo(text), let .cacheLimitInfo(text), let .speedBoostInfo(text):
             return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
         case let .hidePhoneInSettings(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
@@ -992,6 +1024,14 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
         case let .settingsIconsLink(text, label):
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: label, labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                 arguments.openTab(.settingsIcons)
+            })
+        case let .autoCacheCleanupLink(text, label):
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: label, labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+                arguments.openTab(.cacheLimit)
+            })
+        case let .speedBoostLink(text, label):
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: label, labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+                arguments.openTab(.speedBoost)
             })
         case let .chatListDensity(_, text, value, selected):
             return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: text, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
@@ -1180,11 +1220,33 @@ private func telewhiteTabTitle(_ tab: TelewhiteModsTab, strings: TelewhiteModsSt
         return strings.text("Chat List", "Список чатов")
     case .settingsIcons:
         return strings.text("Settings Icons", "Иконки настроек")
+    case .cacheLimit:
+        return strings.text("Clear Space", "Освобождать место")
+    case .speedBoost:
+        return strings.text("Speed Boost", "Ускорить загрузку")
     }
 }
 
 // One name per value, used both for the option row on the screen and for the summary on
 // the row that opens it, so the two can never drift apart.
+private func telewhiteCacheLimitName(_ settings: TelewhiteModsSettings, strings: TelewhiteModsStrings) -> String {
+    if !settings.autoCacheCleanup {
+        return strings.text("Off", "Выкл")
+    }
+    return strings.text("\(settings.cacheLimitGigabytes) GB", "\(settings.cacheLimitGigabytes) ГБ")
+}
+
+private func telewhiteSpeedBoostName(_ value: Int32, strings: TelewhiteModsStrings) -> String {
+    switch value {
+    case 1:
+        return strings.text("Moderate", "Умеренно")
+    case 2:
+        return strings.text("Maximum", "Максимально")
+    default:
+        return strings.text("Off", "Выкл")
+    }
+}
+
 private func telewhiteDensityName(_ value: Int32, strings: TelewhiteModsStrings) -> String {
     switch value {
     case 1:
@@ -1386,24 +1448,11 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.mediaHeader(telewhiteTabTitle(.media, strings: strings)))
         entries.append(.downloadStories(strings.text("Save Other People's Stories", "Сохранять чужие истории"), settings.downloadStories))
         entries.append(.hideStories(strings.text("Hide the Stories Row", "Скрыть ленту историй"), settings.hideStories))
-        entries.append(.autoCacheCleanup(strings.text("Clear Space Automatically", "Освобождать место автоматически"), settings.autoCacheCleanup))
-        if settings.autoCacheCleanup {
-            for (index, limit) in [Int32(1), 2, 5, 10].enumerated() {
-                entries.append(.cacheLimit(Int32(index), strings.text("Keep up to \(limit) GB", "Хранить до \(limit) ГБ"), limit, settings.cacheLimitGigabytes == limit))
-            }
-        }
-        entries.append(.speedBoostEnabled(strings.text("Speed Boost", "Ускорить загрузку"), settings.speedBoost > 0))
-        if settings.speedBoost > 0 {
-            for (index, level) in [Int32(1), 2].enumerated() {
-                let title = level == 1
-                    ? strings.text("Moderate", "Умеренно")
-                    : strings.text("Maximum", "Максимально")
-                entries.append(.speedBoostLevel(Int32(index), title, level, settings.speedBoost == level))
-            }
-        }
+        entries.append(.autoCacheCleanupLink(strings.text("Clear Space Automatically", "Освобождать место автоматически"), telewhiteCacheLimitName(settings, strings: strings)))
+        entries.append(.speedBoostLink(strings.text("Speed Boost", "Ускорить загрузку"), telewhiteSpeedBoostName(settings.speedBoost, strings: strings)))
         entries.append(.longRoundVideos(strings.text("Longer Round Videos", "Длинные кружки"), settings.longRoundVideos))
         entries.append(.confirmVoiceSend(strings.text("Confirm Voice and Round Videos", "Спрашивать перед голосовым и кружком"), settings.confirmVoiceSend))
-        entries.append(.mediaInfo(strings.text("Nothing in the cloud is deleted — only the copies on this phone. On a weak network Speed Boost can make transfers worse.", "Из облака ничего не удаляется — только копии на этом телефоне. На слабой сети ускорение может замедлить.")))
+        entries.append(.mediaInfo(strings.text("Nothing in the cloud is deleted — only the copies on this phone.", "Из облака ничего не удаляется — только копии на этом телефоне.")))
 
     case .appearance:
         entries.append(.appearanceHeader(telewhiteTabTitle(.appearance, strings: strings)))
@@ -1447,6 +1496,29 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.chatFontSizeOption(1, strings.text("Small", "Меньше"), PresentationFontSize.small.rawValue, settings.chatFontSizeOverride == PresentationFontSize.small.rawValue))
         entries.append(.chatFontSizeOption(2, strings.text("Large", "Больше"), PresentationFontSize.large.rawValue, settings.chatFontSizeOverride == PresentationFontSize.large.rawValue))
         entries.append(.chatTextInfo(strings.text("Applies to message text in chats.", "Применяется к тексту сообщений в чатах.")))
+
+    case .cacheLimit:
+        entries.append(.autoCacheCleanup(strings.text("Clear Space Automatically", "Освобождать место автоматически"), settings.autoCacheCleanup))
+        if settings.autoCacheCleanup {
+            entries.append(.cacheLimitHeader(strings.text("Keep up to", "Хранить до")))
+            for (index, limit) in [Int32(1), 2, 5, 10].enumerated() {
+                entries.append(.cacheLimit(Int32(index), strings.text("\(limit) GB", "\(limit) ГБ"), limit, settings.cacheLimitGigabytes == limit))
+            }
+        }
+        entries.append(.cacheLimitInfo(strings.text("When downloaded photos and videos take up more than this, the oldest ones go. Nothing is lost — anything you open again is downloaded from Telegram.", "Когда скачанные фото и видео займут больше лимита, самые старые удаляются. Ничего не теряется — при открытии всё снова скачается из Telegram.")))
+
+    case .speedBoost:
+        entries.append(.speedBoostEnabled(strings.text("Speed Boost", "Ускорить загрузку"), settings.speedBoost > 0))
+        if settings.speedBoost > 0 {
+            entries.append(.speedBoostHeader(strings.text("Level", "Уровень")))
+            for (index, level) in [Int32(1), 2].enumerated() {
+                let title = level == 1
+                    ? strings.text("Moderate", "Умеренно")
+                    : strings.text("Maximum", "Максимально")
+                entries.append(.speedBoostLevel(Int32(index), title, level, settings.speedBoost == level))
+            }
+        }
+        entries.append(.speedBoostInfo(strings.text("Downloads and uploads media in more pieces at a time. Helps on a fast connection; on a weak one it can make transfers worse.", "Качает и отправляет медиа большим числом кусков сразу. Помогает на быстром соединении; на слабом может замедлить.")))
 
     case .developer:
         entries.append(.developerHeader(telewhiteTabTitle(.developer, strings: strings)))
