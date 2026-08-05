@@ -506,7 +506,7 @@ public class ItemListAvatarAndNameInfoItemNode: ListViewItemNode, ItemListItemNo
                             statusColor = item.presentationData.theme.list.itemSecondaryTextColor
                         } else if case .generic = item.mode, !servicePeer, let presence = item.presence {
                             let timestamp = CFAbsoluteTimeGetCurrent() + NSTimeIntervalSince1970
-                            let (string, activity) = stringAndActivityForUserPresence(strings: item.presentationData.strings, dateTimeFormat: item.dateTimeFormat, presence: presence, relativeTo: Int32(timestamp), expanded: true)
+                            let (string, activity) = stringAndActivityForUserPresence(strings: item.presentationData.strings, dateTimeFormat: item.dateTimeFormat, presence: presence, relativeTo: Int32(timestamp))
                             statusText = string
                             if activity {
                                 statusColor = item.presentationData.theme.list.itemAccentColor

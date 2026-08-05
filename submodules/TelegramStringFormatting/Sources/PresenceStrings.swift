@@ -568,7 +568,16 @@ public func stringForStoryActivityTimestamp(strings: PresentationStrings, dateTi
     }
 }
 
-public func stringAndActivityForUserPresence(strings: PresentationStrings, dateTimeFormat: PresentationDateTimeFormat, presence: EnginePeer.Presence, relativeTo timestamp: Int32, expanded: Bool = false) -> (String, Bool) {
+// Telewhite: last seen is told as a clock time, not as an age. "5 hours ago" makes the
+// reader do the arithmetic and still leaves them unsure, while "today at 15:45" is the
+// thing they actually wanted to know. Under an hour stays relative, because "12 minutes
+// ago" really is easier to feel than 15:33.
+//
+// The stock code already knew how to say it — the profile screen asked for it through an
+// "expanded" flag while the chat title and every list got the vague form. The flag is gone
+// and the precise wording is simply what everyone gets; both strings (LastSeen_TodayAt,
+// LastSeen_YesterdayAt) were already translated for the profile.
+public func stringAndActivityForUserPresence(strings: PresentationStrings, dateTimeFormat: PresentationDateTimeFormat, presence: EnginePeer.Presence, relativeTo timestamp: Int32) -> (String, Bool) {
     switch presence.status {
     case let .present(statusTimestamp):
         if statusTimestamp >= timestamp {
@@ -577,7 +586,7 @@ public func stringAndActivityForUserPresence(strings: PresentationStrings, dateT
             let difference = timestamp - statusTimestamp
             if difference < 60 {
                 return (strings.LastSeen_JustNow, false)
-            } else if difference < 60 * 60 && !expanded {
+            } else if difference < 60 * 60 {
                 let minutes = difference / 60
                 return (strings.LastSeen_MinutesAgo(minutes), false)
             } else {
@@ -597,12 +606,7 @@ public func stringAndActivityForUserPresence(strings: PresentationStrings, dateT
                 if dayDifference == 0 || dayDifference == -1 {
                     let day: RelativeTimestampFormatDay
                     if dayDifference == 0 {
-                        if expanded {
-                            day = .today
-                        } else {
-                            let minutes = difference / (60 * 60)
-                            return (strings.LastSeen_HoursAgo(minutes), false)
-                        }
+                        day = .today
                     } else {
                         day = .yesterday
                     }
