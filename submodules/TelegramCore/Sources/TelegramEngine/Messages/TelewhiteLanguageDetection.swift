@@ -28,7 +28,7 @@ public func telewhiteNormalizeLanguageCode(_ code: String) -> String {
 // Deliberately low: between two Cyrillic languages the recognizer is often confident
 // and wrong, and wrongly translating Russian into Russian is far more annoying than
 // occasionally leaving a Ukrainian message untranslated.
-private let telewhiteTargetLanguageHypothesisFloor: Double = 0.15
+public let telewhiteTargetLanguageHypothesisFloor: Double = 0.15
 
 // Telewhite: below this probability a detection is treated as no detection at all
 // rather than as evidence of a foreign language.
@@ -38,7 +38,7 @@ public let telewhiteLanguageConfidenceFloor: Double = 0.45
 // The absolute floor above says "present"; without this it also said "plausible", which
 // made every near neighbour of the target untranslatable — Portuguese text puts "es"
 // over 0.15 for a Spanish target, Japanese puts "zh" there for a Chinese one.
-private let telewhiteTargetLanguageRelativeFloor: Double = 0.5
+public let telewhiteTargetLanguageRelativeFloor: Double = 0.5
 
 // Telewhite: the recognizer cannot reliably tell Russian from Ukrainian, but the two
 // alphabets can: these letters exist in one and not the other. This is only ever used
