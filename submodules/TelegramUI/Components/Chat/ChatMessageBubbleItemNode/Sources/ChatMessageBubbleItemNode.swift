@@ -1972,6 +1972,14 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
                     needsTelewhiteTranslateButton = false
                 }
             }
+            // Telewhite: and not on text that is already in the language the button would
+            // translate into — tapping it there handed the same sentence back. The verdict
+            // comes from the detector the automatic translation uses, so the button and the
+            // translation panel agree on what counts as "already in your language"; it is
+            // asked last because it is the only test here that has to look at the text.
+            if needsTelewhiteTranslateButton, telewhiteTextIsAlreadyInLanguage(item.message.text, toLang: telewhiteMessageTranslationTargetLanguage(fallback: item.presentationData.strings.baseLanguageCode)) {
+                needsTelewhiteTranslateButton = false
+            }
         }
 
         /*if isInlinePage {

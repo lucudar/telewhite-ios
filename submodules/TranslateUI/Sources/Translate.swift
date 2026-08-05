@@ -161,15 +161,10 @@ public func effectiveIgnoredTranslationLanguages(context: AccountContext, ignore
     return dontTranslateLanguages
 }
 
+// Telewhite: the body moved to TelegramCore so the language detector could use it without
+// depending on a UI module. This stays as the name the rest of the app already calls.
 public func normalizeTranslationLanguage(_ code: String) -> String {
-    var code = code
-    if code.contains("-") {
-        code = code.components(separatedBy: "-").first ?? code
-    }
-    if code == "nb" {
-        code = "no"
-    }
-    return code
+    return telewhiteNormalizeLanguageCode(code)
 }
 
 public func canTranslateChats(context: AccountContext) -> Bool {
