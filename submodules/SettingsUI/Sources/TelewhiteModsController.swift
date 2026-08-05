@@ -1252,73 +1252,53 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
     func text(_ en: String, _ ru: String) -> String {
         return isRussian ? ru : en
     }
-    // Telewhite: every line here is read by someone who just installed the app and has
-    // no idea what the switch does. Say what they will see, not how it is implemented.
+    // Telewhite: a subtitle earns its place only when the title leaves a real question —
+    // what exactly changes, or the catch worth knowing before tapping. A row whose title
+    // already says it gets nothing, and anything true of the whole screen goes to the
+    // footer instead of being repeated under every switch. One sentence is the budget.
     switch entry {
     case .preserveDeletedMessages:
-        return text("If someone deletes a message, it stays in the chat for you, marked \"Deleted\". Only on this phone — nothing is sent anywhere.", "Если собеседник удалит сообщение, у вас оно останется в чате с пометкой «Удалено». Только на этом телефоне — никуда ничего не отправляется.")
+        return text("It stays in the chat, marked \"Deleted\".", "Останется в чате с пометкой «Удалено».")
     case .backgroundMessageRefresh:
-        return text("While the app is closed, the phone quietly picks up new messages on its own, so a message that arrives and is deleted before you ever look at it is still kept. iOS decides how often this happens — there is no fixed schedule and no guarantee, and only the account you are currently using is refreshed.", "Пока приложение закрыто, телефон сам время от времени забирает новые сообщения — тогда удалённое сохранится, даже если вы не успели его увидеть. Как часто это происходит, решает iOS: расписания нет и полной гарантии тоже. Обновляется только тот аккаунт, в котором вы сейчас находитесь.")
+        return text("Then a message deleted before you ever looked is kept too. iOS decides how often.", "Тогда сохранится и то, что удалили, пока вы не смотрели. Частоту выбирает iOS.")
     case .keepTimedMessages:
-        return text("In chats with a self-destruct timer, messages stay instead of disappearing when the time runs out. Only on this phone — for everyone else they still disappear. Secret chats are not affected.", "В чатах с таймером удаления сообщения останутся, а не исчезнут по истечении времени. Только на этом телефоне — у остальных они всё равно исчезнут. На секретные чаты не влияет.")
-    case .showPreviousEditedText:
-        return text("When someone edits a message, the old version stays visible in small text underneath.", "Когда сообщение изменят, под ним мелким шрифтом останется прошлый вариант.")
+        return text("Secret chats are not affected.", "Кроме секретных чатов.")
     case .forwardHideNamesByDefault:
-        return text("Forwarded messages go out without the \"Forwarded from\" line. You can still turn it back on for a single forward.", "Пересланные сообщения уходят без строки «Переслано от». Для конкретной пересылки имя можно вернуть вручную.")
+        return text("For a single forward the name can be brought back.", "Для конкретной пересылки имя можно вернуть.")
     case .oneTimeMedia:
-        return text("Photos and videos sent as view-once can be opened as many times as you like, and saved.", "Фото и видео, отправленные с самоудалением после просмотра, можно открывать сколько угодно раз и сохранять себе.")
+        return text("Open them as often as you like, and save them.", "Открывать сколько угодно раз и сохранять.")
     case .hdPhotos:
-        return text("Your photos are sent with much less compression. They look better and use more data.", "Ваши фото отправляются почти без сжатия — выглядят лучше, весят больше.")
+        return text("Better quality, bigger files.", "Качество лучше, вес больше.")
     case .quickForwardToSaved:
-        return text("Adds \"Forward to Saved Messages\" to the message menu — one tap, no chat picker.", "Добавляет в меню сообщения пункт «Переслать в Избранное» — одно нажатие, без выбора чата.")
+        return text("Appears in the message menu.", "Появится в меню сообщения.")
     case .showReadDateOnTap:
-        return text("Tap the checkmarks under your message to see when it was read. Works in private chats. Nothing is shown if the other person hides their read times, or if you hide yours.", "Нажмите на галочки под своим сообщением, чтобы увидеть, когда его прочитали. Работает в личных чатах. Время не покажется, если собеседник скрыл время прочтения или если вы скрыли своё.")
+        return text("Tap the checkmarks under your message. Private chats only.", "По нажатию на галочки под сообщением. Только в личных чатах.")
     case .translatorLink:
-        return text("Automatic translation of incoming messages, your own messages and voice messages.", "Автоперевод входящих, перевод ваших сообщений и голосовых.")
-    case .autoTranslateEnglish:
-        return text("Messages in other languages are shown to you already translated. Messages in your own language are left alone.", "Сообщения на других языках сразу показываются переведёнными. Сообщения на вашем языке не трогаются.")
-    case .translationTargetLanguage:
-        return text("The language everything is translated into.", "Язык, на который всё переводится.")
-    case .translateMessages:
-        return text("Adds \"Translate\" to the menu that appears when you hold a message.", "Добавляет пункт «Перевести» в меню, которое открывается долгим нажатием на сообщение.")
+        return text("Incoming, your own messages, voice messages.", "Входящие, ваши сообщения, голосовые.")
     case .outgoingTranslateButtonEnabled:
-        return text("Puts a translator button at the top of private chats: tap it and your messages are sent translated, hold it to pick the language.", "Ставит кнопку переводчика в шапку личных чатов: нажатие — ваши сообщения уходят переведёнными, долгое нажатие — выбор языка.")
+        return text("A button in the chat header: tap to switch on, hold to pick the language.", "Кнопка в шапке чата: нажатие — включить, долгое — выбрать язык.")
     case .localTranscription:
-        return text("Turns voice messages into text without Premium. The phone does the recognition itself, so the audio is not sent anywhere and it works offline. The first time, iOS asks for permission.", "Превращает голосовые в текст без Premium. Распознаёт сам телефон, поэтому звук никуда не отправляется и работает без интернета. При первом включении iOS спросит разрешение.")
+        return text("The phone recognises it itself, offline.", "Распознаёт сам телефон, без интернета.")
     case .translateButtonInChat:
-        return text("Puts a small round button beside every incoming message. Tap it and the translation appears inside the bubble; tap again for the original. The stored message is not changed, so copying and forwarding still give the original text.", "Ставит маленькую круглую кнопку рядом с каждым входящим сообщением. Нажали — перевод появляется прямо в пузыре, нажали снова — вернулся оригинал. Само сообщение не меняется, поэтому копирование и пересылка по-прежнему дают исходный текст.")
+        return text("The translation appears inside the bubble.", "Перевод появляется прямо в пузыре.")
     case .translateVoiceMessages:
-        return text("Voice messages in other languages get a translation under the transcript.", "Под расшифровкой голосового на чужом языке появляется перевод.")
+        return text("Shown under the transcript.", "Показывается под расшифровкой.")
     case .protectionBypass:
-        return text("In chats and channels that block saving, you can take screenshots, copy text, forward and save media again.", "В чатах и каналах, где запрещено сохранять, снова работают скриншоты, копирование, пересылка и сохранение медиа.")
-    case .hidePhoneInSettings:
-        return text("Your phone number and @username stop being shown in Settings and on your own profile, so nobody sees them over your shoulder. Other people still see them as usual.", "Ваш номер и @имя перестают показываться в настройках и в вашем профиле — их не увидят, заглянув в ваш экран. Для других людей ничего не меняется.")
+        return text("Screenshots, copying, forwarding, saving media.", "Скриншоты, копирование, пересылка, сохранение медиа.")
     case .showProfileIds:
-        return text("Shows the numeric ID in profiles and chats. Tap it to copy. Useful for bots; safe to leave off.", "Показывает числовой ID в профилях и чатах. Нажмите, чтобы скопировать. Нужно для ботов, обычно можно не включать.")
+        return text("Tap to copy.", "Нажмите, чтобы скопировать.")
     case .ghost:
-        return text("Nobody can tell you are there: no read receipts, no \"played\" marks on voice messages, no \"typing\", no online status, and stories are viewed anonymously.", "Никто не видит, что вы здесь: нет галочек о прочтении, отметок о прослушивании голосовых, статусов «печатает» и «в сети», а истории вы смотрите анонимно.")
+        return text("No read receipts, no \"typing\", no online status; stories viewed anonymously.", "Ни прочтений, ни «печатает», ни «в сети»; истории смотрите анонимно.")
     case .ghostChatButtonEnabled:
-        return text("Adds a ghost icon to the top of every chat. It turns invisibility on for that one person, without affecting the rest.", "Добавляет значок-призрак в шапку каждого чата. Он включает невидимку только для этого собеседника, остальных не затрагивает.")
+        return text("Turns invisibility on for one person only.", "Включает невидимку для одного собеседника.")
     case .channelsDeclutter:
-        return text("Hides reactions, the comments bar and the share button under channel posts, leaving just the post.", "Убирает под постами каналов реакции, панель комментариев и кнопку «Поделиться» — остаётся только сам пост.")
-    case .hideSponsoredContent:
-        return text("Removes sponsored posts inside channels and promoted chats from search results. They are never requested, so they do not load at all.", "Убирает рекламные посты внутри каналов и продвигаемые чаты из результатов поиска. Реклама не запрашивается вообще, поэтому и не загружается.")
-    case .downloadStories:
-        return text("Adds a save button to other people's stories.", "Добавляет кнопку сохранения в чужих историях.")
-    case .hideStories:
-        return text("Removes the row of stories above the chat list.", "Убирает ленту историй над списком чатов.")
-    case .confirmVoiceSend:
-        return text("Asks before a recorded voice message or round video is sent. Recording is press-and-hold, so letting go in the wrong place sends it — this puts a question in the way.", "Спрашивает перед отправкой записанного голосового или кружка. Запись идёт удержанием пальца, поэтому отпустил не там — уже улетело; здесь на пути встаёт вопрос.")
+        return text("Reactions, the comments bar, the share button.", "Реакции, панель комментариев, кнопку «Поделиться».")
     case .longRoundVideos:
-        return text("Round videos stop at a minute in stock Telegram. This raises the recorder limit to five. That minute is the app's own, not the server's, so a longer one may still be refused on upload — if that happens, switch this back off.", "В обычном Telegram кружок останавливается на минуте. Здесь предел записи поднимается до пяти. Эта минута — ограничение приложения, а не сервера, поэтому длинный кружок всё же может не приняться при отправке. Если так — просто выключите обратно.")
-    case .autoCacheCleanup:
-        return text("When downloaded photos and videos take up more than the limit, the oldest ones are deleted. Nothing is lost — anything you open again is downloaded from Telegram.", "Когда скачанные фото и видео займут больше лимита, самые старые удаляются. Ничего не теряется — при открытии всё снова скачается из Telegram.")
-    case .speedBoostEnabled:
-        return text("Downloads and uploads media in more pieces at a time. Helps most on a fast connection; on a weak one it can make things slower.", "Качает и отправляет медиа большим числом кусков сразу. Сильнее всего помогает на быстром соединении; на слабом может, наоборот, замедлить.")
+        return text("Up to five minutes. Past a minute the server sends it on as a normal video.", "До пяти минут. Дольше минуты сервер пришлёт обычным видео.")
     case .chatSplitLandscape:
-        return text("Turn the phone sideways and the chat list stays next to the open chat, like on a computer.", "Поверните телефон горизонтально — список чатов останется рядом с открытым чатом, как на компьютере.")
+        return text("The chat list stays beside the open chat.", "Список чатов остаётся рядом с открытым.")
     case .amoledMode:
-        return text("Makes the dark theme pure black. On OLED screens black pixels are switched off, so it also saves battery.", "Делает тёмную тему полностью чёрной. На OLED-экранах чёрные пиксели не светятся, поэтому расходуется меньше заряда.")
+        return text("A pure black background in the dark theme.", "Полностью чёрный фон в тёмной теме.")
     default:
         return nil
     }
@@ -1367,7 +1347,7 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.localTranscription(strings.text("Voice to Text Without Premium", "Расшифровка голосовых без Premium"), settings.localTranscription))
         entries.append(.translateVoiceMessages(strings.text("Translate Voice Messages", "Переводить голосовые"), settings.translateVoiceMessages))
         entries.append(.translateButtonInChat(strings.text("Translate Button on Messages", "Кнопка перевода у сообщений"), settings.translateButtonInChat))
-        entries.append(.translatorInfo(strings.text("Translation is free and needs no account. Messages already in your language are never translated.", "Перевод бесплатный и не требует аккаунта. Сообщения, уже написанные на вашем языке, не переводятся.")))
+        entries.append(.translatorInfo(strings.text("Translation is free. Messages already in your language are left alone.", "Перевод бесплатный. Сообщения на вашем языке не переводятся.")))
 
     case .translationLanguage:
         entries.append(.translationLanguageHeader(telewhiteTabTitle(.translationLanguage, strings: strings)))
@@ -1384,7 +1364,7 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.protectionBypass(strings.text("Allow Saving Everywhere", "Разрешить сохранять везде"), settings.screenshotProtectionBypass || settings.contentRestrictionBypass))
         entries.append(.hidePhoneInSettings(strings.text("Hide My Number and Username", "Скрыть свой номер и юзернейм"), settings.hidePhoneInSettings))
         entries.append(.showProfileIds(strings.text("Show Numeric IDs", "Показывать числовые ID"), settings.showUserIds || settings.showChatIds || settings.showMessageIds))
-        entries.append(.privacyInfo(strings.text("These switches change what this phone shows and allows. They do not change your Telegram privacy settings.", "Эти переключатели меняют то, что показывает и разрешает этот телефон. Настройки приватности в самом Telegram они не трогают.")))
+        entries.append(.privacyInfo(strings.text("Changes what this phone shows and allows. Your Telegram privacy settings stay as they are.", "Меняет то, что показывает этот телефон. Настройки приватности Telegram остаются как есть.")))
 
     case .stealth:
         entries.append(.stealthHeader(telewhiteTabTitle(.stealth, strings: strings)))
@@ -1400,7 +1380,7 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.channelsHeader(telewhiteTabTitle(.channels, strings: strings)))
         entries.append(.channelsDeclutter(strings.text("Clean Up Posts", "Убрать лишнее под постами"), settings.channelHideReactions || settings.channelHideComments || settings.channelHideShareButton))
         entries.append(.hideSponsoredContent(strings.text("Hide Ads", "Скрыть рекламу"), settings.hideSponsoredContent))
-        entries.append(.channelsInfo(strings.text("Only changes how posts look on this phone. Nobody else is affected.", "Меняет только то, как посты выглядят на этом телефоне. Для остальных ничего не меняется.")))
+        entries.append(.channelsInfo(strings.text("Only on this phone — nobody else is affected.", "Только на этом телефоне — для остальных ничего не меняется.")))
 
     case .media:
         entries.append(.mediaHeader(telewhiteTabTitle(.media, strings: strings)))
@@ -1423,7 +1403,7 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         }
         entries.append(.longRoundVideos(strings.text("Longer Round Videos", "Длинные кружки"), settings.longRoundVideos))
         entries.append(.confirmVoiceSend(strings.text("Confirm Voice and Round Videos", "Спрашивать перед голосовым и кружком"), settings.confirmVoiceSend))
-        entries.append(.mediaInfo(strings.text("Your messages and files in the cloud are never deleted — only the copies downloaded to this phone. Speed Boost asks the server for more pieces at once; on a weak network that can backfire, so lower it if transfers get worse.", "Ваши сообщения и файлы в облаке не удаляются — стираются только копии, скачанные на этот телефон. Ускорение запрашивает у сервера больше кусков сразу; на слабой сети это может выйти боком — тогда снизьте уровень или выключите.")))
+        entries.append(.mediaInfo(strings.text("Nothing in the cloud is deleted — only the copies on this phone. On a weak network Speed Boost can make transfers worse.", "Из облака ничего не удаляется — только копии на этом телефоне. На слабой сети ускорение может замедлить.")))
 
     case .appearance:
         entries.append(.appearanceHeader(telewhiteTabTitle(.appearance, strings: strings)))
@@ -1440,33 +1420,33 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.amoledMode(strings.text("AMOLED Mode", "AMOLED режим"), settings.amoledMode))
         entries.append(.settingsIconsLink(strings.text("Settings Icons", "Иконки настроек"), telewhiteIconVariantName(settings.settingsIconVariant, strings: strings)))
         entries.append(.chatTextLink(strings.text("Chat Text", "Текст в чате")))
-        entries.append(.appearanceInfo(strings.text("Tap a colour row to mix your own shade — colour wheel, sliders, HEX or the eyedropper. AMOLED mode deepens the background to true black.", "Нажмите на строку цвета и подберите свой оттенок — колесо, ползунки, HEX или пипетка. AMOLED-режим делает фон полностью чёрным.")))
+        entries.append(.appearanceInfo(strings.text("Tap a colour row to mix your own shade.", "Нажмите на строку цвета, чтобы подобрать свой оттенок.")))
 
     case .chatListLook:
         entries.append(.chatListDensityHeader(strings.text("Density", "Плотность")))
         for (index, density) in [Int32(0), 1, 2, 3].enumerated() {
             entries.append(.chatListDensity(Int32(index), telewhiteDensityName(density, strings: strings), density, settings.chatListDensity == density))
         }
-        entries.append(.chatListDensityInfo(strings.text("Shrinks the avatar and tightens the row, so more chats fit on the screen. The text column follows the avatar, so the row gets narrower as well as shorter. \"Roomy\" is stock Telegram.", "Уменьшает аватарку и поджимает строку — на экране помещается больше чатов. Текст сдвигается вслед за аватаркой, поэтому строка становится не только ниже, но и уже. «Просторно» — как в обычном Telegram.")))
+        entries.append(.chatListDensityInfo(strings.text("A smaller avatar and a tighter row, so more chats fit. \"Roomy\" is stock Telegram.", "Меньше аватарка и плотнее строка — чатов на экране больше. «Просторно» — как в обычном Telegram.")))
         entries.append(.chatListRowsHeader(strings.text("Lines Under the Name", "Строк под именем")))
         for (index, rows) in [Int32(1), 2, 3].enumerated() {
             entries.append(.chatListRows(Int32(index), telewhiteRowsName(rows, strings: strings), rows, settings.chatListRows == rows))
         }
-        entries.append(.chatListRowsInfo(strings.text("How much of the last message you see. In groups one line goes to the sender's name, so those rows show one line of text fewer. Two lines is stock Telegram.", "Сколько видно от последнего сообщения. В группах одна строка уходит под имя отправителя, поэтому там текста на строку меньше. Две строки — как в обычном Telegram.")))
+        entries.append(.chatListRowsInfo(strings.text("How much of the last message you see. In groups one line goes to the sender's name. Two is stock Telegram.", "Сколько видно от последнего сообщения. В группах одна строка уходит под имя. Две — как в обычном Telegram.")))
 
     case .settingsIcons:
         entries.append(.settingsIconsHeader(strings.text("Style", "Стиль")))
         for (index, variant) in [Int32(0), 1, 2, 3].enumerated() {
             entries.append(.settingsIconVariant(Int32(index), telewhiteIconVariantName(variant, strings: strings), variant, settings.settingsIconVariant == variant))
         }
-        entries.append(.settingsIconsInfo(strings.text("Changes every icon in Settings at once. \"Solid\" and \"Outlined\" follow the accent colour; \"Thin, Gray\" is the quietest and drops the colour; \"In a Ring\" draws a hairline circle around a smaller glyph. The change shows up straight away, no restart.", "Меняет сразу все значки в настройках. «Заливкой» и «Контурные» следуют акцентному цвету, «Тонкие серые» — самый спокойный вариант без цвета, «В кольце» рисует тонкую окружность вокруг уменьшенного значка. Результат виден сразу, перезапуск не нужен.")))
+        entries.append(.settingsIconsInfo(strings.text("Changes every icon in Settings at once. \"Solid\" and \"Outlined\" follow the accent colour.", "Меняет сразу все значки в настройках. «Заливкой» и «Контурные» следуют акцентному цвету.")))
 
     case .chatText:
         entries.append(.chatTextHeader(strings.text("Chat Text", "Текст в чате")))
         entries.append(.chatFontSizeOption(0, strings.text("Default", "По умолчанию"), 0, settings.chatFontSizeOverride == 0))
         entries.append(.chatFontSizeOption(1, strings.text("Small", "Меньше"), PresentationFontSize.small.rawValue, settings.chatFontSizeOverride == PresentationFontSize.small.rawValue))
         entries.append(.chatFontSizeOption(2, strings.text("Large", "Больше"), PresentationFontSize.large.rawValue, settings.chatFontSizeOverride == PresentationFontSize.large.rawValue))
-        entries.append(.chatTextInfo(strings.text("Applies to message text in chats and updates instantly.", "Применяется к тексту сообщений в чатах и обновляется мгновенно.")))
+        entries.append(.chatTextInfo(strings.text("Applies to message text in chats.", "Применяется к тексту сообщений в чатах.")))
 
     case .developer:
         entries.append(.developerHeader(telewhiteTabTitle(.developer, strings: strings)))
@@ -1485,7 +1465,7 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         }
         entries.append(.pushToken(strings.text("APNs token", "APNs токен"), pushToken.isEmpty ? shortToken : "\(shortToken) — \(strings.text("tap to copy", "нажмите чтобы скопировать"))"))
         entries.append(.debugMenu(strings.text("Debug Menu", "Меню отладки")))
-        entries.append(.developerInfo(strings.text("Diagnostics for push registration and technical debugging tools.", "Диагностика регистрации push-уведомлений и технические инструменты отладки.")))
+        entries.append(.developerInfo(strings.text("Push registration diagnostics and debug tools.", "Диагностика пушей и инструменты отладки.")))
     }
 
     return entries
