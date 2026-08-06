@@ -2828,7 +2828,16 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                                 if file.isAnimated {
                                     badgeContent = .mediaDownload(backgroundColor: messageTheme.mediaDateAndStatusFillColor, foregroundColor: messageTheme.mediaDateAndStatusTextColor, duration: "\(gifTitle)", size: nil, muted: false, active: false)
                                 } else {
-                                    badgeContent = .mediaDownload(backgroundColor: messageTheme.mediaDateAndStatusFillColor, foregroundColor: messageTheme.mediaDateAndStatusTextColor, duration: strings.Conversation_Processing, size: nil, muted: false, active: false)
+                                    // Telewhite: this branch is reached when the file has no known size yet —
+                                    // a video still being prepared for sending. "Processing..." on its own
+                                    // never changes, so there is no way to tell a slow upload from a stuck
+                                    // one. The percentage is known here even when the byte count is not, so
+                                    // it is shown next to the word.
+                                    var processingString = strings.Conversation_Processing
+                                    if message.flags.contains(.Unsent) {
+                                        processingString = "\(processingString) \(Int(progress * 100.0))%"
+                                    }
+                                    badgeContent = .mediaDownload(backgroundColor: messageTheme.mediaDateAndStatusFillColor, foregroundColor: messageTheme.mediaDateAndStatusTextColor, duration: processingString, size: nil, muted: false, active: false)
                                 }
                             }
                             if file.isAnimated && isMediaStreamable(message: EngineMessage(message), media: file) {
