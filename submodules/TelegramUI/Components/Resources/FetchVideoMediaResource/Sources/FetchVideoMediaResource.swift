@@ -423,6 +423,14 @@ public func fetchVideoLibraryMediaResource(postbox: Postbox, resource: VideoLibr
                              }*/
                         }), entityRenderer: entityRenderer)!
                         let signalDisposable = signal.start(next: { next in
+                            // Telewhite: the legacy converter reports progress as it goes, exactly as the
+                            // modern pipeline above does, but only its final result was ever read here —
+                            // so the bubble sat on "Processing..." with a number that never moved, because
+                            // the only progress reaching it was the upload, which had not started yet.
+                            if let progress = next as? NSNumber {
+                                subscriber.putNext(.progressUpdated(progress.floatValue))
+                                return
+                            }
                             if let result = next as? TGMediaVideoConversionResult {
                                 var value = stat()
                                 if stat(result.fileURL.path, &value) == 0 {
