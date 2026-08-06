@@ -3,22 +3,24 @@ import Postbox
 import TelegramApi
 import SwiftSignalKit
 
-// Telewhite: interactive read receipts are suppressed by global Ghost Mode, by the
-// standalone "Hide Read Receipts" toggle, or when per-chat ghost is on for this peer.
-private func telewhiteHideReadReceiptsEnabled(peerId: PeerId) -> Bool {
-    let defaults = UserDefaults.standard
-    if defaults.bool(forKey: "telewhite.mods.ghostMode") || defaults.bool(forKey: "telewhite.mods.hideReadReceipts") {
-        return true
-    }
-    let ghostPeerIds = defaults.array(forKey: "telewhite.mods.ghostPeerIds") as? [NSNumber] ?? []
-    return ghostPeerIds.contains(NSNumber(value: peerId.toInt64()))
-}
+// Telewhite: nothing is suppressed here either, for the same reason as in
+// ApplyMaxReadIndexInteractively.swift — see the note there. This function only writes local
+// state and queues pending actions; every path that reaches the server is guarded further
+// down, where it belongs:
+//
+//   read position   -> SynchronizePeerReadState refuses to push under Ghost Mode
+//   mention consume -> ManagedConsumePersonalMessagesActions clears it locally and skips
+//                      the network call
+//
+// Voice and video messages never get here at all: a message with unconsumed content is
+// deliberately left out of consumeMessageIds below, so no "played" mark can escape.
+//
+// Guarding this function instead left messages that arrived while the chat was open unread
+// forever in the local database — the folder badge kept counting a chat that the server,
+// and every other device, considered read.
 
 func _internal_installInteractiveReadMessagesAction(postbox: Postbox, stateManager: AccountStateManager, peerId: PeerId, threadId: Int64?) -> Disposable {
     return postbox.installStoreMessageAction(peerId: peerId, { messages, transaction in
-        if telewhiteHideReadReceiptsEnabled(peerId: peerId) {
-            return
-        }
         var consumeMessageIds: [MessageId] = []
         var readReactionOrPollVotesIds: [MessageId] = []
         
