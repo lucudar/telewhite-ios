@@ -3,31 +3,23 @@ import Postbox
 import TelegramApi
 import SwiftSignalKit
 
-// Telewhite: interactive read receipts are suppressed by global Ghost Mode, by the
-// standalone "Hide Read Receipts" toggle, or when per-chat ghost is on for this peer.
-private func telewhiteHideReadReceiptsEnabled(peerId: PeerId) -> Bool {
-    let defaults = UserDefaults.standard
-    if defaults.bool(forKey: "telewhite.mods.ghostMode") || defaults.bool(forKey: "telewhite.mods.hideReadReceipts") {
-        return true
-    }
-    let ghostPeerIds = defaults.array(forKey: "telewhite.mods.ghostPeerIds") as? [NSNumber] ?? []
-    return ghostPeerIds.contains(NSNumber(value: peerId.toInt64()))
-}
+// Telewhite: nothing is suppressed in this file, deliberately. Read receipts are hidden one
+// layer down, in SynchronizePeerReadState.swift, which is the only place that actually tells
+// the server anything. What happens here is local bookkeeping: it clears the unread count for
+// the chat.
+//
+// Both were once guarded, and that was the bug. With Ghost Mode on, opening a chat — or even
+// tapping "mark all as read" — left the folder badge showing unread forever, because this
+// function returned before touching the local state. Restoring a guard here would bring that
+// back without hiding anything extra.
 
 func _internal_applyMaxReadIndexInteractively(postbox: Postbox, stateManager: AccountStateManager, index: MessageIndex) -> Signal<Void, NoError> {
-    if telewhiteHideReadReceiptsEnabled(peerId: index.id.peerId) {
-        return .complete()
-    }
     return postbox.transaction { transaction -> Void in
         _internal_applyMaxReadIndexInteractively(transaction: transaction, stateManager: stateManager, index: index)
     }
 }
 
 func _internal_applyMaxReadIndexInteractively(transaction: Transaction, stateManager: AccountStateManager, index: MessageIndex) {
-    if telewhiteHideReadReceiptsEnabled(peerId: index.id.peerId) {
-        return
-    }
-
     let messageIds = transaction.applyInteractiveReadMaxIndex(index)
 
     if let peer = transaction.getPeer(index.id.peerId), peer.isForumOrMonoForum {
