@@ -1535,13 +1535,18 @@ public func telewhiteModsController(context: AccountContext) -> ViewController {
     let statePromise = ValuePromise(initialSettings, ignoreRepeated: true)
 
     let updateSettings: ((TelewhiteModsSettings) -> TelewhiteModsSettings) -> Void = { f in
+        // Remember what the cache mod looked like before the change: the block below must be
+        // able to tell "the mod is off" from "the mod has just been switched off".
+        var wasAutoCacheCleanup = false
         let updated = stateValue.modify { _ in
             // Mutate the LIVE settings, not this screen's snapshot. The screen stays alive
             // on the Settings tab while chats write the same struct (the per-chat ghost
             // button writes ghostPeerIds, the chat translator writes
             // outgoingTranslationPeerIds/Languages), so flipping any switch here used to
             // save a stale copy over them and silently wipe the per-chat state.
-            let updated = f(TelewhiteModsSettings.current)
+            let current = TelewhiteModsSettings.current
+            wasAutoCacheCleanup = current.autoCacheCleanup
+            let updated = f(current)
             updated.save()
             return updated
         }
@@ -1550,17 +1555,32 @@ public func telewhiteModsController(context: AccountContext) -> ViewController {
         // computes it, so saving an unrelated setting cannot put the account back online.
         let keepOnline = !(updated.ghostMode || updated.hideOnlineStatus || !updated.ghostPeerIds.isEmpty)
         context.account.shouldKeepOnlinePresence.set(.single(keepOnline))
-        let cacheLimit = updated.autoCacheCleanup ? updated.cacheLimitGigabytes : Int32.max
-        let _ = updateCacheStorageSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
-            var current = current
-            current.defaultCacheStorageLimitGigabytes = cacheLimit
-            return current
-        }).start()
-        let _ = (context.sharedContext.accountManager.sharedData(keys: [SharedDataKeys.cacheStorageSettings])
-        |> take(1)).start(next: { sharedData in
-            let cacheSettings = sharedData.entries[SharedDataKeys.cacheStorageSettings]?.get(CacheStorageSettings.self) ?? CacheStorageSettings.defaultSettings
-            context.account.postbox.mediaBox.setMaxStoreTimes(general: cacheSettings.defaultCacheStorageTimeout, shortLived: 60 * 60, gigabytesLimit: cacheLimit)
-        })
+        // The storage limit belongs to Telegram, not to this screen. Writing it on every
+        // change meant that toggling something unrelated — Hide Ads, Invisible Mode, any of
+        // them — silently reset whatever limit the user had chosen in Data and Storage.
+        //
+        // So it is written only when this mod is the one deciding: while it is on, and once
+        // more at the moment it is switched off, to hand control back. "Unlimited" is what
+        // handing back means, because that is the stock default and the mod overwrote
+        // whatever stood there before it took over.
+        var cacheLimitToApply: Int32?
+        if updated.autoCacheCleanup {
+            cacheLimitToApply = updated.cacheLimitGigabytes
+        } else if wasAutoCacheCleanup {
+            cacheLimitToApply = Int32.max
+        }
+        if let cacheLimit = cacheLimitToApply {
+            let _ = updateCacheStorageSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
+                var current = current
+                current.defaultCacheStorageLimitGigabytes = cacheLimit
+                return current
+            }).start()
+            let _ = (context.sharedContext.accountManager.sharedData(keys: [SharedDataKeys.cacheStorageSettings])
+            |> take(1)).start(next: { sharedData in
+                let cacheSettings = sharedData.entries[SharedDataKeys.cacheStorageSettings]?.get(CacheStorageSettings.self) ?? CacheStorageSettings.defaultSettings
+                context.account.postbox.mediaBox.setMaxStoreTimes(general: cacheSettings.defaultCacheStorageTimeout, shortLived: 60 * 60, gigabytesLimit: cacheLimit)
+            })
+        }
         statePromise.set(updated)
     }
 
