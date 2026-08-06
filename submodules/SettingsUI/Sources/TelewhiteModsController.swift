@@ -53,6 +53,8 @@ public struct TelewhiteModsSettings: Equatable {
     public var speedBoost: Int32
     public var longRoundVideos: Bool
     public var confirmVoiceSend: Bool
+    public var videoNoRecompress: Bool
+    public var stripFileMetadata: Bool
     public var settingsIconVariant: Int32
     public var chatListRows: Int32
     public var channelHideReactions: Bool
@@ -107,6 +109,8 @@ public struct TelewhiteModsSettings: Equatable {
         static let speedBoost = "telewhite.mods.speedBoost"
         static let longRoundVideos = "telewhite.mods.longRoundVideos"
         static let confirmVoiceSend = "telewhite.mods.confirmVoiceSend"
+        static let videoNoRecompress = "telewhite.mods.videoNoRecompress"
+        static let stripFileMetadata = "telewhite.mods.stripFileMetadata"
         static let settingsIconVariant = "telewhite.mods.settingsIconVariant"
         static let chatListRows = "telewhite.mods.chatListRows"
         static let channelHideReactions = "telewhite.mods.channelHideReactions"
@@ -199,6 +203,8 @@ public struct TelewhiteModsSettings: Equatable {
             speedBoost: min(2, max(0, (defaults.object(forKey: Key.speedBoost) as? NSNumber)?.int32Value ?? 0)),
             longRoundVideos: defaults.bool(forKey: Key.longRoundVideos),
             confirmVoiceSend: defaults.bool(forKey: Key.confirmVoiceSend),
+            videoNoRecompress: defaults.bool(forKey: Key.videoNoRecompress),
+            stripFileMetadata: defaults.bool(forKey: Key.stripFileMetadata),
             settingsIconVariant: min(3, max(0, (defaults.object(forKey: Key.settingsIconVariant) as? NSNumber)?.int32Value ?? 0)),
             chatListRows: min(3, max(1, (defaults.object(forKey: Key.chatListRows) as? NSNumber)?.int32Value ?? 2)),
             channelHideReactions: defaults.bool(forKey: Key.channelHideReactions),
@@ -331,6 +337,8 @@ public struct TelewhiteModsSettings: Equatable {
         defaults.set(self.speedBoost, forKey: Key.speedBoost)
         defaults.set(self.longRoundVideos, forKey: Key.longRoundVideos)
         defaults.set(self.confirmVoiceSend, forKey: Key.confirmVoiceSend)
+        defaults.set(self.videoNoRecompress, forKey: Key.videoNoRecompress)
+        defaults.set(self.stripFileMetadata, forKey: Key.stripFileMetadata)
         defaults.set(self.settingsIconVariant, forKey: Key.settingsIconVariant)
         defaults.set(self.chatListRows, forKey: Key.chatListRows)
         defaults.set(self.channelHideReactions, forKey: Key.channelHideReactions)
@@ -513,6 +521,8 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case speedBoostInfo(String)
     case longRoundVideos(String, Bool)
     case confirmVoiceSend(String, Bool)
+    case videoNoRecompress(String, Bool)
+    case stripFileMetadata(String, Bool)
     case mediaInfo(String)
 
     case appearanceHeader(String)
@@ -559,13 +569,13 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.translator.rawValue
         case .translationLanguageHeader, .translationLanguageOption:
             return TelewhiteModsSection.translationLanguage.rawValue
-        case .privacyHeader, .protectionBypass, .hidePhoneInSettings, .showProfileIds, .privacyInfo:
+        case .privacyHeader, .protectionBypass, .hidePhoneInSettings, .showProfileIds, .stripFileMetadata, .privacyInfo:
             return TelewhiteModsSection.privacy.rawValue
         case .stealthHeader, .ghost, .ghostChatButtonEnabled, .stealthInfo:
             return TelewhiteModsSection.stealth.rawValue
         case .channelsHeader, .channelsDeclutter, .hideSponsoredContent, .channelsInfo:
             return TelewhiteModsSection.channels.rawValue
-        case .mediaHeader, .downloadStories, .hideStories, .autoCacheCleanupLink, .speedBoostLink, .longRoundVideos, .confirmVoiceSend, .mediaInfo:
+        case .mediaHeader, .downloadStories, .hideStories, .autoCacheCleanupLink, .speedBoostLink, .longRoundVideos, .confirmVoiceSend, .videoNoRecompress, .mediaInfo:
             return TelewhiteModsSection.media.rawValue
         case .autoCacheCleanup, .cacheLimitHeader, .cacheLimit, .cacheLimitInfo:
             return TelewhiteModsSection.cacheLimit.rawValue
@@ -646,8 +656,10 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 102
         case .showProfileIds:
             return 103
-        case .privacyInfo:
+        case .stripFileMetadata:
             return 104
+        case .privacyInfo:
+            return 110
         case .stealthHeader:
             return 300
         case .ghost:
@@ -678,6 +690,8 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 520
         case .confirmVoiceSend:
             return 521
+        case .videoNoRecompress:
+            return 522
         // Telewhite: stableId must rise in the order rows are appended — ItemListUI
         // asserts it (ItemListControllerNode.swift:449) and its row diff assumes it.
         // The trailing info row therefore sits at the end of the media block, not at 502.
@@ -983,6 +997,14 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
         case let .confirmVoiceSend(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.confirmVoiceSend = value
+            }
+        case let .videoNoRecompress(text, value):
+            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
+                settings.videoNoRecompress = value
+            }
+        case let .stripFileMetadata(text, value):
+            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
+                settings.stripFileMetadata = value
             }
         case let .longRoundVideos(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
@@ -1336,6 +1358,8 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
         return text("Screenshots, copying, forwarding, saving media.", "Скриншоты, копирование, пересылка, сохранение медиа.")
     case .showProfileIds:
         return text("Tap to copy.", "Нажмите, чтобы скопировать.")
+    case .stripFileMetadata:
+        return text("An image sent as a file loses where and on what it was taken. Quality is untouched.", "Из картинки, отправленной файлом, пропадут место и модель камеры. Качество не меняется.")
     case .ghost:
         return text("No read receipts, no \"typing\", no online status; stories viewed anonymously.", "Ни прочтений, ни «печатает», ни «в сети»; истории смотрите анонимно.")
     case .ghostChatButtonEnabled:
@@ -1344,6 +1368,8 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
         return text("Reactions, the comments bar, the share button.", "Реакции, панель комментариев, кнопку «Поделиться».")
     case .longRoundVideos:
         return text("Up to five minutes. Past a minute the server sends it on as a normal video.", "До пяти минут. Дольше минуты сервер пришлёт обычным видео.")
+    case .videoNoRecompress:
+        return text("Sent as recorded: no waiting, original quality, a much bigger file.", "Уходит как снято: без ожидания, в исходном качестве, но файл заметно больше.")
     case .chatSplitLandscape:
         return text("The chat list stays beside the open chat.", "Список чатов остаётся рядом с открытым.")
     case .amoledMode:
@@ -1412,6 +1438,7 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.protectionBypass(strings.text("Allow Saving Everywhere", "Разрешить сохранять везде"), settings.screenshotProtectionBypass || settings.contentRestrictionBypass))
         entries.append(.hidePhoneInSettings(strings.text("Hide My Number and Username", "Скрыть свой номер и юзернейм"), settings.hidePhoneInSettings))
         entries.append(.showProfileIds(strings.text("Show Numeric IDs", "Показывать числовые ID"), settings.showUserIds || settings.showChatIds || settings.showMessageIds))
+        entries.append(.stripFileMetadata(strings.text("Strip Data From Sent Files", "Убирать данные из отправляемых файлов"), settings.stripFileMetadata))
         entries.append(.privacyInfo(strings.text("Changes what this phone shows and allows. Your Telegram privacy settings stay as they are.", "Меняет то, что показывает этот телефон. Настройки приватности Telegram остаются как есть.")))
 
     case .stealth:
@@ -1438,6 +1465,7 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.speedBoostLink(strings.text("Speed Boost", "Ускорить загрузку"), telewhiteSpeedBoostName(settings.speedBoost, strings: strings)))
         entries.append(.longRoundVideos(strings.text("Longer Round Videos", "Длинные кружки"), settings.longRoundVideos))
         entries.append(.confirmVoiceSend(strings.text("Confirm Voice and Round Videos", "Спрашивать перед голосовым и кружком"), settings.confirmVoiceSend))
+        entries.append(.videoNoRecompress(strings.text("Send Videos Without Re-encoding", "Отправлять видео без пережатия"), settings.videoNoRecompress))
         entries.append(.mediaInfo(strings.text("Nothing in the cloud is deleted — only the copies on this phone.", "Из облака ничего не удаляется — только копии на этом телефоне.")))
 
     case .appearance:

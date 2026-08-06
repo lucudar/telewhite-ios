@@ -102,6 +102,72 @@
 
 @implementation TGMediaVideoConverter
 
+// Telewhite: "Send Videos Without Re-encoding".
+//
+// The normal path decodes every frame, renders it through a video composition and encodes it
+// again — minutes of "Processing..." on a long clip that the phone had already compressed when
+// it recorded it. When nothing about the video is actually being changed, all of that work
+// produces a smaller file and nothing else.
+//
+// This takes the other route: AVAssetExportSession with the passthrough preset copies the
+// existing video and audio streams into an MP4 container without touching the encoded frames.
+// It finishes in seconds and the picture is bit-for-bit the original.
+//
+// Note this does NOT reuse TGMediaVideoConversionPresetPassthrough. That preset still reads
+// through AVAssetReaderVideoCompositionOutput, which decodes and renders every frame, and then
+// hands raw pixel buffers to a writer input configured to pass samples through unchanged — it
+// is not a remux and would not save any time here.
+//
+// Only for a video that is being sent as it is: any trim, crop, filter, drawing, GIF conversion
+// or hand-picked quality falls back to the normal path, because all of those need the frames.
++ (bool)telewhiteShouldRemuxWithoutRecompression:(AVAsset *)avAsset adjustments:(TGMediaVideoEditAdjustments *)adjustments
+{
+    if (![[NSUserDefaults standardUserDefaults] boolForKey:@"telewhite.mods.videoNoRecompress"])
+        return false;
+    if (![avAsset isKindOfClass:[AVURLAsset class]])
+        return false;
+    if ([[avAsset tracksWithMediaType:AVMediaTypeVideo] firstObject] == nil)
+        return false;
+
+    if (adjustments != nil)
+    {
+        if (adjustments.sendAsGif || [adjustments trimApplied] || [adjustments toolsApplied] || [adjustments hasPainting] || [adjustments cropAppliedForAvatar:false])
+            return false;
+        if (adjustments.preset != TGMediaVideoConversionPresetCompressedDefault)
+            return false;
+    }
+
+    // Asked before anything is started, so an asset the system cannot copy as-is quietly takes
+    // the normal path instead of failing the send.
+    if (![[AVAssetExportSession exportPresetsCompatibleWithAsset:avAsset] containsObject:AVAssetExportPresetPassthrough])
+        return false;
+
+    return true;
+}
+
+// Progress has to keep flowing or the bubble shows a frozen "Processing...". The export session
+// only exposes a number to poll, so it is polled on the conversion queue and stops as soon as
+// the session leaves the exporting state.
++ (void)telewhiteReportRemuxProgress:(AVAssetExportSession *)exportSession queue:(SQueue *)queue subscriber:(SSubscriber *)subscriber context:(SAtomic *)context
+{
+    [queue dispatch:^
+    {
+        if (((TGMediaVideoConversionContext *)context.value).cancelled)
+            return;
+
+        AVAssetExportSessionStatus status = exportSession.status;
+        if (status != AVAssetExportSessionStatusExporting && status != AVAssetExportSessionStatusWaiting && status != AVAssetExportSessionStatusUnknown)
+            return;
+
+        [subscriber putNext:@(exportSession.progress)];
+
+        TGDispatchAfter(0.25, queue._dispatch_queue, ^
+        {
+            [self telewhiteReportRemuxProgress:exportSession queue:queue subscriber:subscriber context:context];
+        });
+    }];
+}
+
 + (SSignal *)convertAVAsset:(AVAsset *)avAsset adjustments:(TGMediaVideoEditAdjustments *)adjustments path:(NSString *)path watcher:(TGMediaVideoFileWatcher *)watcher entityRenderer:(id<TGPhotoPaintEntityRenderer>)entityRenderer
 {
     return [self convertAVAsset:avAsset adjustments:adjustments path:path watcher:watcher inhibitAudio:false entityRenderer:entityRenderer];
@@ -121,6 +187,9 @@
         SAtomic *context = [[SAtomic alloc] initWithValue:[TGMediaVideoConversionContext contextWithQueue:queue subscriber:subscriber]];
         NSURL *outputUrl = [NSURL fileURLWithPath:path];
         
+        // Telewhite: held so that cancelling the send also cancels a remux in flight.
+        __block AVAssetExportSession *telewhiteExportSession = nil;
+
         NSArray *requiredKeys = @[ @"tracks", @"duration" ];
         [avAsset loadValuesAsynchronouslyForKeys:requiredKeys completionHandler:^
         {
@@ -160,6 +229,69 @@
                     }
                 }
                 
+                if ([self telewhiteShouldRemuxWithoutRecompression:avAsset adjustments:adjustments])
+                {
+                    AVAssetExportSession *exportSession = [[AVAssetExportSession alloc] initWithAsset:avAsset presetName:AVAssetExportPresetPassthrough];
+                    if (exportSession != nil && [exportSession.supportedFileTypes containsObject:AVFileTypeMPEG4])
+                    {
+                        telewhiteExportSession = exportSession;
+                        exportSession.outputURL = outputUrl;
+                        exportSession.outputFileType = AVFileTypeMPEG4;
+                        exportSession.shouldOptimizeForNetworkUse = true;
+
+                        AVAssetTrack *remuxVideoTrack = [[avAsset tracksWithMediaType:AVMediaTypeVideo] firstObject];
+                        CGSize remuxDimensions = CGSizeApplyAffineTransform(remuxVideoTrack.naturalSize, remuxVideoTrack.preferredTransform);
+                        remuxDimensions = CGSizeMake(fabs(remuxDimensions.width), fabs(remuxDimensions.height));
+                        NSTimeInterval remuxDuration = CMTimeGetSeconds(avAsset.duration);
+
+                        UIImage *remuxCoverImage = nil;
+                        AVAssetImageGenerator *coverGenerator = [[AVAssetImageGenerator alloc] initWithAsset:avAsset];
+                        coverGenerator.appliesPreferredTrackTransform = true;
+                        coverGenerator.requestedTimeToleranceBefore = kCMTimeZero;
+                        coverGenerator.requestedTimeToleranceAfter = kCMTimeZero;
+                        CGImageRef coverRef = [coverGenerator copyCGImageAtTime:kCMTimeZero actualTime:NULL error:NULL];
+                        if (coverRef != NULL)
+                        {
+                            remuxCoverImage = [[UIImage alloc] initWithCGImage:coverRef];
+                            CGImageRelease(coverRef);
+                        }
+
+                        [self telewhiteReportRemuxProgress:exportSession queue:queue subscriber:subscriber context:context];
+
+                        [exportSession exportAsynchronouslyWithCompletionHandler:^
+                        {
+                            [queue dispatch:^
+                            {
+                                if (((TGMediaVideoConversionContext *)context.value).cancelled)
+                                    return;
+
+                                if (exportSession.status != AVAssetExportSessionStatusCompleted)
+                                {
+                                    [subscriber putError:exportSession.error];
+                                    return;
+                                }
+
+                                id liveUploadData = nil;
+                                if (watcher != nil)
+                                    liveUploadData = [watcher fileUpdated:true];
+
+                                NSUInteger fileSize = [[[NSFileManager defaultManager] attributesOfItemAtPath:outputUrl.path error:nil] fileSize];
+                                TGMediaVideoConversionResult *result = [TGMediaVideoConversionResult resultWithFileURL:outputUrl fileSize:fileSize duration:remuxDuration dimensions:remuxDimensions coverImage:remuxCoverImage liveUploadData:liveUploadData];
+
+                                [context modify:^id(TGMediaVideoConversionContext *currentContext)
+                                {
+                                    return [currentContext finishedContext];
+                                }];
+
+                                [subscriber putNext:result];
+                                [subscriber putCompletion];
+                            }];
+                        }];
+
+                        return;
+                    }
+                }
+
                 if (![self setupAssetReaderWriterForAVAsset:avAsset image:nil duration:0.0 outputURL:outputUrl preset:preset entityRenderer:entityRenderer adjustments:adjustments inhibitAudio:inhibitAudio conversionContext:context error:&error])
                 {
                     [subscriber putError:error];
@@ -224,6 +356,8 @@
                     
                     [currentContext.videoProcessor cancel];
                     [currentContext.audioProcessor cancel];
+                    // Telewhite: a remux has no sample processors of its own to stop.
+                    [telewhiteExportSession cancelExport];
                     
                     return [currentContext cancelledContext];
                 }];
