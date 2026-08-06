@@ -120,8 +120,14 @@
 //
 // Only for a video that is being sent as it is: any trim, crop, filter, drawing, GIF conversion
 // or hand-picked quality falls back to the normal path, because all of those need the frames.
+// Set the first time a remux fails, so one bad file does not make every later send take the
+// slow route through a failure first. Cleared on the next app launch, which is often enough.
+static bool telewhiteRemuxDisabledForSession = false;
+
 + (bool)telewhiteShouldRemuxWithoutRecompression:(AVAsset *)avAsset adjustments:(TGMediaVideoEditAdjustments *)adjustments
 {
+    if (telewhiteRemuxDisabledForSession)
+        return false;
     if (![[NSUserDefaults standardUserDefaults] boolForKey:@"telewhite.mods.videoNoRecompress"])
         return false;
     if (![avAsset isKindOfClass:[AVURLAsset class]])
@@ -187,8 +193,10 @@
         SAtomic *context = [[SAtomic alloc] initWithValue:[TGMediaVideoConversionContext contextWithQueue:queue subscriber:subscriber]];
         NSURL *outputUrl = [NSURL fileURLWithPath:path];
         
-        // Telewhite: held so that cancelling the send also cancels a remux in flight.
+        // Telewhite: held so that cancelling the send also cancels a remux in flight, and the
+        // fallback conversion it may hand over to.
         __block AVAssetExportSession *telewhiteExportSession = nil;
+        __block id<SDisposable> telewhiteFallbackDisposable = nil;
 
         NSArray *requiredKeys = @[ @"tracks", @"duration" ];
         [avAsset loadValuesAsynchronouslyForKeys:requiredKeys completionHandler:^
@@ -267,7 +275,22 @@
 
                                 if (exportSession.status != AVAssetExportSessionStatusCompleted)
                                 {
-                                    [subscriber putError:exportSession.error];
+                                    // Telewhite: a copy the system refuses to make must not cost the user
+                                    // their send. Drop whatever was written, remember not to try this route
+                                    // again for now, and convert the ordinary way — slower, but it works.
+                                    [[NSFileManager defaultManager] removeItemAtURL:outputUrl error:NULL];
+                                    telewhiteRemuxDisabledForSession = true;
+
+                                    telewhiteFallbackDisposable = [[self convertAVAsset:avAsset adjustments:adjustments path:path watcher:watcher inhibitAudio:inhibitAudio entityRenderer:entityRenderer] startWithNext:^(id next)
+                                    {
+                                        [subscriber putNext:next];
+                                    } error:^(id error)
+                                    {
+                                        [subscriber putError:error];
+                                    } completed:^
+                                    {
+                                        [subscriber putCompletion];
+                                    }];
                                     return;
                                 }
 
@@ -358,6 +381,7 @@
                     [currentContext.audioProcessor cancel];
                     // Telewhite: a remux has no sample processors of its own to stop.
                     [telewhiteExportSession cancelExport];
+                    [telewhiteFallbackDisposable dispose];
                     
                     return [currentContext cancelledContext];
                 }];
