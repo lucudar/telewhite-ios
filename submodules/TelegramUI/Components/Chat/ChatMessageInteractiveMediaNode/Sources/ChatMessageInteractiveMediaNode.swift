@@ -2846,14 +2846,22 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                                     let durationString = stringForDuration(playerDuration > 0 ? playerDuration : Int32(duration), position: playerPosition)
                                     badgeContent = .mediaDownload(backgroundColor: messageTheme.mediaDateAndStatusFillColor, foregroundColor: messageTheme.mediaDateAndStatusTextColor, duration: durationString, size: active ? sizeString : nil, muted: muted, active: active)
                                     
-                                    mediaDownloadState = .fetching(progress: automaticPlayback ? nil : adjustedProgress)
+                                    // Telewhite: the ring used to be handed nil while autoplay was on, which
+                                    // draws an endless spinner — it says "something is happening" and nothing
+                                    // else. The progress is known here, so it is shown.
+                                    mediaDownloadState = .fetching(progress: adjustedProgress)
                                     if self.playerStatus?.status == .playing {
                                         mediaDownloadState = nil
                                     }
                                 } else {
-                                    let progressString = String(format: "%d%%", Int(progress * 100.0))
-                                    badgeContent = .text(inset: message.flags.contains(.Unsent) ? 0.0 : 12.0, backgroundColor: messageTheme.mediaDateAndStatusFillColor, foregroundColor: messageTheme.mediaDateAndStatusTextColor, text: NSAttributedString(string: progressString), iconName: nil)
-                                    mediaDownloadState = automaticPlayback ? .none : .compactFetching(progress: 0.0)
+                                    // Telewhite: megabytes rather than a bare percentage, the way a file in
+                                    // a chat reports itself — "12.3 MB / 45.6 MB" answers "is this moving?"
+                                    // at a glance, and a percentage on a 2 GB video does not.
+                                    //
+                                    // The ring was being handed a literal 0.0, so it never filled no matter how
+                                    // far along the download was. That is what made it unreadable.
+                                    badgeContent = .text(inset: message.flags.contains(.Unsent) ? 0.0 : 12.0, backgroundColor: messageTheme.mediaDateAndStatusFillColor, foregroundColor: messageTheme.mediaDateAndStatusTextColor, text: NSAttributedString(string: sizeString), iconName: nil)
+                                    mediaDownloadState = automaticPlayback ? .none : .compactFetching(progress: adjustedProgress)
                                 }
                                 
                                 if !message.flags.contains(.Unsent) {
