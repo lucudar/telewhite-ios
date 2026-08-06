@@ -688,7 +688,15 @@ public func legacyAssetPickerEnqueueMessages(
                             }
                         case let .file(data, thumbnail, mimeType, name, caption):
                             switch data {
-                                case let .tempFile(path):
+                                case let .tempFile(originalPath):
+                                    // Telewhite: a file from Files, iCloud or another app is uploaded
+                                    // byte for byte, so an image still carries its EXIF and GPS tags.
+                                    // Library photos are re-encoded on the way out and never do, which
+                                    // is why only this branch needs it.
+                                    var path = originalPath
+                                    if telewhiteStripFileMetadataEnabled(), mimeType.hasPrefix("image/"), let cleanedPath = telewhiteStripImageMetadata(atPath: originalPath) {
+                                        path = cleanedPath
+                                    }
                                     var previewRepresentations: [TelegramMediaImageRepresentation] = []
                                     if let thumbnail = thumbnail {
                                         let resource = LocalFileMediaResource(fileId: Int64.random(in: Int64.min ... Int64.max))
