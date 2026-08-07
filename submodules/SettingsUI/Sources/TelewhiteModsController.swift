@@ -561,6 +561,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case developerHeader(String)
     case pushStatus(String, String)
     case pushToken(String, String)
+    case lastVideoSend(String, String)
     case debugMenu(String)
     case developerInfo(String)
     
@@ -594,7 +595,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.chatListLook.rawValue
         case .settingsIconsHeader, .settingsIconVariant, .settingsIconsInfo:
             return TelewhiteModsSection.settingsIcons.rawValue
-        case .developerHeader, .pushStatus, .pushToken, .debugMenu, .developerInfo:
+        case .developerHeader, .pushStatus, .pushToken, .lastVideoSend, .debugMenu, .developerInfo:
             return TelewhiteModsSection.developer.rawValue
         }
     }
@@ -775,6 +776,8 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 804
         case .pushToken:
             return 805
+        case .lastVideoSend:
+            return 8055
         case .debugMenu:
             return 806
         case .developerInfo:
@@ -1087,6 +1090,8 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
                     return updated
                 }
             })
+        case let .lastVideoSend(text, value):
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: value, labelStyle: .multilineDetailText, sectionId: self.section, style: .blocks, disclosureStyle: .none, action: nil)
         case let .pushStatus(text, value):
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: value, labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .none, action: nil)
         case let .pushToken(text, value):
@@ -1564,6 +1569,10 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
             shortToken = pushToken
         }
         entries.append(.pushToken(strings.text("APNs token", "APNs токен"), pushToken.isEmpty ? shortToken : "\(shortToken) — \(strings.text("tap to copy", "нажмите чтобы скопировать"))"))
+        // Telewhite: what the last video send actually did — which pipeline, and whether the
+        // no-recompression path ran or why it did not. Written by the converter itself.
+        let lastVideoSend = defaults.string(forKey: "telewhite.debug.lastVideoSend") ?? strings.text("No video sent yet", "Видео ещё не отправлялось")
+        entries.append(.lastVideoSend(strings.text("Last video send", "Последняя отправка видео"), lastVideoSend))
         entries.append(.debugMenu(strings.text("Debug Menu", "Меню отладки")))
         entries.append(.developerInfo(strings.text("Push registration diagnostics and debug tools.", "Диагностика пушей и инструменты отладки.")))
     }

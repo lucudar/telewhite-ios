@@ -219,6 +219,10 @@ private let throttlingContext = FetchVideoLibraryMediaResourceContext()
 // chosen deliberately so that its remux can happen. Any real edit — trim, crop, filters, drawing,
 // GIF — goes to the modern pipeline exactly as before, because those need the frames decoded and
 // the modern path does that better.
+private func telewhiteNoteVideoPipeline(_ note: String) {
+    UserDefaults.standard.set(note, forKey: "telewhite.debug.lastVideoSend")
+}
+
 private func telewhiteWantsLegacyRemux(_ adjustments: TGVideoEditAdjustments?) -> Bool {
     if !UserDefaults.standard.bool(forKey: "telewhite.mods.videoNoRecompress") {
         return false
@@ -372,6 +376,9 @@ public func fetchVideoLibraryMediaResource(postbox: Postbox, resource: VideoLibr
                     }
                     let tempFile = EngineTempBox.shared.tempFile(fileName: "video.mp4")
                     let updatedSize = Atomic<Int64>(value: 0)
+                    // Telewhite: the fork that decides everything — the remux exists only on the
+                    // legacy side, so which pipeline ran is the first thing worth knowing.
+                    telewhiteNoteVideoPipeline(mediaEditorValues != nil ? "library video -> modern pipeline (no remux)" : "library video -> legacy converter")
                     if let mediaEditorValues {
                         let duration: Double = avAsset.duration.seconds
                         let configuration = recommendedVideoExportConfiguration(values: mediaEditorValues, duration: duration, frameRate: 30.0)
@@ -573,6 +580,7 @@ public func fetchLocalFileVideoMediaResource(postbox: Postbox, resource: LocalFi
         }
         let tempFile = EngineTempBox.shared.tempFile(fileName: "video.mp4")
         let updatedSize = Atomic<Int64>(value: 0)
+        telewhiteNoteVideoPipeline(mediaEditorValues != nil ? "local file -> modern pipeline (no remux)" : "local file -> legacy converter")
         if let mediaEditorValues {
             let duration: Double
             let subject: MediaEditorVideoExport.Subject

@@ -124,21 +124,39 @@
 // slow route through a failure first. Cleared on the next app launch, which is often enough.
 static bool telewhiteRemuxDisabledForSession = false;
 
+// Telewhite: leaves a breadcrumb the owner can read in the debug menu. Three builds were spent
+// guessing why the mod appeared to do nothing; a sentence stating what actually happened costs
+// one line and ends the guessing.
+void telewhiteNoteVideoSend(NSString *note)
+{
+    [[NSUserDefaults standardUserDefaults] setObject:note forKey:@"telewhite.debug.lastVideoSend"];
+}
+
 + (bool)telewhiteShouldRemuxWithoutRecompression:(AVAsset *)avAsset adjustments:(TGMediaVideoEditAdjustments *)adjustments
 {
-    if (telewhiteRemuxDisabledForSession)
+    if (telewhiteRemuxDisabledForSession) {
+        telewhiteNoteVideoSend(@"encode: remux disabled after an earlier failure");
         return false;
-    if (![[NSUserDefaults standardUserDefaults] boolForKey:@"telewhite.mods.videoNoRecompress"])
+    }
+    if (![[NSUserDefaults standardUserDefaults] boolForKey:@"telewhite.mods.videoNoRecompress"]) {
+        telewhiteNoteVideoSend(@"encode: mod is off");
         return false;
-    if (![avAsset isKindOfClass:[AVURLAsset class]])
+    }
+    if (![avAsset isKindOfClass:[AVURLAsset class]]) {
+        telewhiteNoteVideoSend([NSString stringWithFormat:@"encode: asset is %@, not a file", NSStringFromClass([avAsset class])]);
         return false;
-    if ([[avAsset tracksWithMediaType:AVMediaTypeVideo] firstObject] == nil)
+    }
+    if ([[avAsset tracksWithMediaType:AVMediaTypeVideo] firstObject] == nil) {
+        telewhiteNoteVideoSend(@"encode: no video track");
         return false;
+    }
 
     if (adjustments != nil)
     {
-        if (adjustments.sendAsGif || [adjustments trimApplied] || [adjustments toolsApplied] || [adjustments hasPainting] || [adjustments cropAppliedForAvatar:false])
+        if (adjustments.sendAsGif || [adjustments trimApplied] || [adjustments toolsApplied] || [adjustments hasPainting] || [adjustments cropAppliedForAvatar:false]) {
+            telewhiteNoteVideoSend(@"encode: the video was edited");
             return false;
+        }
         // The chosen quality preset is deliberately NOT consulted. It used to be, and that made the
         // mod look broken: the picker remembers a quality in TG_preferredVideoPreset_v0 and puts it
         // into adjustments, so anyone who had ever touched the quality selector silently got the
@@ -148,9 +166,12 @@ static bool telewhiteRemuxDisabledForSession = false;
 
     // Asked before anything is started, so an asset the system cannot copy as-is quietly takes
     // the normal path instead of failing the send.
-    if (![[AVAssetExportSession exportPresetsCompatibleWithAsset:avAsset] containsObject:AVAssetExportPresetPassthrough])
+    if (![[AVAssetExportSession exportPresetsCompatibleWithAsset:avAsset] containsObject:AVAssetExportPresetPassthrough]) {
+        telewhiteNoteVideoSend(@"encode: the system will not copy this asset");
         return false;
+    }
 
+    telewhiteNoteVideoSend(@"remux: starting");
     return true;
 }
 
@@ -282,6 +303,7 @@ static bool telewhiteRemuxDisabledForSession = false;
                                     // their send. Drop whatever was written, remember not to try this route
                                     // again for now, and convert the ordinary way — slower, but it works.
                                     [[NSFileManager defaultManager] removeItemAtURL:outputUrl error:NULL];
+                                    telewhiteNoteVideoSend([NSString stringWithFormat:@"remux failed (%@), falling back to encoding", exportSession.error.localizedDescription ?: @"no reason given"]);
                                     telewhiteRemuxDisabledForSession = true;
 
                                     telewhiteFallbackDisposable = [[self convertAVAsset:avAsset adjustments:adjustments path:path watcher:watcher inhibitAudio:inhibitAudio entityRenderer:entityRenderer] startWithNext:^(id next)
@@ -302,6 +324,7 @@ static bool telewhiteRemuxDisabledForSession = false;
                                     liveUploadData = [watcher fileUpdated:true];
 
                                 NSUInteger fileSize = [[[NSFileManager defaultManager] attributesOfItemAtPath:outputUrl.path error:nil] fileSize];
+                                telewhiteNoteVideoSend([NSString stringWithFormat:@"remux: done in %.1fs, %.0f MB", CACurrentMediaTime() - start, fileSize / 1048576.0]);
                                 TGMediaVideoConversionResult *result = [TGMediaVideoConversionResult resultWithFileURL:outputUrl fileSize:fileSize duration:remuxDuration dimensions:remuxDimensions coverImage:remuxCoverImage liveUploadData:liveUploadData];
 
                                 [context modify:^id(TGMediaVideoConversionContext *currentContext)
