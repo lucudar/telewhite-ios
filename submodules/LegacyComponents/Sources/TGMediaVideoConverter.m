@@ -139,8 +139,11 @@ static bool telewhiteRemuxDisabledForSession = false;
     {
         if (adjustments.sendAsGif || [adjustments trimApplied] || [adjustments toolsApplied] || [adjustments hasPainting] || [adjustments cropAppliedForAvatar:false])
             return false;
-        if (adjustments.preset != TGMediaVideoConversionPresetCompressedDefault)
-            return false;
+        // The chosen quality preset is deliberately NOT consulted. It used to be, and that made the
+        // mod look broken: the picker remembers a quality in TG_preferredVideoPreset_v0 and puts it
+        // into adjustments, so anyone who had ever touched the quality selector silently got the
+        // slow path forever. "Send without re-encoding" has to outrank a size preference — the
+        // whole point is not to re-encode. Edits above still win, because those need the frames.
     }
 
     // Asked before anything is started, so an asset the system cannot copy as-is quietly takes
