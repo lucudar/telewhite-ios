@@ -164,13 +164,13 @@ void telewhiteNoteVideoSend(NSString *note)
         // whole point is not to re-encode. Edits above still win, because those need the frames.
     }
 
-    // Asked before anything is started, so an asset the system cannot copy as-is quietly takes
-    // the normal path instead of failing the send.
-    if (![[AVAssetExportSession exportPresetsCompatibleWithAsset:avAsset] containsObject:AVAssetExportPresetPassthrough]) {
-        telewhiteNoteVideoSend(@"encode: the system will not copy this asset");
-        return false;
-    }
-
+    // No exportPresetsCompatibleWithAsset: check here, deliberately. It was here, and it refused
+    // every single video: that call lists presets for TRANSCODING, and passthrough is routinely
+    // absent from it even for assets that copy perfectly well. The guard meant to catch the odd
+    // file turned out to reject all of them, which is what made the mod look inert.
+    //
+    // The honest test is to try. Creating the session fails cleanly for an asset that cannot be
+    // copied, and an export that fails later falls back to normal encoding a few lines below.
     telewhiteNoteVideoSend(@"remux: starting");
     return true;
 }
@@ -264,11 +264,25 @@ void telewhiteNoteVideoSend(NSString *note)
                 if ([self telewhiteShouldRemuxWithoutRecompression:avAsset adjustments:adjustments])
                 {
                     AVAssetExportSession *exportSession = [[AVAssetExportSession alloc] initWithAsset:avAsset presetName:AVAssetExportPresetPassthrough];
-                    if (exportSession != nil && [exportSession.supportedFileTypes containsObject:AVFileTypeMPEG4])
+                    // A phone records into a QuickTime container, and copying its tracks into MP4 is
+                    // not always allowed — but copying them into QuickTime always is. Telegram is
+                    // happy with either, so take whichever the system offers rather than insisting.
+                    NSString *remuxFileType = nil;
+                    if ([exportSession.supportedFileTypes containsObject:AVFileTypeMPEG4]) {
+                        remuxFileType = AVFileTypeMPEG4;
+                    } else if ([exportSession.supportedFileTypes containsObject:AVFileTypeQuickTimeMovie]) {
+                        remuxFileType = AVFileTypeQuickTimeMovie;
+                    }
+                    if (exportSession == nil) {
+                        telewhiteNoteVideoSend(@"encode: passthrough session could not be created");
+                    } else if (remuxFileType == nil) {
+                        telewhiteNoteVideoSend([NSString stringWithFormat:@"encode: no copyable container (offered %@)", [exportSession.supportedFileTypes componentsJoinedByString:@", "]]);
+                    }
+                    if (exportSession != nil && remuxFileType != nil)
                     {
                         telewhiteExportSession = exportSession;
                         exportSession.outputURL = outputUrl;
-                        exportSession.outputFileType = AVFileTypeMPEG4;
+                        exportSession.outputFileType = remuxFileType;
                         exportSession.shouldOptimizeForNetworkUse = true;
 
                         AVAssetTrack *remuxVideoTrack = [[avAsset tracksWithMediaType:AVMediaTypeVideo] firstObject];
