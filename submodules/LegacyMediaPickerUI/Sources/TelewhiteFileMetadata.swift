@@ -1,6 +1,7 @@
 import Foundation
 import ImageIO
 import MobileCoreServices
+import LegacyComponents
 
 // Telewhite: "Strip Data From Files".
 //
@@ -71,4 +72,24 @@ func telewhiteStripImageMetadata(atPath path: String) -> String? {
     }
 
     return outputPath
+}
+
+// Telewhite: true when this video will be sent without re-encoding, so the message must describe
+// the original rather than what the compressor would have produced.
+//
+// The dimensions written into a message are normally clamped to the "medium" preset — 848 on the
+// long side — because that is what the file was about to become. With the no-recompression mod the
+// file stays 1920x1080, and a message claiming 848 makes every client render it as a small video:
+// the picture is untouched but looks worse, which is exactly what got reported.
+func telewhiteSendsVideoUnchanged(_ adjustments: TGVideoEditAdjustments?) -> Bool {
+    if !UserDefaults.standard.bool(forKey: "telewhite.mods.videoNoRecompress") {
+        return false
+    }
+    guard let adjustments else {
+        return true
+    }
+    if adjustments.sendAsGif || adjustments.trimApplied() || adjustments.toolsApplied() || adjustments.hasPainting() || adjustments.cropApplied(forAvatar: false) {
+        return false
+    }
+    return true
 }

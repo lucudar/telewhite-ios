@@ -891,7 +891,17 @@ public func legacyAssetPickerEnqueueMessages(
                                 preset = TGMediaVideoConversionPresetAnimation
                             }
                             if !asAnimation {
-                                finalDimensions = TGMediaVideoConverter.dimensions(for: finalDimensions, adjustments: adjustments, preset: TGMediaVideoConversionPresetCompressedMedium)
+                                // Telewhite: a video sent without re-encoding keeps its own size, so the
+                                // message has to say so. The medium preset caps the declared size at 848 —
+                                // right when the file was about to be compressed to that, wrong when it is
+                                // going out untouched at 1920x1080. The same function is still used, so
+                                // orientation and rounding keep behaving; only the ceiling moves up.
+                                //
+                                // A 4K original will still be described as 1920 on the long side: that is
+                                // the highest ceiling this table has. Closer than 848, and worth revisiting
+                                // if 4K sending becomes a habit.
+                                let dimensionsPreset: TGMediaVideoConversionPreset = telewhiteSendsVideoUnchanged(adjustments) ? TGMediaVideoConversionPresetCompressedVeryHigh : TGMediaVideoConversionPresetCompressedMedium
+                                finalDimensions = TGMediaVideoConverter.dimensions(for: finalDimensions, adjustments: adjustments, preset: dimensionsPreset)
                             }
                             
                             var resourceAdjustments: VideoMediaResourceAdjustments?
