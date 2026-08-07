@@ -205,6 +205,33 @@ private final class FetchVideoLibraryMediaResourceContext {
 
 private let throttlingContext = FetchVideoLibraryMediaResourceContext()
 
+// Telewhite: which converter a video goes through, and why the no-recompression mod has to have
+// a say in it.
+//
+// There are two pipelines here. The modern one (MediaEditorVideoExport) is the default — the
+// killswitch that turns it off lives on the server and is not set — and the legacy
+// TGMediaVideoConverter runs only when a video arrives with no editor values at all. The
+// no-recompression path is built into the legacy converter, so as long as the picker attaches
+// adjustments (it does, as soon as anyone has ever chosen a quality), the modern pipeline took
+// over and the mod had no effect whatsoever. That is why turning it on appeared to change nothing.
+//
+// When the mod is on and the adjustments describe no actual editing, the legacy converter is
+// chosen deliberately so that its remux can happen. Any real edit — trim, crop, filters, drawing,
+// GIF — goes to the modern pipeline exactly as before, because those need the frames decoded and
+// the modern path does that better.
+private func telewhiteWantsLegacyRemux(_ adjustments: TGVideoEditAdjustments?) -> Bool {
+    if !UserDefaults.standard.bool(forKey: "telewhite.mods.videoNoRecompress") {
+        return false
+    }
+    guard let adjustments else {
+        return true
+    }
+    if adjustments.sendAsGif || adjustments.trimApplied() || adjustments.toolsApplied() || adjustments.hasPainting() || adjustments.cropApplied(forAvatar: false) {
+        return false
+    }
+    return true
+}
+
 public func fetchVideoLibraryMediaResource(postbox: Postbox, resource: VideoLibraryMediaResource, alwaysUseModernPipeline: Bool = true) -> Signal<MediaResourceDataFetchResult, MediaResourceDataFetchError> {
     let signal = Signal<MediaResourceDataFetchResult, MediaResourceDataFetchError> { subscriber in
         subscriber.putNext(.reset)
@@ -331,7 +358,7 @@ public func fetchVideoLibraryMediaResource(postbox: Postbox, resource: VideoLibr
                                     mediaEditorValues = values
                                 }
                             } else if let dict = legacy_unarchiveDeprecated(data: adjustmentsValue.data.makeData()) as? [AnyHashable : Any], let legacyAdjustments = TGVideoEditAdjustments(dictionary: dict) {
-                                if alwaysUseModernPipeline {
+                                if alwaysUseModernPipeline && !telewhiteWantsLegacyRemux(legacyAdjustments) {
                                     mediaEditorValues = MediaEditorValues(legacyAdjustments: legacyAdjustments, defaultPreset: qualityPreset)
                                 } else {
                                     adjustments = legacyAdjustments
@@ -536,7 +563,7 @@ public func fetchLocalFileVideoMediaResource(postbox: Postbox, resource: LocalFi
                 if let values = try? JSONDecoder().decode(MediaEditorValues.self, from: videoAdjustments.data.makeData()) {
                     mediaEditorValues = values
                 } else if let dict = legacy_unarchiveDeprecated(data: videoAdjustments.data.makeData()) as? [AnyHashable : Any], let legacyAdjustments = TGVideoEditAdjustments(dictionary: dict) {
-                    if alwaysUseModernPipeline && !isImage {
+                    if alwaysUseModernPipeline && !isImage && !telewhiteWantsLegacyRemux(legacyAdjustments) {
                         mediaEditorValues = MediaEditorValues(legacyAdjustments: legacyAdjustments, defaultPreset: qualityPreset)
                     } else {
                         adjustments = legacyAdjustments
