@@ -72,6 +72,9 @@ private final class PendingMessageContext {
     var error: PendingMessageFailureReason?
     var statusSubscribers = Bag<(PendingMessageStatus?, PendingMessageFailureReason?) -> Void>()
     var forcedReuploadOnce: Bool = false
+    // Telewhite: how many times this message has been sent again by itself after a failure the
+    // user did not cause. Lives on the context so it resets when the message finally goes.
+    var telewhiteAutoRetryCount: Int32 = 0
     let postponeDisposable = MetaDisposable()
     var postponeSending = false
 }
@@ -2235,6 +2238,26 @@ public final class PendingMessageManager {
                                 strongSelf.beginSendingMessages([messageId])
                                 return
                             }
+                        } else if telewhiteShouldAutoResend(errorDescription: error.errorDescription), context.telewhiteAutoRetryCount < telewhiteAutoResendAttemptLimit {
+                            // Telewhite: a send that failed for a reason Telegram itself has no name
+                            // for is almost always the network — the tunnel died mid-upload, the
+                            // request timed out, the server hiccuped. The stock behaviour is to mark
+                            // the message failed and wait for the person to notice and tap Retry.
+                            // With this on, it retries itself first, backing off so a genuinely dead
+                            // connection is not hammered, and only gives up after a few tries.
+                            //
+                            // Anything Telegram does name — slow mode, a ban, a file too large — is
+                            // left alone below: repeating those changes nothing and hides a real
+                            // answer from the user.
+                            context.telewhiteAutoRetryCount += 1
+                            let delay = Double(context.telewhiteAutoRetryCount) * 3.0
+                            queue.after(delay, {
+                                guard let strongSelf = self, let context = strongSelf.messageContexts[messageId], context.telewhiteAutoRetryCount > 0 else {
+                                    return
+                                }
+                                strongSelf.beginSendingMessages([messageId])
+                            })
+                            return
                         } else if let failureReason = sendMessageReasonForError(error.errorDescription) {
                             if let context = strongSelf.messageContexts[message.id] {
                                 context.error = failureReason

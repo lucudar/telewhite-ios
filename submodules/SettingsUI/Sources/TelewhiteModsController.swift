@@ -55,6 +55,7 @@ public struct TelewhiteModsSettings: Equatable {
     public var confirmVoiceSend: Bool
     public var videoNoRecompress: Bool
     public var stripFileMetadata: Bool
+    public var autoResendFailed: Bool
     public var settingsIconVariant: Int32
     public var chatListRows: Int32
     public var channelHideReactions: Bool
@@ -111,6 +112,7 @@ public struct TelewhiteModsSettings: Equatable {
         static let confirmVoiceSend = "telewhite.mods.confirmVoiceSend"
         static let videoNoRecompress = "telewhite.mods.videoNoRecompress"
         static let stripFileMetadata = "telewhite.mods.stripFileMetadata"
+        static let autoResendFailed = "telewhite.mods.autoResendFailed"
         static let settingsIconVariant = "telewhite.mods.settingsIconVariant"
         static let chatListRows = "telewhite.mods.chatListRows"
         static let channelHideReactions = "telewhite.mods.channelHideReactions"
@@ -205,6 +207,7 @@ public struct TelewhiteModsSettings: Equatable {
             confirmVoiceSend: defaults.bool(forKey: Key.confirmVoiceSend),
             videoNoRecompress: defaults.bool(forKey: Key.videoNoRecompress),
             stripFileMetadata: defaults.bool(forKey: Key.stripFileMetadata),
+            autoResendFailed: defaults.object(forKey: Key.autoResendFailed) as? Bool ?? true,
             settingsIconVariant: min(3, max(0, (defaults.object(forKey: Key.settingsIconVariant) as? NSNumber)?.int32Value ?? 0)),
             chatListRows: min(3, max(1, (defaults.object(forKey: Key.chatListRows) as? NSNumber)?.int32Value ?? 2)),
             channelHideReactions: defaults.bool(forKey: Key.channelHideReactions),
@@ -339,6 +342,7 @@ public struct TelewhiteModsSettings: Equatable {
         defaults.set(self.confirmVoiceSend, forKey: Key.confirmVoiceSend)
         defaults.set(self.videoNoRecompress, forKey: Key.videoNoRecompress)
         defaults.set(self.stripFileMetadata, forKey: Key.stripFileMetadata)
+        defaults.set(self.autoResendFailed, forKey: Key.autoResendFailed)
         defaults.set(self.settingsIconVariant, forKey: Key.settingsIconVariant)
         defaults.set(self.chatListRows, forKey: Key.chatListRows)
         defaults.set(self.channelHideReactions, forKey: Key.channelHideReactions)
@@ -523,6 +527,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case confirmVoiceSend(String, Bool)
     case videoNoRecompress(String, Bool)
     case stripFileMetadata(String, Bool)
+    case autoResendFailed(String, Bool)
     case mediaInfo(String)
 
     case appearanceHeader(String)
@@ -575,7 +580,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.stealth.rawValue
         case .channelsHeader, .channelsDeclutter, .hideSponsoredContent, .channelsInfo:
             return TelewhiteModsSection.channels.rawValue
-        case .mediaHeader, .downloadStories, .hideStories, .autoCacheCleanupLink, .speedBoostLink, .longRoundVideos, .confirmVoiceSend, .videoNoRecompress, .mediaInfo:
+        case .mediaHeader, .downloadStories, .hideStories, .autoCacheCleanupLink, .speedBoostLink, .longRoundVideos, .confirmVoiceSend, .videoNoRecompress, .autoResendFailed, .mediaInfo:
             return TelewhiteModsSection.media.rawValue
         case .autoCacheCleanup, .cacheLimitHeader, .cacheLimit, .cacheLimitInfo:
             return TelewhiteModsSection.cacheLimit.rawValue
@@ -692,6 +697,8 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 521
         case .videoNoRecompress:
             return 522
+        case .autoResendFailed:
+            return 523
         // Telewhite: stableId must rise in the order rows are appended — ItemListUI
         // asserts it (ItemListControllerNode.swift:449) and its row diff assumes it.
         // The trailing info row therefore sits at the end of the media block, not at 502.
@@ -1001,6 +1008,10 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
         case let .videoNoRecompress(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.videoNoRecompress = value
+            }
+        case let .autoResendFailed(text, value):
+            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
+                settings.autoResendFailed = value
             }
         case let .stripFileMetadata(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
@@ -1370,6 +1381,8 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
         return text("Up to five minutes. Past a minute the server sends it on as a normal video.", "До пяти минут. Дольше минуты сервер пришлёт обычным видео.")
     case .videoNoRecompress:
         return text("Sent as recorded: no waiting, original quality, a much bigger file.", "Уходит как снято: без ожидания, в исходном качестве, но файл заметно больше.")
+    case .autoResendFailed:
+        return text("A message that fails on a bad connection tries again by itself, up to four times.", "Сообщение, не ушедшее из-за связи, пробует отправиться само — до четырёх раз.")
     case .chatSplitLandscape:
         return text("The chat list stays beside the open chat.", "Список чатов остаётся рядом с открытым.")
     case .amoledMode:
@@ -1466,6 +1479,7 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.longRoundVideos(strings.text("Longer Round Videos", "Длинные кружки"), settings.longRoundVideos))
         entries.append(.confirmVoiceSend(strings.text("Confirm Voice and Round Videos", "Спрашивать перед голосовым и кружком"), settings.confirmVoiceSend))
         entries.append(.videoNoRecompress(strings.text("Send Videos Without Re-encoding", "Отправлять видео без пережатия"), settings.videoNoRecompress))
+        entries.append(.autoResendFailed(strings.text("Resend Automatically", "Переотправлять автоматически"), settings.autoResendFailed))
         entries.append(.mediaInfo(strings.text("Nothing in the cloud is deleted — only the copies on this phone.", "Из облака ничего не удаляется — только копии на этом телефоне.")))
 
     case .appearance:
