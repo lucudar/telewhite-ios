@@ -16,6 +16,7 @@ import ZipArchive
 import WebKit
 import InAppPurchaseManager
 import TelegramVoip
+import BuildConfig
 
 @objc private final class DebugControllerMailComposeDelegate: NSObject, MFMailComposeViewControllerDelegate {
     public func mailComposeController(_ controller: MFMailComposeViewController, didFinishWith result: MFMailComposeResult, error: Error?) {
@@ -1671,7 +1672,8 @@ public func debugController(sharedContext: SharedAccountContext, context: Accoun
         return getNavigationControllerImpl?()
     })
     
-    let appGroupName = "group.\(Bundle.main.bundleIdentifier!)"
+    let baseAppBundleId = Bundle.main.bundleIdentifier!
+    let appGroupName = BuildConfig.telewhiteResolvedAppGroupName(baseAppBundleId) ?? "group.\(baseAppBundleId)"
     let maybeAppGroupUrl = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupName)
     
     var hasLegacyAppData = false

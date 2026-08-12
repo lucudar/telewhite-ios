@@ -198,6 +198,90 @@ API_AVAILABLE(ios(10))
     return APP_CONFIG_IS_SIRI_ENABLED;
 }
 
++ (NSArray<NSString *> * _Nonnull)telewhiteAppGroupsFromEmbeddedProfile {
+    NSString *profilePath = [[NSBundle mainBundle] pathForResource:@"embedded" ofType:@"mobileprovision"];
+    if (profilePath == nil) {
+        // App extensions carry their own copy; when running inside one, mainBundle is the
+        // appex, so fall back to the containing app bundle two levels up (.../App.app/PlugIns/X.appex).
+        NSString *appexPath = [[NSBundle mainBundle] bundlePath];
+        NSString *containerPath = [[appexPath stringByDeletingLastPathComponent] stringByDeletingLastPathComponent];
+        profilePath = [containerPath stringByAppendingPathComponent:@"embedded.mobileprovision"];
+        if (![[NSFileManager defaultManager] fileExistsAtPath:profilePath]) {
+            return @[];
+        }
+    }
+
+    NSData *profileData = [NSData dataWithContentsOfFile:profilePath];
+    if (profileData == nil) {
+        return @[];
+    }
+
+    // The file is a CMS envelope around a plain plist. Decoding the signature needs
+    // Security's CMS API, which is unavailable on iOS, so slice out the payload instead —
+    // the same approach every re-signing tool uses.
+    NSData *openTag = [@"<?xml" dataUsingEncoding:NSUTF8StringEncoding];
+    NSData *closeTag = [@"</plist>" dataUsingEncoding:NSUTF8StringEncoding];
+    NSRange openRange = [profileData rangeOfData:openTag options:0 range:NSMakeRange(0, profileData.length)];
+    if (openRange.location == NSNotFound) {
+        return @[];
+    }
+    NSRange searchRange = NSMakeRange(openRange.location, profileData.length - openRange.location);
+    NSRange closeRange = [profileData rangeOfData:closeTag options:0 range:searchRange];
+    if (closeRange.location == NSNotFound) {
+        return @[];
+    }
+
+    NSRange plistRange = NSMakeRange(openRange.location, closeRange.location + closeRange.length - openRange.location);
+    NSDictionary *profile = [NSPropertyListSerialization propertyListWithData:[profileData subdataWithRange:plistRange] options:NSPropertyListImmutable format:nil error:nil];
+    if (![profile isKindOfClass:[NSDictionary class]]) {
+        return @[];
+    }
+
+    NSDictionary *entitlements = profile[@"Entitlements"];
+    if (![entitlements isKindOfClass:[NSDictionary class]]) {
+        return @[];
+    }
+
+    NSArray *groups = entitlements[@"com.apple.security.application-groups"];
+    if (![groups isKindOfClass:[NSArray class]]) {
+        return @[];
+    }
+
+    NSMutableArray<NSString *> *result = [[NSMutableArray alloc] init];
+    for (id group in groups) {
+        if ([group isKindOfClass:[NSString class]]) {
+            [result addObject:group];
+        }
+    }
+    // Sorted so the app and every extension agree on which group to use when the profile
+    // lists several: dictionary order in the plist is not guaranteed to be stable.
+    [result sortUsingSelector:@selector(compare:)];
+    return result;
+}
+
++ (NSString * _Nullable)telewhiteResolvedAppGroupName:(NSString * _Nonnull)baseAppBundleId {
+    static NSString *cachedGroupName = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        NSMutableArray<NSString *> *candidates = [[NSMutableArray alloc] init];
+        [candidates addObject:[@"group." stringByAppendingString:baseAppBundleId]];
+        for (NSString *group in [self telewhiteAppGroupsFromEmbeddedProfile]) {
+            if (![candidates containsObject:group]) {
+                [candidates addObject:group];
+            }
+        }
+
+        NSFileManager *fileManager = [NSFileManager defaultManager];
+        for (NSString *candidate in candidates) {
+            if ([fileManager containerURLForSecurityApplicationGroupIdentifier:candidate] != nil) {
+                cachedGroupName = candidate;
+                return;
+            }
+        }
+    });
+    return cachedGroupName;
+}
+
 + (NSString * _Nullable)bundleSeedId {
     NSDictionary *query = [NSDictionary dictionaryWithObjectsAndKeys:
        (__bridge NSString *)kSecClassGenericPassword, (__bridge NSString *)kSecClass,

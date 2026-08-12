@@ -21,6 +21,20 @@
 @property (nonatomic, readonly) bool isICloudEnabled;
 @property (nonatomic, readonly) bool isSiriEnabled;
 
+/*
+ Telewhite: the app group this build can actually share data through.
+
+ The stock code assumes "group.<bundle id>", which only holds when the signing team owns
+ that group. Re-signing services hand out App IDs and groups with unrelated generated
+ names (group.5915cf3ad6de96bd.1 and friends), so the assumed name resolves to nil and the
+ app, the notification service and Share all fail to find their shared container.
+
+ Returns the first candidate whose container iOS actually grants: the conventional name
+ first, then the groups listed in embedded.mobileprovision, sorted so that every target in
+ the bundle independently picks the same one. Nil only if none resolve.
+ */
++ (NSString * _Nullable)telewhiteResolvedAppGroupName:(NSString * _Nonnull)baseAppBundleId;
+
 + (DeviceSpecificEncryptionParameters * _Nonnull)deviceSpecificEncryptionParameters:(NSString * _Nonnull)rootPath baseAppBundleId:(NSString * _Nonnull)baseAppBundleId;
 - (NSData * _Nullable)bundleDataWithAppToken:(NSData * _Nullable)appToken tokenType:(NSString * _Nullable)tokenType tokenEnvironment:(NSString * _Nullable)tokenEnvironment signatureDict:(NSDictionary * _Nullable)signatureDict;
 

@@ -167,6 +167,58 @@ jobs:
           path: /Users/Shared/telegram-ios/build/artifacts/Telewhite-sideload-fake-signed.ipa
           if-no-files-found: error
 
+      # Second IPA, extensions included. --sideload above implies --disableExtensions, which
+      # strips NotificationService, Share, the widgets and Siri: that IPA can never show a
+      # push notification body or offer a share sheet, no matter how it is re-signed.
+      #
+      # Dropping --sideload also drops the -DTELEGRAM_SIDELOAD define, and with it the
+      # fallback that puts the shared container in Application Support when no app group
+      # resolves. So this IPA needs a signing identity whose profile really grants an app
+      # group and aps-environment — a paid team, or a re-signing service. Installing it with a
+      # free Apple ID fails, which is why the stripped IPA above stays the default download.
+      #
+      # Built second on purpose: the artifact above is already uploaded by the time this runs,
+      # so a failure here cannot cost the release. Expect roughly another full build's worth of
+      # time even on a warm cache — the flag change alters TelegramUI's compiler flags, so the
+      # largest module and everything above it recompile.
+      - name: Build release IPA with extensions
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          cd /Users/Shared/telegram-ios
+
+          python3 -u build-system/Make/Make.py \
+            --bazelUserRoot="/private/var/tmp/_bazel_telegram_ios" \
+            --cacheDir="$HOME/bazel-disk-cache" \
+            build \
+            --continueOnError \
+            --configurationPath=build-input/fork-configuration.json \
+            --codesigningInformationPath=build-input/generated-codesigning \
+            --configuration=release_arm64 \
+            --buildNumber="${GITHUB_RUN_NUMBER}" \
+            --outputBuildArtifactsPath=build/artifacts-extensions
+
+          cp build/artifacts-extensions/Telegram.ipa build/artifacts/Telewhite-extensions-fake-signed.ipa
+
+          # An IPA whose PlugIns directory is missing would be the stripped build under a
+          # misleading name, which is worse than no second artifact at all.
+          python3 - <<'PY'
+          import zipfile, sys
+          names = zipfile.ZipFile("build/artifacts/Telewhite-extensions-fake-signed.ipa").namelist()
+          appex = sorted({n.split("PlugIns/")[1].split("/")[0] for n in names if "PlugIns/" in n})
+          print("bundled extensions:", appex)
+          if not appex:
+              sys.exit("no extensions in the IPA that is supposed to have them")
+          PY
+
+      - name: Upload IPA with extensions
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: Telewhite-extensions-fake-signed-ipa
+          path: /Users/Shared/telegram-ios/build/artifacts/Telewhite-extensions-fake-signed.ipa
+          if-no-files-found: warn
+
       - name: Generate AltStore source
         run: |
           set -euo pipefail
@@ -226,14 +278,51 @@ jobs:
           APP_VERSION="$(python3 -c 'import json; print(json.load(open("versions.json"))["app"])')"
           TAG="v${APP_VERSION}.${GITHUB_RUN_NUMBER}"
 
+          # Written to a file rather than passed inline: the notes are several paragraphs, and
+          # a multi-line string inside this YAML scalar terminates it at the first blank line.
+          cat > build/artifacts/release-notes.md <<NOTES
+          Automated build ${GITHUB_RUN_NUMBER} from \`${GITHUB_REF_NAME}\` (${GITHUB_SHA}).
+
+          AltStore source: https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/altstore.json
+
+          **Telewhite-sideload-fake-signed.ipa** — the usual download. No app extensions, so it
+          installs under a free Apple ID, but it cannot show push notification text or offer a
+          share sheet.
+
+          **Telewhite-extensions-fake-signed.ipa** — the same app with NotificationService,
+          Share, widgets and Siri included. Requires a signing identity whose profile grants
+          \`aps-environment\` and an app group (a paid team, or a re-signing service). This is
+          the one to use if you want push notifications.
+          NOTES
+
           gh release create "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "Telewhite $TAG" \
-            --notes "Automated build ${GITHUB_RUN_NUMBER} from \`${GITHUB_REF_NAME}\` (${GITHUB_SHA}). Install the IPA with TrollStore, AltStore or SideStore. AltStore source: https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/altstore.json" \
+            --notes-file build/artifacts/release-notes.md \
             --latest \
             build/artifacts/Telewhite-sideload-fake-signed.ipa \
             build/artifacts/altstore.json
+
+      # Attached separately so a missing extensions IPA (its build step is allowed to fail)
+      # cannot stop the release above from being published.
+      - name: Attach the extensions IPA to the release
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd /Users/Shared/telegram-ios
+
+          if [ ! -f build/artifacts/Telewhite-extensions-fake-signed.ipa ]; then
+            echo "no extensions IPA was produced; nothing to attach"
+            exit 0
+          fi
+
+          APP_VERSION="$(python3 -c 'import json; print(json.load(open("versions.json"))["app"])')"
+          gh release upload "v${APP_VERSION}.${GITHUB_RUN_NUMBER}" \
+            --repo "$GITHUB_REPOSITORY" \
+            build/artifacts/Telewhite-extensions-fake-signed.ipa
 
       # Cache housekeeping runs last and cannot fail the job. Anything here is a speed
       # optimisation for the next run, so it must never delay or block a release — and a
