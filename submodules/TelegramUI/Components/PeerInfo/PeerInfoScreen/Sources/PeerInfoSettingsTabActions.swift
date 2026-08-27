@@ -74,7 +74,13 @@ extension PeerInfoScreenNode {
         }
         
         var items: [ActionSheetItem] = []
-        items.append(ActionSheetTextItem(title: self.presentationData.strings.Settings_LogoutConfirmationText.trimmingCharacters(in: .whitespacesAndNewlines)))
+        var confirmationText = self.presentationData.strings.Settings_LogoutConfirmationText.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Telewhite: same warning as the other log-out path — this authorization may be the one
+        // carrying push delivery, and logging out ends that for good. nil when untrue.
+        if let warning = telewhiteLogoutPushWarning(isRussian: self.presentationData.strings.baseLanguageCode.lowercased().hasPrefix("ru")) {
+            confirmationText += "\n\n" + warning
+        }
+        items.append(ActionSheetTextItem(title: confirmationText))
         items.append(ActionSheetButtonItem(title: self.presentationData.strings.Settings_Logout, color: .destructive, action: { [weak self] in
             dismissAction()
             if let strongSelf = self {

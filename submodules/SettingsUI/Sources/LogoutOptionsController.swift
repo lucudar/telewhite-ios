@@ -256,7 +256,16 @@ public func logoutOptionsController(context: AccountContext, navigationControlle
         ]), nil)
     }, logout: {
         let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-        let alertController = textAlertController(context: context, title: presentationData.strings.Settings_LogoutConfirmationTitle, text: presentationData.strings.Settings_LogoutConfirmationText, actions: [
+
+        // Telewhite: warn when this authorization belongs to another app, because logging out
+        // destroys it and pushes never come back on this build's own api_id. Returns nil when
+        // that is not the case, and then the stock text is shown unchanged.
+        var text = presentationData.strings.Settings_LogoutConfirmationText
+        if let warning = telewhiteLogoutPushWarning(isRussian: presentationData.strings.baseLanguageCode.lowercased().hasPrefix("ru")) {
+            text += "\n\n" + warning
+        }
+
+        let alertController = textAlertController(context: context, title: presentationData.strings.Settings_LogoutConfirmationTitle, text: text, actions: [
             TextAlertAction(type: .genericAction, title: presentationData.strings.Common_Cancel, action: {
             }),
             TextAlertAction(type: .defaultAction, title: presentationData.strings.Common_OK, action: {

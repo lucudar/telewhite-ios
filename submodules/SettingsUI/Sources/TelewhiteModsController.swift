@@ -559,6 +559,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case appearanceInfo(String)
     
     case developerHeader(String)
+    case pushSession(String, String)
     case pushStatus(String, String)
     case pushToken(String, String)
     case lastVideoSend(String, String)
@@ -595,7 +596,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.chatListLook.rawValue
         case .settingsIconsHeader, .settingsIconVariant, .settingsIconsInfo:
             return TelewhiteModsSection.settingsIcons.rawValue
-        case .developerHeader, .pushStatus, .pushToken, .lastVideoSend, .debugMenu, .developerInfo:
+        case .developerHeader, .pushSession, .pushStatus, .pushToken, .lastVideoSend, .debugMenu, .developerInfo:
             return TelewhiteModsSection.developer.rawValue
         }
     }
@@ -772,6 +773,8 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 1229
         case .developerHeader:
             return 800
+        case .pushSession:
+            return 803
         case .pushStatus:
             return 804
         case .pushToken:
@@ -1092,6 +1095,11 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             })
         case let .lastVideoSend(text, value):
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: value, labelStyle: .multilineDetailText, sectionId: self.section, style: .blocks, disclosureStyle: .none, action: nil)
+        case let .pushSession(text, value):
+            // Telewhite: which app the *server* thinks this authorization belongs to. Push
+            // delivery is decided by that app's api_id, not by the installed binary, so this
+            // row is the only place the difference is visible before pushes silently stop.
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: value, labelStyle: .multilineDetailText, sectionId: self.section, style: .blocks, disclosureStyle: .none, action: nil)
         case let .pushStatus(text, value):
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: value, labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .none, action: nil)
         case let .pushToken(text, value):
@@ -1397,7 +1405,7 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
     }
 }
 
-private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteModsSettings, translationSettings: TranslationSettings, strings: TelewhiteModsStrings, accentColor: UIColor, bubbleColor: UIColor) -> [TelewhiteModsEntry] {
+private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteModsSettings, translationSettings: TranslationSettings, strings: TelewhiteModsStrings, accentColor: UIColor, bubbleColor: UIColor, currentSession: RecentAccountSession?) -> [TelewhiteModsEntry] {
     var entries: [TelewhiteModsEntry] = []
 
     switch tab {
@@ -1557,6 +1565,28 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.developerHeader(telewhiteTabTitle(.developer, strings: strings)))
 
         let defaults = UserDefaults.standard
+
+        // Telewhite: Telegram binds an app (api_id) to an authorization when it is created, and
+        // picks the APNs certificate by that api_id — the installed binary has no say. So a
+        // session created by another client keeps delivering pushes through that client's
+        // certificate even after this build is installed over it, and a session created here
+        // gets no pushes at all, because this api_id has no certificate uploaded. Nothing else
+        // in the app makes that difference visible, which is why it gets its own row.
+        let sessionValue: String
+        if let currentSession = currentSession {
+            let appLabel = currentSession.appName.isEmpty ? strings.text("unknown app", "неизвестное приложение") : currentSession.appName
+            let verdict: String
+            if let buildApiId = telewhiteBuildApiId(), buildApiId == currentSession.apiId {
+                verdict = strings.text("this build — no push certificate", "эта сборка — сертификата пушей нет")
+            } else {
+                verdict = strings.text("another app — pushes arrive through it", "другое приложение — пуши идут через него")
+            }
+            sessionValue = "\(appLabel) · api_id \(currentSession.apiId)\n\(verdict)"
+        } else {
+            sessionValue = strings.text("checking…", "проверяется…")
+        }
+        entries.append(.pushSession(strings.text("App session", "Сессия приложения"), sessionValue))
+
         let pushStatus = defaults.string(forKey: "telewhite.push.status") ?? strings.text("Not requested yet", "Ещё не запрошено")
         entries.append(.pushStatus(strings.text("Push status", "Статус пушей"), pushStatus))
         let pushToken = defaults.string(forKey: "telewhite.push.token") ?? ""
@@ -1751,12 +1781,34 @@ private func telewhiteModsSectionController(context: AccountContext, tab: Telewh
         return sharedData.entries[ApplicationSpecificSharedDataKeys.translationSettings]?.get(TranslationSettings.self) ?? TranslationSettings.defaultSettings
     }
 
-    let signal = combineLatest(context.sharedContext.presentationData, statePromise.get(), translationSettings)
+    // Telewhite: only the Developer tab shows the session row, so only it pays for the
+    // account.getAuthorizations request that creating this context fires. The context seeds its
+    // state with an empty list and starts loading in its own init, so this signal emits at once
+    // (row reads "checking…") and again when the answer arrives — the screen never waits on it.
+    // Subscribing to `state` retains the context, so it does not need to be held separately.
+    let currentSessionSignal: Signal<RecentAccountSession?, NoError>
+    if tab == .developer {
+        currentSessionSignal = context.engine.privacy.activeSessions().state
+        |> map { state -> RecentAccountSession? in
+            let session = state.sessions.first(where: { $0.isCurrent })
+            if let session = session {
+                // Parked so both log-out confirmations can warn about losing pushes without
+                // firing their own request and delaying the alert. Written here rather than in
+                // the entries builder to keep the side effect out of the render path.
+                telewhiteStoreCurrentSessionApp(apiId: session.apiId, appName: session.appName)
+            }
+            return session
+        }
+    } else {
+        currentSessionSignal = .single(nil)
+    }
+
+    let signal = combineLatest(context.sharedContext.presentationData, statePromise.get(), translationSettings, currentSessionSignal)
     |> deliverOnMainQueue
-    |> map { presentationData, settings, translationSettings -> (ItemListControllerState, (ItemListNodeState, Any)) in
+    |> map { presentationData, settings, translationSettings, currentSession -> (ItemListControllerState, (ItemListNodeState, Any)) in
         let strings = TelewhiteModsStrings(presentationData: presentationData)
         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(telewhiteTabTitle(tab, strings: strings)), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back), animateChanges: false)
-        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: telewhiteModsEntries(tab: tab, settings: settings, translationSettings: translationSettings, strings: strings, accentColor: presentationData.theme.list.itemAccentColor, bubbleColor: presentationData.theme.chat.message.outgoing.bubble.withWallpaper.fill.first ?? presentationData.theme.list.itemAccentColor), style: .blocks, animateChanges: false)
+        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: telewhiteModsEntries(tab: tab, settings: settings, translationSettings: translationSettings, strings: strings, accentColor: presentationData.theme.list.itemAccentColor, bubbleColor: presentationData.theme.chat.message.outgoing.bubble.withWallpaper.fill.first ?? presentationData.theme.list.itemAccentColor, currentSession: currentSession), style: .blocks, animateChanges: false)
         return (controllerState, (listState, arguments as Any))
     }
 

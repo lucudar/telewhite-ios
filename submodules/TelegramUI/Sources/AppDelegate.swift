@@ -550,6 +550,12 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         let apiId: Int32 = buildConfig.apiId
         let apiHash: String = buildConfig.apiHash
         let languagesCategory = "ios"
+
+        // Telewhite: Mods -> Developer compares this against the api_id the server reports for
+        // the current authorization, to show whether pushes are being delivered through another
+        // client's certificate. Parked in shared storage because SettingsUI and PeerInfoScreen
+        // both need it and neither can read BuildConfig.
+        telewhiteStoreBuildApiId(apiId)
         
         let autolockDeadine: Signal<Int32?, NoError>
         if #available(iOS 10.0, *) {
