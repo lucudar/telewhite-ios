@@ -9,7 +9,14 @@ import Foundation
 //     certificate, even after this build is installed over it (same bundle id, preserved data
 //     container, so no new login happens and the authorization survives);
 //   * logging out destroys that authorization, and the next login creates one under this build's
-//     api_id, which has no certificate uploaded — pushes stop permanently.
+//     api_id — which may or may not have a certificate of its own.
+//
+// That last uncertainty is deliberate and must stay: whether a given api_id has an APNs
+// certificate uploaded is known only to Telegram's servers, and the client cannot query it. An
+// earlier version of this file stated "no certificate uploaded — pushes stop permanently" as
+// fact; the owner then observed pushes arriving on a session belonging to this very build, which
+// disproved it. So the UI reports *whose* session it is and lets that speak for itself, rather
+// than predicting delivery it cannot see.
 //
 // The two api_ids therefore have to be comparable from several modules at once: TelegramUI knows
 // the build's own value, the Mods -> Developer screen learns the session's from the server, and
@@ -51,18 +58,22 @@ public func telewhiteForeignSessionAppName() -> String? {
 }
 
 /// Sentence to append to a log-out confirmation, or nil when the warning would not be true.
+///
+/// States the mechanism, not an outcome: logging out replaces the authorization with one
+/// belonging to this build, and pushes that currently arrive via the other app's certificate
+/// may stop. "May", not "will" — see the note at the top of this file.
 public func telewhiteLogoutPushWarning(isRussian: Bool) -> String? {
     guard let appName = telewhiteForeignSessionAppName() else {
         return nil
     }
     if isRussian {
         if appName.isEmpty {
-            return "Пуш-уведомления приходят через другое приложение, к которому привязана эта сессия. Выход её уничтожит, и уведомления перестанут приходить — вернуть их можно будет только переустановкой поверх того приложения."
+            return "Эта сессия принадлежит другому приложению, и пуш-уведомления сейчас идут через его сертификат. Выход уничтожит сессию: следующий вход создаст её заново уже от этой сборки, и уведомления могут перестать приходить. Вернуть прежнюю сессию можно только переустановкой поверх того приложения."
         }
-        return "Пуш-уведомления приходят через «\(appName)» — к нему привязана эта сессия. Выход её уничтожит, и уведомления перестанут приходить: вернуть их можно будет только переустановкой поверх «\(appName)»."
+        return "Эта сессия принадлежит приложению «\(appName)», и пуш-уведомления сейчас идут через его сертификат. Выход уничтожит сессию: следующий вход создаст её заново уже от этой сборки, и уведомления могут перестать приходить. Вернуть прежнюю сессию можно только переустановкой поверх «\(appName)»."
     }
     if appName.isEmpty {
-        return "Push notifications are delivered through another app that this session belongs to. Logging out destroys the session and pushes will stop — the only way back is reinstalling over that app."
+        return "This session belongs to another app, and pushes currently arrive through its certificate. Logging out destroys the session: the next login creates one owned by this build, and notifications may stop. The only way back is reinstalling over that app."
     }
-    return "Push notifications are delivered through “\(appName)”, which this session belongs to. Logging out destroys the session and pushes will stop — the only way back is reinstalling over “\(appName)”."
+    return "This session belongs to “\(appName)”, and pushes currently arrive through its certificate. Logging out destroys the session: the next login creates one owned by this build, and notifications may stop. The only way back is reinstalling over “\(appName)”."
 }

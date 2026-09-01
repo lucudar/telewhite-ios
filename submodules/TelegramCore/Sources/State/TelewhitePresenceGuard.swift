@@ -6,23 +6,45 @@ import MtProtoKit
 // Telewhite: keeps the account reported as offline across actions that make the server
 // mark it online — above all sending a message.
 //
-// Why a burst of requests instead of one: the server flips the account online while it
-// processes the send, and we cannot order our request after it (this MtProtoKit has no
-// `invokeAfterMsg` wrapper). The previous implementation fired a single
-// `updateStatus(offline:)` from `applySentMessage`, i.e. only once the server's reply had
-// come back. That left the online flag standing for the whole round trip — and for the
-// entire upload on photos and voice messages, which is seconds, not milliseconds. A
-// contact with the chat open received `updateUserStatus(online)` and saw "online" before
-// our correction landed.
+// Two layers, because neither covers everything on its own.
 //
-// So the burst starts when the request is *issued*, not when it completes, and keeps
-// pulsing offline on a decaying interval until well after the send settles. Overlapping
-// sends share a single burst: each new send pushes the deadline out rather than starting
-// a competing loop, which keeps the request count flat when sending an album.
+// 1. A *chained* offline packet. MTProto can order one request after another server-side
+//    (`invokeAfterMsg`), and this MtProtoKit does support it: `MTRequest.shouldDependOnRequest`
+//    is turned into constructor 0xcb9f372d in MTRequestMessageService, and `Network.request`
+//    already exposes it through its `tag:` parameter — message sending itself uses that to
+//    stay ordered (`PendingMessageRequestDependencyTag`). So the offline packet is bound to
+//    the send and executed by the server immediately after it, in the same container, with no
+//    round trip. An earlier comment here claimed the wrapper did not exist and that a burst
+//    was the only option; that was wrong.
+//
+// 2. A decaying burst, kept as a fallback. The chain covers the instant of the send, but not
+//    everything: `invokeAfterMsg` is dropped if the request it depends on fails, no chain is
+//    formed when the triggering action is not a message send (marking read, uploading), and a
+//    photo or voice upload keeps the account online for seconds while the file transfers —
+//    long after the send request itself was processed. The burst is sparser than it used to
+//    be: the dense 0.25s step existed to catch the flip at send time, which the chain now
+//    handles precisely.
+//
+// Overlapping sends share a single burst: each new action pushes the deadline out rather than
+// starting a competing loop, which keeps the request count flat when sending an album.
+
+/// Binds a request to the most recent pending message send, so the server runs it right after.
+///
+/// Matching any `PendingMessageRequestDependencyTag` is deliberate: MtProtoKit walks its
+/// pending requests in reverse and stops at the first match, so this picks the latest send.
+/// When nothing matches — the common case for a read receipt — no wrapper is added and the
+/// request goes out on its own, which is exactly the desired fallback.
+private final class TelewhitePresenceAfterSendTag: NetworkRequestDependencyTag {
+    func shouldDependOn(other: NetworkRequestDependencyTag) -> Bool {
+        return other is PendingMessageRequestDependencyTag
+    }
+}
+
 final class TelewhitePresenceGuard {
     static let shared = TelewhitePresenceGuard()
 
-    /// How long a burst keeps pulsing after the most recent triggering action.
+    /// How long the fallback burst keeps pulsing after the most recent triggering action.
+    /// Sized for an upload rather than for a round trip — the chain covers the round trip.
     private static let burstDuration: Double = 8.0
 
     private let lock = NSLock()
@@ -49,11 +71,15 @@ final class TelewhitePresenceGuard {
         return !(defaults.array(forKey: "telewhite.mods.ghostPeerIds") as? [NSNumber] ?? []).isEmpty
     }
 
-    /// Starts — or extends — an offline burst. Safe to call as often as needed.
+    /// Chains an offline packet to the pending send and starts — or extends — the fallback
+    /// burst. Safe to call as often as needed.
     static func assertOffline(network: Network) {
         guard self.shouldSuppressPresence() else {
             return
         }
+        let chained: Signal<Api.Bool, MTRpcError> = network.request(Api.functions.account.updateStatus(offline: .boolTrue), tag: TelewhitePresenceAfterSendTag())
+        let _ = chained.start()
+
         self.shared.beginBurst(network: network)
     }
 
@@ -70,7 +96,9 @@ final class TelewhitePresenceGuard {
             // A burst is already running; it just picked up the extended deadline.
             return
         }
-        self.pulse(network: network, delay: 0.0, step: 0)
+        // Starts at 1.0 rather than 0.0: the chained packet above already covers this
+        // instant, so firing another one here would be a duplicate of it.
+        self.pulse(network: network, delay: 1.0, step: 0)
     }
 
     private func pulse(network: Network, delay: Double, step: Int) {
@@ -91,18 +119,15 @@ final class TelewhitePresenceGuard {
             guard shouldContinue else {
                 return
             }
-            // Dense while the server is likely to flip us online, then steady so a slow
-            // upload stays covered without a request every quarter second.
+            // Steady rather than decaying-from-dense: this loop now only has to keep a slow
+            // upload covered, so a packet every 1.5-2s is enough and costs far fewer
+            // requests than the old 0.25s opening step.
             let nextDelay: Double
             switch step {
                 case 0:
-                    nextDelay = 0.25
-                case 1:
-                    nextDelay = 0.5
-                case 2:
-                    nextDelay = 1.0
-                default:
                     nextDelay = 1.5
+                default:
+                    nextDelay = 2.0
             }
             strongSelf.pulse(network: network, delay: nextDelay, step: step + 1)
         })

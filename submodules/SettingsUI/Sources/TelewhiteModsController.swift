@@ -1569,17 +1569,21 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         // Telewhite: Telegram binds an app (api_id) to an authorization when it is created, and
         // picks the APNs certificate by that api_id — the installed binary has no say. So a
         // session created by another client keeps delivering pushes through that client's
-        // certificate even after this build is installed over it, and a session created here
-        // gets no pushes at all, because this api_id has no certificate uploaded. Nothing else
-        // in the app makes that difference visible, which is why it gets its own row.
+        // certificate even after this build is installed over it. Nothing else in the app makes
+        // that difference visible, which is why it gets its own row.
+        //
+        // The row reports whose session it is and stops there. It used to add "no push
+        // certificate" for a session of this build's own api_id, which was an over-claim: the
+        // client cannot see whether a certificate is uploaded, and pushes were then observed
+        // arriving on exactly such a session.
         let sessionValue: String
         if let currentSession = currentSession {
             let appLabel = currentSession.appName.isEmpty ? strings.text("unknown app", "неизвестное приложение") : currentSession.appName
             let verdict: String
             if let buildApiId = telewhiteBuildApiId(), buildApiId == currentSession.apiId {
-                verdict = strings.text("this build — no push certificate", "эта сборка — сертификата пушей нет")
+                verdict = strings.text("this build's own api_id", "api_id этой сборки")
             } else {
-                verdict = strings.text("another app — pushes arrive through it", "другое приложение — пуши идут через него")
+                verdict = strings.text("another app — delivery depends on it", "другое приложение — доставка зависит от него")
             }
             sessionValue = "\(appLabel) · api_id \(currentSession.apiId)\n\(verdict)"
         } else {
