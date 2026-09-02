@@ -48,6 +48,11 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
     private var deliveryFailedNode: ChatMessageDeliveryFailedNode?
     private var shareButtonNode: ChatMessageShareButton?
 
+    // Telewhite: trash badge for a message the sender deleted while "Keep Deleted Messages"
+    // preserved it. Stickers are laid out by this node rather than by the bubble node, so
+    // neither the bubble's fade nor its badge ever reached them.
+    private var telewhiteDeletedBadgeNode: ASImageNode?
+
     public var telegramFile: TelegramMediaFile?
     private let fetchDisposable = MetaDisposable()
     
@@ -1101,6 +1106,36 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
                     strongSelf.contextSourceNode.contentNode.frame = CGRect(origin: CGPoint(), size: layoutSize)
                     strongSelf.contextSourceNode.contentRect = strongSelf.imageNode.frame
                     strongSelf.containerNode.targetNodeForActivationProgressContentRect = strongSelf.contextSourceNode.contentRect
+
+                    // Telewhite: fade the sticker and mark it, same treatment the bubble node
+                    // gives text and photos. The fade goes on imageNode rather than on
+                    // contextSourceNode.contentNode because the badge and the timestamp are
+                    // siblings inside that container and must stay fully opaque. The badge is
+                    // added to contentNode, which is the node the context menu lifts out of
+                    // the list, so the badge is lifted with the sticker instead of being left
+                    // behind in the dimmed list.
+                    let isTelewhiteDeleted = telewhiteIsDeletedPreserved(attributes: item.message.attributes)
+                    strongSelf.imageNode.alpha = isTelewhiteDeleted ? telewhiteDeletedContentAlpha : 1.0
+                    if isTelewhiteDeleted {
+                        let badgeNode: ASImageNode
+                        if let current = strongSelf.telewhiteDeletedBadgeNode {
+                            badgeNode = current
+                        } else {
+                            badgeNode = ASImageNode()
+                            badgeNode.isUserInteractionEnabled = false
+                            badgeNode.displaysAsynchronously = false
+                            strongSelf.contextSourceNode.contentNode.addSubnode(badgeNode)
+                            strongSelf.telewhiteDeletedBadgeNode = badgeNode
+                        }
+                        let badgeImage = telewhiteDeletedBadgeImage()
+                        badgeNode.image = badgeImage
+                        if let badgeImage {
+                            badgeNode.frame = telewhiteDeletedBadgeFrame(badgeSize: badgeImage.size, contentFrame: strongSelf.imageNode.frame, containerWidth: params.width - params.rightInset, isIncoming: incoming)
+                        }
+                    } else if let badgeNode = strongSelf.telewhiteDeletedBadgeNode {
+                        strongSelf.telewhiteDeletedBadgeNode = nil
+                        badgeNode.removeFromSupernode()
+                    }
                     
                     animation.animator.updateFrame(layer: strongSelf.dateAndStatusNode.layer, frame: dateAndStatusFrame, completion: nil)
                     dateAndStatusApply(animation)

@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import Display
+import TelegramCore
 
 // Telewhite: badge marking a message the sender deleted while "Keep Deleted
 // Messages" preserved it locally.
@@ -43,6 +44,22 @@ private final class TelewhiteDeletedBadgeCache {
 /// Opacity for the content of a preserved-deleted message. Mild on purpose — the
 /// badge carries the signal, so the content stays legible.
 public let telewhiteDeletedContentAlpha: CGFloat = 0.6
+
+/// Whether a message was deleted by its sender and kept by "Keep Deleted Messages".
+///
+/// One owner for the check: every item node needs it, and hand-rolling the attribute loop
+/// per node is how one of them ends up testing a different condition than the rest.
+/// Takes the attribute array rather than the message so this module does not need Postbox —
+/// `EngineMessage.Attribute` is a typealias of `MessageAttribute`, so call sites pass
+/// `item.message.attributes` unchanged.
+public func telewhiteIsDeletedPreserved(attributes: [EngineMessage.Attribute]) -> Bool {
+    for attribute in attributes {
+        if attribute is TelewhiteDeletedMessageAttribute {
+            return true
+        }
+    }
+    return false
+}
 
 /// A dark translucent circle holding just a trash glyph, legible over both message
 /// bubbles and photos. Cached per screen scale.
@@ -98,46 +115,29 @@ public func telewhiteDeletedBadgeImage() -> UIImage? {
     }
 }
 
-/// Places a badge of `badgeSize` in the free gutter beside `contentFrame` — right of
-/// incoming content, left of outgoing — so it does not cover the message.
+/// Places a badge of `badgeSize` **inside** `contentFrame`, in the bottom leading corner.
 ///
-/// `containerWidth` must already have the safe-area inset taken off, and
-/// `reservedGutterWidth` the width of anything the layout puts in that gutter (the share
-/// and summarize buttons, a video note's reply/forward header). Otherwise the badge is
-/// drawn under the rounded corner in landscape, or the share button lands on top of it.
+/// Not the top one: that corner holds the sender's name, the forward and reply headers and
+/// the media duration pill, so a badge there covered exactly the information that says whose
+/// deleted message this was. Bottom-leading is the one inside corner Telegram leaves free —
+/// the timestamp and delivery ticks sit bottom-trailing.
 ///
-/// When the gutter cannot hold the badge it moves inside the content, to the **bottom**
-/// leading corner. Not the top one: that corner holds the sender's name, the forward and
-/// reply headers and the media duration pill, so the badge covered exactly the
-/// information that says whose deleted message this was. Bottom-leading is the one inside
-/// corner Telegram leaves free — the timestamp and delivery ticks sit bottom-trailing.
-/// `preferInsideBottom` skips the gutter entirely. Video notes pass it when the message
-/// carries a reply or forward header: those headers are right-aligned into the very gutter
-/// the badge wants, and a round video's bounding-box corner is transparent anyway, so
-/// inside-bottom is free space there rather than a compromise.
+/// This used to prefer the gutter beside the message and only fall inside when the gutter was
+/// too narrow. That existed because the badge was once a pill reading "Удалено"/"Deleted",
+/// wide enough to cover the last line of a long text. It is an 18pt circle now, so inside is
+/// no longer a compromise — and the gutter placement had its own costs: it sat under the
+/// rounded corner in landscape, lost the z-order fight with right-aligned reply headers, and
+/// put the mark far enough from the content to read as unrelated chrome.
+///
+/// `containerWidth`, `reservedGutterWidth` and `preferInsideBottom` are vestigial: every
+/// placement is now inside, so nothing is measured against the gutter. They are kept only so
+/// this change does not have to touch every call site at once; removing them is a follow-up
+/// that edits call sites and nothing else.
 public func telewhiteDeletedBadgeFrame(badgeSize: CGSize, contentFrame: CGRect, containerWidth: CGFloat, isIncoming: Bool, reservedGutterWidth: CGFloat = 0.0, preferInsideBottom: Bool = false) -> CGRect {
     let spacing: CGFloat = 6.0
-    let edgeInset: CGFloat = 4.0
-
-    let insideBottom = CGPoint(
+    let origin = CGPoint(
         x: isIncoming ? contentFrame.minX + spacing : contentFrame.maxX - spacing - badgeSize.width,
         y: contentFrame.maxY - 4.0 - badgeSize.height
     )
-    if preferInsideBottom {
-        return CGRect(origin: insideBottom, size: badgeSize)
-    }
-
-    var origin = CGPoint(x: 0.0, y: contentFrame.minY + 4.0)
-    if isIncoming {
-        origin.x = contentFrame.maxX + spacing + reservedGutterWidth
-        if origin.x + badgeSize.width > containerWidth - edgeInset {
-            origin = insideBottom
-        }
-    } else {
-        origin.x = contentFrame.minX - spacing - reservedGutterWidth - badgeSize.width
-        if origin.x < edgeInset {
-            origin = insideBottom
-        }
-    }
     return CGRect(origin: origin, size: badgeSize)
 }

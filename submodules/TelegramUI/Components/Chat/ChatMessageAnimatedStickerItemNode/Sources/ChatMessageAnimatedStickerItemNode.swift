@@ -108,6 +108,12 @@ public class ChatMessageAnimatedStickerItemNode: ChatMessageItemView {
     private var selectionNode: ChatMessageSelectionNode?
     private var deliveryFailedNode: ChatMessageDeliveryFailedNode?
     private var shareButtonNode: ChatMessageShareButton?
+
+    // Telewhite: trash badge for a message the sender deleted while "Keep Deleted Messages"
+    // preserved it. Animated stickers and animated emoji are laid out by this node rather
+    // than by the bubble node, so neither the bubble's fade nor its badge ever reached them —
+    // which is why a deleted animated sticker looked exactly like a live one.
+    private var telewhiteDeletedBadgeNode: ASImageNode?
     
     public var telegramFile: TelegramMediaFile?
     public var emojiFile: TelegramMediaFile?
@@ -1651,6 +1657,44 @@ public class ChatMessageAnimatedStickerItemNode: ChatMessageItemView {
                     
                     strongSelf.contextSourceNode.contentRect = contextContentFrame
                     strongSelf.containerNode.targetNodeForActivationProgressContentRect = strongSelf.contextSourceNode.contentRect
+
+                    // Telewhite: fade the sticker and mark it, same treatment the bubble node
+                    // gives text and photos.
+                    //
+                    // Only animationNode is faded. imageNode's alpha already has an owner in
+                    // this node — the playback path sets it to 0.0 to hide the static
+                    // representation once the animation is up (lines 232 and 421) — and writing
+                    // it here would fight that on every layout pass and flash the static
+                    // sticker over the playing one. The cost is that a deleted sticker whose
+                    // animation has not started yet is not dimmed for that moment; the badge
+                    // still marks it, which is the signal the design leans on anyway.
+                    //
+                    // The fade cannot go on contextSourceNode.contentNode either: the badge and
+                    // the timestamp are siblings inside it and must stay opaque. The badge is
+                    // added to contentNode, which is what the context menu lifts out of the
+                    // list, so it is lifted with the sticker.
+                    let isTelewhiteDeleted = telewhiteIsDeletedPreserved(attributes: item.message.attributes)
+                    strongSelf.animationNode?.alpha = isTelewhiteDeleted ? telewhiteDeletedContentAlpha : 1.0
+                    if isTelewhiteDeleted {
+                        let badgeNode: ASImageNode
+                        if let current = strongSelf.telewhiteDeletedBadgeNode {
+                            badgeNode = current
+                        } else {
+                            badgeNode = ASImageNode()
+                            badgeNode.isUserInteractionEnabled = false
+                            badgeNode.displaysAsynchronously = false
+                            strongSelf.contextSourceNode.contentNode.addSubnode(badgeNode)
+                            strongSelf.telewhiteDeletedBadgeNode = badgeNode
+                        }
+                        let badgeImage = telewhiteDeletedBadgeImage()
+                        badgeNode.image = badgeImage
+                        if let badgeImage {
+                            badgeNode.frame = telewhiteDeletedBadgeFrame(badgeSize: badgeImage.size, contentFrame: contextContentFrame, containerWidth: params.width - params.rightInset, isIncoming: incoming)
+                        }
+                    } else if let badgeNode = strongSelf.telewhiteDeletedBadgeNode {
+                        strongSelf.telewhiteDeletedBadgeNode = nil
+                        badgeNode.removeFromSupernode()
+                    }
                     
                     var animationNodeFrame = updatedContentFrame.insetBy(dx: imageInset, dy: imageInset)
                     if let telegramFile, telegramFile.isPremiumSticker {
