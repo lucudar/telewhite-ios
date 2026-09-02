@@ -406,8 +406,6 @@ private enum TelewhiteModsSection: Int32 {
     case translator
     case translationLanguage
     case privacy
-    case stealth
-    case channels
     case media
     case appearance
     case chatText
@@ -421,8 +419,6 @@ private enum TelewhiteModsSection: Int32 {
 private enum TelewhiteModsTab: Int32, Equatable {
     case messenger
     case privacy
-    case stealth
-    case channels
     case media
     case appearance
     case developer
@@ -458,6 +454,14 @@ private enum TelewhiteModsMenuIcon: Int32, Equatable {
 
 private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case menuItem(Int32, TelewhiteModsMenuIcon, String, String, TelewhiteModsTab)
+
+    // Telewhite: a screen with a dozen switches in one flat run is read line by line; the
+    // same switches under three short headings are scanned by shape. Every screen already
+    // had exactly one header, so grouping *inside* a screen needed either a new case per
+    // heading or one case that carries its own identity. This is that one case: the caller
+    // passes the stable id and the section, which is also the first step towards the
+    // generic toggle/info/disclosure cell the menu should eventually be built from.
+    case sectionHeader(Int32, TelewhiteModsSection, String)
 
     case messengerHeader(String)
     case preserveDeletedMessages(String, Bool)
@@ -498,17 +502,19 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case showProfileIds(String, Bool)
     case privacyInfo(String)
 
-    case stealthHeader(String)
     // Telewhite: one switch for being invisible, covering messages and stories alike.
     // It also writes the ghostMode master flag, which had lost its row and so could be
     // left stuck on with nothing in the UI able to clear it.
+    //
+    // Lives on the Privacy screen now. Two switches did not justify a top-level row of
+    // their own, and being invisible is a privacy setting by any reading — the split was
+    // an accident of the order these mods were written in, not a distinction a user makes.
     case ghost(String, Bool)
     case ghostChatButtonEnabled(String, Bool)
-    case stealthInfo(String)
 
-    case channelsHeader(String)
+    // Telewhite: likewise folded into Messages. "What is shown under channel posts" is a
+    // message-display setting, and two switches are not a screen.
     case channelsDeclutter(String, Bool)
-    case channelsInfo(String)
 
     case mediaHeader(String)
     case downloadStories(String, Bool)
@@ -570,18 +576,16 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
         switch self {
         case .menuItem:
             return TelewhiteModsSection.menu.rawValue
-        case .messengerHeader, .preserveDeletedMessages, .backgroundMessageRefresh, .keepTimedMessages, .forwardHideNamesByDefault, .showPreviousEditedText, .oneTimeMedia, .hdPhotos, .quickForwardToSaved, .showReadDateOnTap, .translatorLink, .messengerInfo:
+        case .messengerHeader, .preserveDeletedMessages, .backgroundMessageRefresh, .keepTimedMessages, .forwardHideNamesByDefault, .showPreviousEditedText, .oneTimeMedia, .hdPhotos, .quickForwardToSaved, .showReadDateOnTap, .translatorLink, .messengerInfo, .channelsDeclutter, .hideSponsoredContent:
             return TelewhiteModsSection.messenger.rawValue
         case .translatorHeader, .translateMessages, .autoTranslateEnglish, .translationTargetLanguage, .outgoingTranslateButtonEnabled, .outgoingTranslateInPrivate, .outgoingTranslateInGroups, .outgoingTranslateInBots, .localTranscription, .translateVoiceMessages, .translatorInfo:
             return TelewhiteModsSection.translator.rawValue
         case .translationLanguageHeader, .translationLanguageOption:
             return TelewhiteModsSection.translationLanguage.rawValue
-        case .privacyHeader, .protectionBypass, .hidePhoneInSettings, .showProfileIds, .stripFileMetadata, .privacyInfo:
+        case .privacyHeader, .protectionBypass, .hidePhoneInSettings, .showProfileIds, .stripFileMetadata, .privacyInfo, .ghost, .ghostChatButtonEnabled:
             return TelewhiteModsSection.privacy.rawValue
-        case .stealthHeader, .ghost, .ghostChatButtonEnabled, .stealthInfo:
-            return TelewhiteModsSection.stealth.rawValue
-        case .channelsHeader, .channelsDeclutter, .hideSponsoredContent, .channelsInfo:
-            return TelewhiteModsSection.channels.rawValue
+        case let .sectionHeader(_, section, _):
+            return section.rawValue
         case .mediaHeader, .downloadStories, .hideStories, .autoCacheCleanupLink, .speedBoostLink, .longRoundVideos, .confirmVoiceSend, .videoNoRecompress, .autoResendFailed, .mediaInfo:
             return TelewhiteModsSection.media.rawValue
         case .autoCacheCleanup, .cacheLimitHeader, .cacheLimit, .cacheLimitInfo:
@@ -605,6 +609,12 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
         switch self {
         case let .menuItem(index, _, _, _, _):
             return -1000 + index
+        case let .sectionHeader(id, _, _):
+            return id
+        // Telewhite: the Messages screen is numbered in blocks of ten so a heading can be
+        // inserted between groups without renumbering the rows after it. The gaps are the
+        // point, not slack: 0-9 is what happened to the message, 12-19 what leaves the
+        // phone, 25-29 channels, 30 the trailing note.
         case .messengerHeader:
             return 0
         case .preserveDeletedMessages:
@@ -616,19 +626,23 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
         case .showPreviousEditedText:
             return 4
         case .forwardHideNamesByDefault:
-            return 5
+            return 13
         case .oneTimeMedia:
-            return 6
+            return 14
         case .hdPhotos:
-            return 7
+            return 15
         case .quickForwardToSaved:
-            return 8
+            return 16
         case .showReadDateOnTap:
-            return 9
+            return 17
         case .translatorLink:
-            return 10
+            return 18
+        case .channelsDeclutter:
+            return 26
+        case .hideSponsoredContent:
+            return 27
         case .messengerInfo:
-            return 11
+            return 30
         case .translatorHeader:
             return 50
         case .autoTranslateEnglish:
@@ -665,24 +679,15 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 103
         case .stripFileMetadata:
             return 104
+        // Telewhite: the two invisibility switches were 301-302 on a screen of their own.
+        // Renumbered into Privacy's own range so the screen still reads in ascending order
+        // with the trailing note last — the old numbers would have sorted after it.
+        case .ghost:
+            return 106
+        case .ghostChatButtonEnabled:
+            return 107
         case .privacyInfo:
             return 110
-        case .stealthHeader:
-            return 300
-        case .ghost:
-            return 301
-        case .ghostChatButtonEnabled:
-            return 302
-        case .stealthInfo:
-            return 303
-        case .channelsHeader:
-            return 400
-        case .channelsDeclutter:
-            return 401
-        case .hideSponsoredContent:
-            return 402
-        case .channelsInfo:
-            return 403
         case .mediaHeader:
             return 500
         case .downloadStories:
@@ -779,12 +784,16 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 804
         case .pushToken:
             return 805
+        // Telewhite: lastVideoSend was 8055, which sorts after developerInfo and left the
+        // Developer screen appending out of order — 805, 8055, 806. Harmless in practice
+        // (nothing crashed), but it defeats a static ordering check, so the block is spaced
+        // out instead: the row keeps its position and the two below it move up a range.
         case .lastVideoSend:
-            return 8055
-        case .debugMenu:
             return 806
+        case .debugMenu:
+            return 810
         case .developerInfo:
-            return 807
+            return 811
         }
     }
     
@@ -809,7 +818,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: telewhiteMenuIcon(icon, color: presentationData.theme.list.itemAccentColor), title: title, titleFont: .bold, label: subtitle, labelStyle: .multilineDetailText, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                 arguments.openTab(tab)
             })
-        case let .messengerHeader(text), let .translatorHeader(text), let .translationLanguageHeader(text), let .privacyHeader(text), let .stealthHeader(text), let .channelsHeader(text), let .mediaHeader(text), let .appearanceHeader(text), let .developerHeader(text), let .chatTextHeader(text), let .chatListDensityHeader(text), let .chatListRowsHeader(text), let .settingsIconsHeader(text), let .cacheLimitHeader(text), let .speedBoostHeader(text):
+        case let .sectionHeader(_, _, text), let .messengerHeader(text), let .translatorHeader(text), let .translationLanguageHeader(text), let .privacyHeader(text), let .mediaHeader(text), let .appearanceHeader(text), let .developerHeader(text), let .chatTextHeader(text), let .chatListDensityHeader(text), let .chatListRowsHeader(text), let .settingsIconsHeader(text), let .cacheLimitHeader(text), let .speedBoostHeader(text):
             return ItemListSectionHeaderItem(presentationData: presentationData, text: text, sectionId: self.section)
         case let .translationLanguageOption(_, title, code, selected):
             return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: title, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
@@ -961,7 +970,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: "", sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                 arguments.openDebug()
             })
-        case let .messengerInfo(text), let .translatorInfo(text), let .privacyInfo(text), let .stealthInfo(text), let .channelsInfo(text), let .mediaInfo(text), let .developerInfo(text), let .appearanceInfo(text), let .chatTextInfo(text), let .chatListDensityInfo(text), let .chatListRowsInfo(text), let .settingsIconsInfo(text), let .cacheLimitInfo(text), let .speedBoostInfo(text):
+        case let .messengerInfo(text), let .translatorInfo(text), let .privacyInfo(text), let .mediaInfo(text), let .developerInfo(text), let .appearanceInfo(text), let .chatTextInfo(text), let .chatListDensityInfo(text), let .chatListRowsInfo(text), let .settingsIconsInfo(text), let .cacheLimitInfo(text), let .speedBoostInfo(text):
             return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
         case let .hidePhoneInSettings(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
@@ -1235,10 +1244,6 @@ private func telewhiteTabTitle(_ tab: TelewhiteModsTab, strings: TelewhiteModsSt
         return strings.text("Messages", "\u{0421}\u{043e}\u{043e}\u{0431}\u{0449}\u{0435}\u{043d}\u{0438}\u{044f}")
     case .privacy:
         return strings.text("Privacy", "\u{041a}\u{043e}\u{043d}\u{0444}\u{0438}\u{0434}\u{0435}\u{043d}\u{0446}\u{0438}\u{0430}\u{043b}\u{044c}\u{043d}\u{043e}\u{0441}\u{0442}\u{044c}")
-    case .stealth:
-        return strings.text("Ghost Mode", "\u{0420}\u{0435}\u{0436}\u{0438}\u{043c} \u{043d}\u{0435}\u{0432}\u{0438}\u{0434}\u{0438}\u{043c}\u{043a}\u{0438}")
-    case .channels:
-        return strings.text("Channels and Groups", "\u{041a}\u{0430}\u{043d}\u{0430}\u{043b}\u{044b} \u{0438} \u{0433}\u{0440}\u{0443}\u{043f}\u{043f}\u{044b}")
     case .media:
         return strings.text("Media and Stories", "\u{041c}\u{0435}\u{0434}\u{0438}\u{0430} \u{0438} \u{0438}\u{0441}\u{0442}\u{043e}\u{0440}\u{0438}\u{0438}")
     case .appearance:
@@ -1334,13 +1339,11 @@ private func telewhiteLanguageDisplayName(_ code: String) -> String {
 
 private func telewhiteMenuEntries(strings: TelewhiteModsStrings) -> [TelewhiteModsEntry] {
     return [
-        .menuItem(0, .privacy, telewhiteTabTitle(.privacy, strings: strings), strings.text("Saving restrictions, your number, numeric IDs.", "Запреты на сохранение, ваш номер, числовые ID."), .privacy),
-        .menuItem(1, .ghost, telewhiteTabTitle(.stealth, strings: strings), strings.text("Read messages and watch stories without being seen.", "Читать сообщения и смотреть истории незаметно."), .stealth),
-        .menuItem(2, .messages, telewhiteTabTitle(.messenger, strings: strings), strings.text("Deleted messages, view-once media, forwarding, translation.", "Удалённые сообщения, одноразовые медиа, пересылка, перевод."), .messenger),
-        .menuItem(3, .groups, telewhiteTabTitle(.channels, strings: strings), strings.text("What is shown under channel posts.", "Что показывать под постами каналов."), .channels),
-        .menuItem(4, .media, telewhiteTabTitle(.media, strings: strings), strings.text("Stories and space taken up on the phone.", "Истории и место, занятое на телефоне."), .media),
-        .menuItem(5, .appearance, telewhiteTabTitle(.appearance, strings: strings), strings.text("Chat text, chat list, landscape mode.", "Текст в чате, список чатов, горизонтальный режим."), .appearance),
-        .menuItem(6, .developer, telewhiteTabTitle(.developer, strings: strings), strings.text("Notification diagnostics and debug tools.", "Диагностика уведомлений и отладка."), .developer)
+        .menuItem(0, .privacy, telewhiteTabTitle(.privacy, strings: strings), strings.text("Being unseen, saving restrictions, your number.", "Незаметность, запреты на сохранение, ваш номер."), .privacy),
+        .menuItem(1, .messages, telewhiteTabTitle(.messenger, strings: strings), strings.text("Deleted and view-once messages, forwarding, channels.", "Удалённые и одноразовые сообщения, пересылка, каналы."), .messenger),
+        .menuItem(2, .media, telewhiteTabTitle(.media, strings: strings), strings.text("Stories and space taken up on the phone.", "Истории и место, занятое на телефоне."), .media),
+        .menuItem(3, .appearance, telewhiteTabTitle(.appearance, strings: strings), strings.text("Chat text, chat list, landscape mode.", "Текст в чате, список чатов, горизонтальный режим."), .appearance),
+        .menuItem(4, .developer, telewhiteTabTitle(.developer, strings: strings), strings.text("Notification diagnostics and debug tools.", "Диагностика уведомлений и отладка."), .developer)
     ]
 }
 
@@ -1410,7 +1413,7 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
 
     switch tab {
     case .messenger:
-        entries.append(.messengerHeader(telewhiteTabTitle(.messenger, strings: strings)))
+        entries.append(.messengerHeader(strings.text("Deleted and Edited", "Удалённые и изменённые")))
         entries.append(.preserveDeletedMessages(strings.text("Keep Deleted Messages", "Не терять удалённые сообщения"), settings.preserveDeletedMessages))
         // Only shown under Keep Deleted Messages, because on its own it does nothing a user
         // would notice — and it is the answer to "why did it not save that one?".
@@ -1419,6 +1422,7 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         }
         entries.append(.keepTimedMessages(strings.text("Timed Messages Do Not Disappear", "Сообщения с таймером не исчезают"), settings.keepTimedMessages))
         entries.append(.showPreviousEditedText(strings.text("Show the Text Before an Edit", "Показывать текст до правки"), settings.showPreviousEditedText))
+        entries.append(.sectionHeader(12, .messenger, strings.text("Sending and Forwarding", "Отправка и пересылка")))
         entries.append(.forwardHideNamesByDefault(strings.text("Forward Without the Author", "Пересылать без автора"), settings.forwardHideNamesByDefault))
         // Rows that write several fields at once read them with OR. Each of these was two
         // or three separate switches in an older build, so a half-on state is something
@@ -1429,6 +1433,9 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.quickForwardToSaved(strings.text("\"To Saved Messages\" Button", "Кнопка «В Избранное»"), settings.quickForwardToSaved))
         entries.append(.showReadDateOnTap(strings.text("Read Time on the Checkmarks", "Время прочтения по галочкам"), settings.showReadDateOnTap))
         entries.append(.translatorLink(telewhiteTabTitle(.translator, strings: strings)))
+        entries.append(.sectionHeader(25, .messenger, strings.text("Channels", "Каналы")))
+        entries.append(.channelsDeclutter(strings.text("Clean Up Posts", "Убрать лишнее под постами"), settings.channelHideReactions || settings.channelHideComments || settings.channelHideShareButton))
+        entries.append(.hideSponsoredContent(strings.text("Hide Ads", "Скрыть рекламу"), settings.hideSponsoredContent))
         entries.append(.messengerInfo(strings.text("Everything here works on this phone only.", "Всё перечисленное работает только на этом телефоне.")))
 
     case .translator:
@@ -1460,28 +1467,19 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         }
 
     case .privacy:
-        entries.append(.privacyHeader(telewhiteTabTitle(.privacy, strings: strings)))
+        entries.append(.privacyHeader(strings.text("What Others See", "Что видят другие")))
         entries.append(.protectionBypass(strings.text("Allow Saving Everywhere", "Разрешить сохранять везде"), settings.screenshotProtectionBypass || settings.contentRestrictionBypass))
         entries.append(.hidePhoneInSettings(strings.text("Hide My Number and Username", "Скрыть свой номер и юзернейм"), settings.hidePhoneInSettings))
         entries.append(.showProfileIds(strings.text("Show Numeric IDs", "Показывать числовые ID"), settings.showUserIds || settings.showChatIds || settings.showMessageIds))
         entries.append(.stripFileMetadata(strings.text("Strip Data From Sent Files", "Убирать данные из отправляемых файлов"), settings.stripFileMetadata))
-        entries.append(.privacyInfo(strings.text("Changes what this phone shows and allows. Your Telegram privacy settings stay as they are.", "Меняет то, что показывает этот телефон. Настройки приватности Telegram остаются как есть.")))
-
-    case .stealth:
-        entries.append(.stealthHeader(telewhiteTabTitle(.stealth, strings: strings)))
+        entries.append(.sectionHeader(105, .privacy, strings.text("Being Unseen", "Незаметность")))
         // Read with OR, not AND: the row writes all five flags at once, so a half-on
         // state can only come from an older build. Showing OFF while the engine still
         // treats the user as invisible is exactly the trap this row exists to undo —
         // ghostMode alone already suppresses the online presence.
         entries.append(.ghost(strings.text("Invisible Mode", "Невидимка"), settings.ghostMode || settings.hideOnlineStatus || settings.hideTypingStatus || settings.hideReadReceipts || settings.ghostStories))
         entries.append(.ghostChatButtonEnabled(strings.text("Ghost Button in Chats", "Кнопка невидимки в чате"), settings.ghostChatButtonEnabled))
-        entries.append(.stealthInfo(strings.text("While you are invisible, Telegram will not show other people's read receipts to you either.", "Пока вы невидимы, Telegram и вам не показывает чужие отметки о прочтении.")))
-
-    case .channels:
-        entries.append(.channelsHeader(telewhiteTabTitle(.channels, strings: strings)))
-        entries.append(.channelsDeclutter(strings.text("Clean Up Posts", "Убрать лишнее под постами"), settings.channelHideReactions || settings.channelHideComments || settings.channelHideShareButton))
-        entries.append(.hideSponsoredContent(strings.text("Hide Ads", "Скрыть рекламу"), settings.hideSponsoredContent))
-        entries.append(.channelsInfo(strings.text("Only on this phone — nobody else is affected.", "Только на этом телефоне — для остальных ничего не меняется.")))
+        entries.append(.privacyInfo(strings.text("Changes what this phone shows and allows; your Telegram privacy settings stay as they are. While you are invisible, Telegram will not show other people's read receipts to you either.", "Меняет то, что показывает этот телефон; настройки приватности Telegram остаются как есть. Пока вы невидимы, Telegram и вам не показывает чужие отметки о прочтении.")))
 
     case .media:
         entries.append(.mediaHeader(telewhiteTabTitle(.media, strings: strings)))
