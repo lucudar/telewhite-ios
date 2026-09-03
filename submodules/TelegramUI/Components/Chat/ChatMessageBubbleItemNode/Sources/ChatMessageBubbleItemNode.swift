@@ -697,6 +697,11 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
     // Tracking it means the common path never writes contentNode.alpha at all, so it
     // cannot fight the insertion/swap alpha animations that own that property.
     private var telewhiteDimmedDeletedContentNodes: Bool = false
+    // Telewhite: one badge per deleted item of a partly-deleted album, keyed by the
+    // message's stableId. The bubble-wide badge cannot do this job: an album is one bubble
+    // holding several messages, so a single badge claimed the whole group was deleted when
+    // only one photo was.
+    private var telewhiteDeletedItemBadgeNodes: [UInt32: ASImageNode] = [:]
     private let shadowNode: ChatMessageShadowNode
     private var clippingNode: ChatMessageBubbleClippingNode
     
@@ -3950,7 +3955,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         var telewhiteContentMessageCount = 0
         for (message, _) in item.content {
             telewhiteContentMessageCount += 1
-            if message.attributes.contains(where: { $0 is TelewhiteDeletedMessageAttribute }) {
+            if telewhiteIsDeletedPreserved(attributes: message.attributes) {
                 telewhiteDeletedStableIds.insert(message.stableId)
             }
         }
@@ -3974,7 +3979,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         // sets aside for the share/summarize button, which lives in the same gutter and
         // draws above the badge.
         let telewhiteBadgeSelectionOffset: CGFloat = (item.controllerInteraction.selectionState != nil && incoming) ? 42.0 : 0.0
-        strongSelf.updateTelewhiteDeletedBadge(isDeleted: isTelewhiteDeleted, contentFrame: backgroundFrame, containerWidth: params.width - params.rightInset - telewhiteBadgeSelectionOffset, isIncoming: incoming, reservedGutterWidth: (needsShareButton || needsSummarizeButton) ? 45.0 : 0.0)
+        strongSelf.updateTelewhiteDeletedBadge(isDeleted: isTelewhiteFullyDeleted, contentFrame: backgroundFrame, containerWidth: params.width - params.rightInset - telewhiteBadgeSelectionOffset, isIncoming: incoming, reservedGutterWidth: (needsShareButton || needsSummarizeButton) ? 45.0 : 0.0)
         // The overlay darkens the whole bubble shape, so it may only appear when the whole
         // bubble is really gone.
         if isTelewhiteFullyDeleted, !hideBackground {
@@ -5145,17 +5150,59 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         // animates insertions, and it only touches alpha when dimming is or was in effect
         // so an untouched bubble keeps the upstream behaviour exactly.
         if isTelewhiteDeleted && !isTelewhiteFullyDeleted {
+            // Telewhite: a partly-deleted album fades the individual items, and now badges
+            // them individually too. The badge goes into mainContextSourceNode.contentNode
+            // rather than into the content node it marks, because that node is the one being
+            // faded — a badge inside it would fade with it and stop being the clear signal.
+            //
+            // contentNode.frame needs no conversion: clippingNode's bounds origin is set to
+            // its own frame origin (see the backgroundFrame assignment), so its children are
+            // laid out in the same coordinates as mainContextSourceNode.contentNode.
+            let badgeImage = telewhiteDeletedBadgeImage()
+            var badgedStableIds = Set<UInt32>()
             for contentNode in strongSelf.contentNodes {
                 guard let stableId = contentNode.item?.message.stableId else {
                     continue
                 }
-                contentNode.alpha = telewhiteDeletedStableIds.contains(stableId) ? telewhiteDeletedContentAlpha : 1.0
+                let isItemDeleted = telewhiteDeletedStableIds.contains(stableId)
+                contentNode.alpha = isItemDeleted ? telewhiteDeletedContentAlpha : 1.0
+                guard isItemDeleted, let badgeImage else {
+                    continue
+                }
+                badgedStableIds.insert(stableId)
+                let badgeNode: ASImageNode
+                if let current = strongSelf.telewhiteDeletedItemBadgeNodes[stableId] {
+                    badgeNode = current
+                } else {
+                    badgeNode = ASImageNode()
+                    badgeNode.isUserInteractionEnabled = false
+                    badgeNode.displaysAsynchronously = false
+                    strongSelf.mainContextSourceNode.contentNode.addSubnode(badgeNode)
+                    strongSelf.telewhiteDeletedItemBadgeNodes[stableId] = badgeNode
+                }
+                badgeNode.image = badgeImage
+                badgeNode.frame = telewhiteDeletedBadgeFrame(badgeSize: badgeImage.size, contentFrame: contentNode.frame, containerWidth: params.width - params.rightInset, isIncoming: incoming)
+            }
+            // Collected first: removing while iterating the dictionary would mutate it
+            // mid-iteration.
+            let staleStableIds = strongSelf.telewhiteDeletedItemBadgeNodes.keys.filter { !badgedStableIds.contains($0) }
+            for stableId in staleStableIds {
+                strongSelf.telewhiteDeletedItemBadgeNodes[stableId]?.removeFromSupernode()
+                strongSelf.telewhiteDeletedItemBadgeNodes.removeValue(forKey: stableId)
             }
             strongSelf.telewhiteDimmedDeletedContentNodes = true
-        } else if strongSelf.telewhiteDimmedDeletedContentNodes {
-            strongSelf.telewhiteDimmedDeletedContentNodes = false
-            for contentNode in strongSelf.contentNodes {
-                contentNode.alpha = 1.0
+        } else {
+            if !strongSelf.telewhiteDeletedItemBadgeNodes.isEmpty {
+                for badgeNode in strongSelf.telewhiteDeletedItemBadgeNodes.values {
+                    badgeNode.removeFromSupernode()
+                }
+                strongSelf.telewhiteDeletedItemBadgeNodes.removeAll()
+            }
+            if strongSelf.telewhiteDimmedDeletedContentNodes {
+                strongSelf.telewhiteDimmedDeletedContentNodes = false
+                for contentNode in strongSelf.contentNodes {
+                    contentNode.alpha = 1.0
+                }
             }
         }
         

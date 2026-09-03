@@ -667,13 +667,7 @@ public class ChatMessageInstantVideoItemNode: ChatMessageItemView, ASGestureReco
                     // overlay nor its badge reaches it — it needs its own pair. The badge
                     // states the deletion outright, so the fade stays mild enough to keep
                     // the video watchable.
-                    var isTelewhiteDeleted = false
-                    for attribute in item.message.attributes {
-                        if attribute is TelewhiteDeletedMessageAttribute {
-                            isTelewhiteDeleted = true
-                            break
-                        }
-                    }
+                    let isTelewhiteDeleted = telewhiteIsDeletedPreserved(attributes: item.message.attributes)
                     // A reply or forward header is right-aligned into the same gutter the
                     // badge wants, and it loses the z-order fight, so the badge would hide
                     // the reply preview. When one is present the badge goes inside instead.
