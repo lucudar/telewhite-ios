@@ -813,7 +813,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
         let arguments = arguments as! TelewhiteModsControllerArguments
         switch self {
         case let .menuItem(_, icon, title, subtitle, tab):
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: telewhiteMenuIcon(icon), title: title, titleFont: .bold, label: subtitle, labelStyle: .multilineDetailText, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: telewhiteMenuIcon(icon, color: presentationData.theme.list.itemAccentColor), title: title, titleFont: .bold, label: subtitle, labelStyle: .multilineDetailText, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                 arguments.openTab(tab)
             })
         case let .sectionHeader(_, _, text), let .messengerHeader(text), let .translatorHeader(text), let .translationLanguageHeader(text), let .privacyHeader(text), let .mediaHeader(text), let .appearanceHeader(text), let .developerHeader(text), let .chatTextHeader(text), let .chatListDensityHeader(text), let .chatListRowsHeader(text), let .settingsIconsHeader(text), let .cacheLimitHeader(text), let .speedBoostHeader(text):
@@ -1185,50 +1185,25 @@ private var telewhiteMenuIconCache: [String: UIImage] = [:]
 private func telewhiteMenuIconSymbolNames(_ icon: TelewhiteModsMenuIcon) -> [String] {
     switch icon {
     case .privacy:
-        return ["lock.shield.fill", "lock.fill", "lock"]
+        return ["lock.shield", "lock"]
     case .messages:
-        return ["bubble.left.and.bubble.right.fill", "bubble.left.fill", "bubble.left"]
+        return ["bubble.left.and.bubble.right", "bubble.left"]
     case .media:
-        return ["photo.fill.on.rectangle.fill", "photo.fill", "photo"]
+        return ["photo.on.rectangle", "photo"]
     case .appearance:
-        return ["paintbrush.fill", "paintbrush", "circle.lefthalf.fill"]
+        return ["paintbrush", "circle.lefthalf.fill"]
     case .developer:
-        return ["hammer.fill", "hammer", "wrench"]
+        return ["hammer", "wrench"]
     }
 }
 
-// Telewhite: one hue per section, so a row is found by colour before the title is read.
-// Deliberately not the theme's accent: five identical accent tiles carry no information,
-// which was the whole reason for putting the glyph on a tile in the first place.
-//
-// The values are dimmer than UIColor.systemBlue and friends. On the AMOLED theme the
-// background is pure black, and the stock system colours vibrate against it at this size.
-private func telewhiteMenuIconTileColor(_ icon: TelewhiteModsMenuIcon) -> UIColor {
-    switch icon {
-    case .privacy:
-        return UIColor(rgb: 0x2E6FD9)
-    case .messages:
-        return UIColor(rgb: 0x2A9D53)
-    case .media:
-        return UIColor(rgb: 0x8250C8)
-    case .appearance:
-        return UIColor(rgb: 0xD9782A)
-    case .developer:
-        return UIColor(rgb: 0x74747A)
-    }
-}
-
-private func telewhiteMenuIcon(_ icon: TelewhiteModsMenuIcon) -> UIImage? {
-    let cacheKey = "\(icon.rawValue)-tile"
+private func telewhiteMenuIcon(_ icon: TelewhiteModsMenuIcon, color: UIColor) -> UIImage? {
+    let cacheKey = "\(icon.rawValue)-\(color.argb)"
     if let cached = telewhiteMenuIconCache[cacheKey] {
         return cached
     }
 
-    // Smaller than the old bare glyph: it now sits on a tile rather than being the whole
-    // icon, and a 19pt symbol inside a 29pt square leaves no margin. Semibold because a
-    // white glyph on a mid-tone fill loses weight compared to a tinted one on the list
-    // background.
-    let configuration = UIImage.SymbolConfiguration(pointSize: 15.0, weight: .semibold)
+    let configuration = UIImage.SymbolConfiguration(pointSize: 19.0, weight: .regular)
     var symbol: UIImage?
     for name in telewhiteMenuIconSymbolNames(icon) {
         if let candidate = UIImage(systemName: name, withConfiguration: configuration) {
@@ -1240,15 +1215,12 @@ private func telewhiteMenuIcon(_ icon: TelewhiteModsMenuIcon) -> UIImage? {
         return nil
     }
 
-    // Fixed canvas so every row lines up regardless of how wide its glyph is.
+    // Centre the glyph on a fixed canvas: symbol widths differ, and the rows must
+    // still line up with each other.
     let size = CGSize(width: 29.0, height: 29.0)
     let renderer = UIGraphicsImageRenderer(size: size)
-    let image = renderer.image { rendererContext in
-        let bounds = CGRect(origin: CGPoint(), size: size)
-        rendererContext.cgContext.setFillColor(telewhiteMenuIconTileColor(icon).cgColor)
-        UIBezierPath(roundedRect: bounds, cornerRadius: 7.5).fill()
-
-        let tinted = symbol.withTintColor(.white, renderingMode: .alwaysOriginal)
+    let image = renderer.image { _ in
+        let tinted = symbol.withTintColor(color, renderingMode: .alwaysOriginal)
         tinted.draw(in: CGRect(
             x: floor((size.width - tinted.size.width) * 0.5),
             y: floor((size.height - tinted.size.height) * 0.5),
