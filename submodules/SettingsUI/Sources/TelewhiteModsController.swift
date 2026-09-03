@@ -1093,7 +1093,11 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
                 }
             })
         case let .settingsIconVariant(_, text, value, selected):
-            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: text, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
+            // Telewhite: each option carries a sample glyph drawn in its own style, so the
+            // choice is made by looking rather than by applying one, going back to Settings
+            // to see the result, and returning here. The names alone could not carry it:
+            // "Layered" and "On a Soft Tile" mean nothing until you see them.
+            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, icon: telewhiteSettingsIconStylePreview(variantRawValue: value), iconSize: CGSize(width: 30.0, height: 30.0), title: text, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
                 arguments.updateSettings { current in
                     var updated = current
                     updated.settingsIconVariant = value

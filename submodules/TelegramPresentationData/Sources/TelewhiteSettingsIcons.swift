@@ -218,12 +218,15 @@ private func telewhiteSettingsIconSymbolNames(bundleImageName name: String) -> [
 
 // Returns nil when the name has no mapping or the symbol is missing on this OS — every one of those falls back to the original bitmap, so a
 // gap shows the old glyph rather than an empty row.
-func telewhiteRenderSettingsSymbolIcon(name: String, size: CGSize) -> UIImage? {
+// `variant` is nil for the real settings rows, which read the user's choice. The style
+// picker passes one explicitly so it can show every style at once without switching the
+// app over to it first.
+func telewhiteRenderSettingsSymbolIcon(name: String, size: CGSize, variant explicitVariant: TelewhiteSettingsIconVariant? = nil) -> UIImage? {
     guard let symbolNames = telewhiteSettingsIconSymbolNames(bundleImageName: name) else {
         return nil
     }
 
-    let variant = telewhiteSettingsIconVariant()
+    let variant = explicitVariant ?? telewhiteSettingsIconVariant()
 
     // The quiet variant drops the accent for the neutral gray the rows used before
     // symbols arrived; the rest stay accent-tinted.
@@ -370,6 +373,20 @@ func telewhiteCachedSettingsBitmapIcon(name: String, scaleFactor: CGFloat, gener
 // The notification name mirrors `TelewhiteModsSettings.didChangeNotification` from
 // the SettingsUI module, duplicated as a string because SettingsUI depends on
 // TelegramPresentationData and importing it would be circular.
+/// One sample glyph drawn in the requested style, for the style picker to show beside each
+/// option. "Appearance" is the sample on purpose: it ships both a filled and a hollow twin,
+/// so the difference between "Solid", "Outlined" and "Thin" is actually visible on it, and
+/// it is narrow enough not to crowd a tile.
+///
+/// Returns nil for an unknown raw value, which the caller renders as a plain row — the same
+/// thing that happens today.
+public func telewhiteSettingsIconStylePreview(variantRawValue: Int32) -> UIImage? {
+    guard let variant = TelewhiteSettingsIconVariant(rawValue: variantRawValue) else {
+        return nil
+    }
+    return telewhiteRenderSettingsSymbolIcon(name: "Appearance", size: CGSize(width: 30.0, height: 30.0), variant: variant)
+}
+
 public func telewhiteThemeModsUpdated() -> Signal<[Bool], NoError> {
     return (Signal<[Bool], NoError> { subscriber in
         let flags: () -> [Bool] = {
