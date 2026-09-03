@@ -1313,6 +1313,12 @@ private func telewhiteIconVariantName(_ value: Int32, strings: TelewhiteModsStri
         return strings.text("Thin, Gray", "тонкие серые")
     case 3:
         return strings.text("In a Ring", "в кольце")
+    case 4:
+        return strings.text("Layered", "с глубиной")
+    case 5:
+        return strings.text("On a Tile", "на плитке")
+    case 6:
+        return strings.text("On a Soft Tile", "на мягкой плитке")
     default:
         return strings.text("Solid", "заливкой")
     }
@@ -1518,10 +1524,12 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
 
     case .settingsIcons:
         entries.append(.settingsIconsHeader(strings.text("Style", "Стиль")))
-        for (index, variant) in [Int32(0), 1, 2, 3].enumerated() {
+        // stableId is 1101 + index and the trailing paragraph sits at 1109, so this list
+        // has room for eight before it collides.
+        for (index, variant) in [Int32(0), 1, 2, 3, 4, 5, 6].enumerated() {
             entries.append(.settingsIconVariant(Int32(index), telewhiteIconVariantName(variant, strings: strings), variant, settings.settingsIconVariant == variant))
         }
-        entries.append(.settingsIconsInfo(strings.text("Changes every icon in Settings at once. \"Solid\" and \"Outlined\" follow the accent colour.", "Меняет сразу все значки в настройках. «Заливкой» и «Контурные» следуют акцентному цвету.")))
+        entries.append(.settingsIconsInfo(strings.text("Changes every icon in Settings at once. Everything except \"Thin, Gray\" follows the accent colour.", "Меняет сразу все значки в настройках. Всё, кроме «тонких серых», следует акцентному цвету.")))
 
     case .chatText:
         entries.append(.chatTextHeader(strings.text("Chat Text", "Текст в чате")))

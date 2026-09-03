@@ -21,6 +21,33 @@ public enum TelewhiteSettingsIconVariant: Int32 {
     case outline = 1
     case thin = 2
     case ringed = 3
+    // Telewhite: added later. Raw values are persisted in UserDefaults, so they append
+    // rather than renumber.
+    case hierarchical = 4
+    case tile = 5
+    case softTile = 6
+
+    /// Variants drawn on a rounded backing square rather than as a bare glyph.
+    var hasTile: Bool {
+        switch self {
+        case .tile, .softTile:
+            return true
+        case .filled, .outline, .thin, .ringed, .hierarchical:
+            return false
+        }
+    }
+
+    /// Variants that want the un-filled twin of the symbol. Tiles and the layered
+    /// rendering both need the solid glyph: a hairline outline disappears on a filled
+    /// square, and `.hierarchical` has nothing to layer without ink to split.
+    var wantsHollowGlyph: Bool {
+        switch self {
+        case .outline, .thin, .ringed:
+            return true
+        case .filled, .hierarchical, .tile, .softTile:
+            return false
+        }
+    }
 }
 
 func telewhiteSettingsIconVariant() -> TelewhiteSettingsIconVariant {
@@ -202,7 +229,7 @@ func telewhiteRenderSettingsSymbolIcon(name: String, size: CGSize) -> UIImage? {
     // symbols arrived; the rest stay accent-tinted.
     let color: UIColor
     switch variant {
-    case .filled, .outline, .ringed:
+    case .filled, .outline, .ringed, .hierarchical, .tile, .softTile:
         color = telewhiteSettingsIconAccentColor() ?? UIColor(rgb: 0x9A9AA0)
     case .thin:
         color = UIColor(rgb: 0x9A9AA0)
@@ -221,7 +248,7 @@ func telewhiteRenderSettingsSymbolIcon(name: String, size: CGSize) -> UIImage? {
     // and the original list still follows, so a name with no hollow twin — "globe",
     // "faceid", "speedometer" — keeps working untouched.
     var candidateNames = symbolNames
-    if variant != .filled {
+    if variant.wantsHollowGlyph {
         candidateNames = symbolNames.compactMap { $0.hasSuffix(".fill") ? String($0.dropLast(5)) : nil } + symbolNames
     }
 
@@ -231,9 +258,36 @@ func telewhiteRenderSettingsSymbolIcon(name: String, size: CGSize) -> UIImage? {
     // 13pt inside a 25pt ring: the widest glyphs in the table ("person.3",
     // "laptopcomputer.and.iphone") run about 1.6x their point size across, so anything
     // larger pokes through the stroke.
-    let pointSize: CGFloat = variant == .ringed ? 13.0 : 20.0
-    let weight: UIImage.SymbolWeight = variant == .thin ? .light : .regular
-    let configuration = UIImage.SymbolConfiguration(pointSize: pointSize, weight: weight)
+    //
+    // A tile leaves the glyph less room than the bare canvas does, so it shrinks to 16pt,
+    // and goes semibold: white ink on a mid-tone fill reads lighter than the same glyph
+    // tinted on the list background.
+    let pointSize: CGFloat
+    switch variant {
+    case .ringed:
+        pointSize = 13.0
+    case .tile, .softTile:
+        pointSize = 16.0
+    case .filled, .outline, .thin, .hierarchical:
+        pointSize = 20.0
+    }
+    let weight: UIImage.SymbolWeight
+    switch variant {
+    case .thin:
+        weight = .light
+    case .tile, .softTile:
+        weight = .semibold
+    case .filled, .outline, .ringed, .hierarchical:
+        weight = .regular
+    }
+    var configuration = UIImage.SymbolConfiguration(pointSize: pointSize, weight: weight)
+    // Telewhite: `.hierarchical` asks SF Symbols to split the glyph into layers of one
+    // hue at different densities, which reads with depth instead of as a flat silhouette.
+    // Gated on iOS 15 — the app still supports 13, where this initialiser does not exist
+    // and the variant simply renders as the plain accent-tinted glyph.
+    if variant == .hierarchical, #available(iOS 15.0, *) {
+        configuration = configuration.applying(UIImage.SymbolConfiguration(hierarchicalColor: color))
+    }
     var symbol: UIImage?
     for symbolName in candidateNames {
         if let candidate = UIImage(systemName: symbolName, withConfiguration: configuration) {
@@ -249,6 +303,14 @@ func telewhiteRenderSettingsSymbolIcon(name: String, size: CGSize) -> UIImage? {
     // column has to stay aligned down the list.
     let renderer = UIGraphicsImageRenderer(size: size)
     let image = renderer.image { context in
+        if variant.hasTile {
+            // 6.5 on a 30pt square is the same corner-to-side ratio iOS uses for the
+            // squircles in its own settings rows.
+            let tileRect = CGRect(origin: .zero, size: size)
+            let fill = variant == .tile ? color : color.withAlphaComponent(0.12)
+            context.cgContext.setFillColor(fill.cgColor)
+            UIBezierPath(roundedRect: tileRect, cornerRadius: 6.5).fill()
+        }
         if variant == .ringed {
             // Inset by half the line width so the stroke lands inside the canvas
             // rather than straddling its edge.
@@ -257,7 +319,16 @@ func telewhiteRenderSettingsSymbolIcon(name: String, size: CGSize) -> UIImage? {
             context.cgContext.setLineWidth(1.0)
             context.cgContext.strokeEllipse(in: ringRect)
         }
-        let tinted = symbol.withTintColor(color, renderingMode: .alwaysOriginal)
+        // On a solid tile the glyph is knocked out in white; everywhere else it carries
+        // the colour itself. `.hierarchical` already has its colour in the configuration,
+        // so re-tinting it here would flatten the layers back into one tone.
+        let glyphColor: UIColor = variant == .tile ? .white : color
+        let tinted: UIImage
+        if variant == .hierarchical, #available(iOS 15.0, *) {
+            tinted = symbol
+        } else {
+            tinted = symbol.withTintColor(glyphColor, renderingMode: .alwaysOriginal)
+        }
         tinted.draw(in: CGRect(
             x: floor((size.width - tinted.size.width) * 0.5),
             y: floor((size.height - tinted.size.height) * 0.5),
