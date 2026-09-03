@@ -1148,8 +1148,24 @@ public final class Camera {
         }
     }
     
+    // Telewhite: the round-video camera can zoom out to 0.5x only while the session is a
+    // single-camera one -- CameraDevice picks a virtual builtInTriple/Dual/DualWide device
+    // then, and those report a minAvailableVideoZoomFactor below 1.0. A dual-camera round
+    // video has to use builtInWideAngleCamera, which cannot go below 1.0, because the
+    // virtual devices do not fit an AVCaptureMultiCamSession. So it is 0.5x or dual, never
+    // both, and that is a hardware limit rather than a policy we chose.
+    //
+    // iOS Low Power Mode already turns dual off for round video, which is why enabling it
+    // makes 0.5x appear -- a side effect people found and then had to keep their phone in
+    // Low Power Mode to use. This flag asks for the same single-camera session directly.
+    //
+    // The key is spelled out rather than imported: Camera must not depend on SettingsUI.
+    // Same pattern as TelewhiteAmoledTheme in TelegramPresentationData.
     public static func isDualCameraSupported(forRoundVideo: Bool = false) -> Bool {
         if #available(iOS 13.0, *), AVCaptureMultiCamSession.isMultiCamSupported && !DeviceModel.current.isIpad {
+            if forRoundVideo && UserDefaults.standard.bool(forKey: "telewhite.mods.roundVideoWideLens") {
+                return false
+            }
             if forRoundVideo && (ProcessInfo.processInfo.isLowPowerModeEnabled || DeviceModel.current == .iPhoneXR) {
                 return false
             }

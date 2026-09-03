@@ -54,6 +54,7 @@ public struct TelewhiteModsSettings: Equatable {
     public var longRoundVideos: Bool
     public var confirmVoiceSend: Bool
     public var videoNoRecompress: Bool
+    public var roundVideoWideLens: Bool
     public var stripFileMetadata: Bool
     public var autoResendFailed: Bool
     public var settingsIconVariant: Int32
@@ -111,6 +112,7 @@ public struct TelewhiteModsSettings: Equatable {
         static let longRoundVideos = "telewhite.mods.longRoundVideos"
         static let confirmVoiceSend = "telewhite.mods.confirmVoiceSend"
         static let videoNoRecompress = "telewhite.mods.videoNoRecompress"
+        static let roundVideoWideLens = "telewhite.mods.roundVideoWideLens"
         static let stripFileMetadata = "telewhite.mods.stripFileMetadata"
         static let autoResendFailed = "telewhite.mods.autoResendFailed"
         static let settingsIconVariant = "telewhite.mods.settingsIconVariant"
@@ -206,9 +208,10 @@ public struct TelewhiteModsSettings: Equatable {
             longRoundVideos: defaults.bool(forKey: Key.longRoundVideos),
             confirmVoiceSend: defaults.bool(forKey: Key.confirmVoiceSend),
             videoNoRecompress: defaults.bool(forKey: Key.videoNoRecompress),
+            roundVideoWideLens: defaults.bool(forKey: Key.roundVideoWideLens),
             stripFileMetadata: defaults.bool(forKey: Key.stripFileMetadata),
             autoResendFailed: defaults.object(forKey: Key.autoResendFailed) as? Bool ?? true,
-            settingsIconVariant: min(3, max(0, (defaults.object(forKey: Key.settingsIconVariant) as? NSNumber)?.int32Value ?? 0)),
+            settingsIconVariant: min(6, max(0, (defaults.object(forKey: Key.settingsIconVariant) as? NSNumber)?.int32Value ?? 0)),
             chatListRows: min(3, max(1, (defaults.object(forKey: Key.chatListRows) as? NSNumber)?.int32Value ?? 2)),
             channelHideReactions: defaults.bool(forKey: Key.channelHideReactions),
             channelHideComments: defaults.bool(forKey: Key.channelHideComments),
@@ -341,6 +344,7 @@ public struct TelewhiteModsSettings: Equatable {
         defaults.set(self.longRoundVideos, forKey: Key.longRoundVideos)
         defaults.set(self.confirmVoiceSend, forKey: Key.confirmVoiceSend)
         defaults.set(self.videoNoRecompress, forKey: Key.videoNoRecompress)
+        defaults.set(self.roundVideoWideLens, forKey: Key.roundVideoWideLens)
         defaults.set(self.stripFileMetadata, forKey: Key.stripFileMetadata)
         defaults.set(self.autoResendFailed, forKey: Key.autoResendFailed)
         defaults.set(self.settingsIconVariant, forKey: Key.settingsIconVariant)
@@ -530,6 +534,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
     case longRoundVideos(String, Bool)
     case confirmVoiceSend(String, Bool)
     case videoNoRecompress(String, Bool)
+    case roundVideoWideLens(String, Bool)
     case stripFileMetadata(String, Bool)
     case autoResendFailed(String, Bool)
     case mediaInfo(String)
@@ -584,7 +589,7 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return TelewhiteModsSection.privacy.rawValue
         case let .sectionHeader(_, section, _):
             return section.rawValue
-        case .mediaHeader, .downloadStories, .hideStories, .autoCacheCleanupLink, .speedBoostLink, .longRoundVideos, .confirmVoiceSend, .videoNoRecompress, .autoResendFailed, .mediaInfo:
+        case .mediaHeader, .downloadStories, .hideStories, .autoCacheCleanupLink, .speedBoostLink, .longRoundVideos, .confirmVoiceSend, .videoNoRecompress, .roundVideoWideLens, .autoResendFailed, .mediaInfo:
             return TelewhiteModsSection.media.rawValue
         case .autoCacheCleanup, .cacheLimitHeader, .cacheLimit, .cacheLimitInfo:
             return TelewhiteModsSection.cacheLimit.rawValue
@@ -702,8 +707,10 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
             return 521
         case .videoNoRecompress:
             return 522
-        case .autoResendFailed:
+        case .roundVideoWideLens:
             return 523
+        case .autoResendFailed:
+            return 524
         // Telewhite: stableId must rise in the order rows are appended — ItemListUI
         // asserts it (ItemListControllerNode.swift:449) and its row diff assumes it.
         // The trailing info row therefore sits at the end of the media block, not at 502.
@@ -1017,6 +1024,10 @@ private enum TelewhiteModsEntry: ItemListNodeEntry, Equatable {
         case let .confirmVoiceSend(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
                 settings.confirmVoiceSend = value
+            }
+        case let .roundVideoWideLens(text, value):
+            return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
+                settings.roundVideoWideLens = value
             }
         case let .videoNoRecompress(text, value):
             return self.switchItem(presentationData: presentationData, arguments: arguments, text: text, value: value) { settings, value in
@@ -1394,11 +1405,21 @@ private func telewhiteEntryDescription(_ entry: TelewhiteModsEntry, presentation
     case .ghost:
         return text("No read receipts, no \"typing\", no online status; stories viewed anonymously.", "Ни прочтений, ни «печатает», ни «в сети»; истории смотрите анонимно.")
     case .ghostChatButtonEnabled:
-        return text("Turns invisibility on for one person only.", "Включает невидимку для одного собеседника.")
+        // Telewhite: the old wording — "turns invisibility on for one person" — was a
+        // half-truth, and the missing half is the confusing one. Read receipts, "typing"
+        // and content views are decided per chat (see the ghostPeerIds checks in
+        // AccountViewTracker, ManagedConsumePersonalMessagesActions,
+        // ManagedSynchronizeConsumeMessageContentsOperations and
+        // ManagedLocalInputActivities), but online status is a property of the account, so
+        // TelewhitePresenceGuard has to hide it from everyone as soon as any chat is ghosted.
+        // Without saying so, turning it on for one chat looks like a bug to everyone else.
+        return text("Read receipts and \"typing\" stop in that chat only — but online status hides from everyone, the server has no per-contact status.", "Прочтения и «печатает» — только в выбранном чате. А «в сети» скрывается сразу для всех: отдельного статуса для каждого собеседника у сервера нет.")
     case .channelsDeclutter:
         return text("Reactions, the comments bar, the share button.", "Реакции, панель комментариев, кнопку «Поделиться».")
     case .longRoundVideos:
         return text("Up to five minutes. Past a minute the server sends it on as a normal video.", "До пяти минут. Дольше минуты сервер пришлёт обычным видео.")
+    case .roundVideoWideLens:
+        return text("Lets the round-video camera zoom out to 0.5x without Low Power Mode. The price is the dual camera: the hardware cannot do both in one round video.", "Позволяет отъезжать в кружке до 0.5x без режима энергосбережения. Цена — двойная камера: одновременно железо этого в кружке не умеет.")
     case .videoNoRecompress:
         return text("Sent as recorded: no waiting, original quality, a much bigger file.", "Уходит как снято: без ожидания, в исходном качестве, но файл заметно больше.")
     case .autoResendFailed:
@@ -1494,6 +1515,7 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         entries.append(.longRoundVideos(strings.text("Longer Round Videos", "Длинные кружки"), settings.longRoundVideos))
         entries.append(.confirmVoiceSend(strings.text("Confirm Voice and Round Videos", "Спрашивать перед голосовым и кружком"), settings.confirmVoiceSend))
         entries.append(.videoNoRecompress(strings.text("Send Videos Without Re-encoding", "Отправлять видео без пережатия"), settings.videoNoRecompress))
+        entries.append(.roundVideoWideLens(strings.text("Wide Lens in Video Messages", "Ультраширокий объектив в кружках"), settings.roundVideoWideLens))
         entries.append(.autoResendFailed(strings.text("Resend Automatically", "Переотправлять автоматически"), settings.autoResendFailed))
         entries.append(.mediaInfo(strings.text("Nothing in the cloud is deleted — only the copies on this phone.", "Из облака ничего не удаляется — только копии на этом телефоне.")))
 
