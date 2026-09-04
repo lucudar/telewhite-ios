@@ -4007,7 +4007,8 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             //
             // The translucency lives in the node's alpha, not in the tint colour, so it
             // does not hinge on UIImageView honouring the alpha channel of tintColor.
-            let telewhiteDimmerIsDark = messageTheme.primaryTextColor.lightness > 0.5
+            let telewhiteDimmedMessageTheme = incoming ? item.presentationData.theme.theme.chat.message.incoming : item.presentationData.theme.theme.chat.message.outgoing
+            let telewhiteDimmerIsDark = telewhiteDimmedMessageTheme.primaryTextColor.lightness > 0.5
             telewhiteDeletedOverlayNode.customHighlightColor = telewhiteDimmerIsDark ? UIColor.black : UIColor.white
             telewhiteDeletedOverlayNode.alpha = 0.45
             telewhiteDeletedOverlayNode.setType(type: backgroundType, highlighted: true, graphics: graphics, maskMode: true, hasWallpaper: true, transition: .immediate, backgroundNode: nil)
