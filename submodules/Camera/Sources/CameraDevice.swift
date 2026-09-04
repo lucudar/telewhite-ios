@@ -110,6 +110,38 @@ final class CameraDevice {
                 }
             }
             
+            // Telewhite: on Pro devices with Low Power Mode OFF the virtual round-video device
+            // (builtInTriple/Dual/DualWide) exposes its <=640x480 420v formats with frame-rate
+            // ranges that top out at 120/240fps, so the ">60fps -> continue outer" filter above
+            // discards every one of them and leaves `candidates` empty. When no format is set the
+            // device stays on its default multicam-oriented format, delivers no frames, and the
+            // round-video preview just hangs (on both the front and back camera). Low Power Mode
+            // caps those very same formats to <=60fps, which is the only reason enabling it made
+            // the 0.5x round video work. When the primary pass finds nothing, retry without the
+            // frame-rate ceiling -- the actual rate is still clamped to the target below via
+            // actualFPS/activeVideoMax(Min)FrameDuration, so this only restores a usable format.
+            if candidates.isEmpty {
+                var fallbackMaxWidth: Int32 = 0
+                var fallbackMaxHeight: Int32 = 0
+                for format in device.formats {
+                    if format.mediaType != .video || format.value(forKey: "isPhotoFormat") as? Bool == true {
+                        continue
+                    }
+                    let dimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+                    if dimensions.width >= fallbackMaxWidth && dimensions.width <= maxDimensions.width && dimensions.height >= fallbackMaxHeight && dimensions.height <= maxDimensions.height {
+                        let subtype = CMFormatDescriptionGetMediaSubType(format.formatDescription)
+                        if subtype == kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange {
+                            if dimensions.width > fallbackMaxWidth {
+                                candidates.removeAll()
+                            }
+                            fallbackMaxWidth = dimensions.width
+                            fallbackMaxHeight = dimensions.height
+                            candidates.append(format)
+                        }
+                    }
+                }
+            }
+            
             if !candidates.isEmpty {
                 var bestFormat: AVCaptureDevice.Format?
     photoOuter: for format in photoCandidates {
