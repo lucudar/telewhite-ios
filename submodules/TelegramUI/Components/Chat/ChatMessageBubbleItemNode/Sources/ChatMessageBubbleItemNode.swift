@@ -3995,7 +3995,21 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             // Softened from 0.72: the content fade above now actually applies, and two
             // heavy dimmers stacked on the same bubble left the text barely readable —
             // the point of preserving a deleted message is being able to read it.
-            telewhiteDeletedOverlayNode.customHighlightColor = UIColor.black.withAlphaComponent(0.45)
+            //
+            // The dimmer follows the bubble's own text colour. A dark bubble with light
+            // text takes translucent black. A bright accent bubble — yellow in the tinted
+            // night theme, say — draws its text in BLACK (DefaultDarkTintedPresentationTheme
+            // picks black once the bubble's lightness passes 0.7), and a black dimmer on
+            // top of that turned the whole bubble into an unreadable black slab with a
+            // trash can in the corner. Such a bubble takes translucent white instead: the
+            // fill goes pale, the black text stays legible, and the message still reads
+            // as faded.
+            //
+            // The translucency lives in the node's alpha, not in the tint colour, so it
+            // does not hinge on UIImageView honouring the alpha channel of tintColor.
+            let telewhiteDimmerIsDark = messageTheme.primaryTextColor.lightness > 0.5
+            telewhiteDeletedOverlayNode.customHighlightColor = telewhiteDimmerIsDark ? UIColor.black : UIColor.white
+            telewhiteDeletedOverlayNode.alpha = 0.45
             telewhiteDeletedOverlayNode.setType(type: backgroundType, highlighted: true, graphics: graphics, maskMode: true, hasWallpaper: true, transition: .immediate, backgroundNode: nil)
             telewhiteDeletedOverlayNode.frame = backgroundFrame
             telewhiteDeletedOverlayNode.updateLayout(size: backgroundFrame.size, transition: .immediate)
