@@ -56,26 +56,6 @@ public protocol ChatSendMessageContextScreenRichTextPreview: AnyObject {
     func update(boundingWidth: CGFloat, presentationData: PresentationData, transition: ComponentTransition) -> CGSize
 }
 
-public protocol ChatSendMessageContextScreenTextInputSource: AnyObject {
-    // The live editor view — used only for frame conversion and to hide the real text
-    // during the morph. (`UIView`, not a UITextView, so any backend qualifies.)
-    var sourceView: UIView { get }
-    var attributedText: NSAttributedString? { get }
-    var defaultTextContainerInset: UIEdgeInsets { get }
-    var contentOffset: CGPoint { get }
-    var currentRightInset: CGFloat { get }
-    var quoteLineStyle: ChatInputTextView.Theme.Quote.LineStyle? { get }
-}
-
-// Declared here (not in ChatInputTextNode) because ChatSendMessageActionUI imports
-// ChatInputTextNode — the reverse would cycle. ChatInputTextView already has every member.
-extension ChatInputTextView: ChatSendMessageContextScreenTextInputSource {
-    public var sourceView: UIView { return self }
-    public var quoteLineStyle: ChatInputTextView.Theme.Quote.LineStyle? {
-        return self.theme?.quote.lineStyle
-    }
-}
-
 final class ChatSendMessageContextScreenComponent: Component {
     typealias EnvironmentType = ViewControllerComponentContainer.Environment
     
@@ -87,7 +67,7 @@ final class ChatSendMessageContextScreenComponent: Component {
     let hasEntityKeyboard: Bool
     let gesture: ContextGesture?
     let sourceSendButton: UIView
-    let textInputSource: ChatSendMessageContextScreenTextInputSource?
+    let textInputView: UITextView?
     let emojiViewProvider: ((ChatTextInputTextCustomEmojiAttribute) -> UIView)?
     let wallpaperBackgroundNode: WallpaperBackgroundNode?
     let completion: () -> Void
@@ -109,7 +89,7 @@ final class ChatSendMessageContextScreenComponent: Component {
         hasEntityKeyboard: Bool,
         gesture: ContextGesture?,
         sourceSendButton: UIView,
-        textInputSource: ChatSendMessageContextScreenTextInputSource?,
+        textInputView: UITextView?,
         emojiViewProvider: ((ChatTextInputTextCustomEmojiAttribute) -> UIView)?,
         wallpaperBackgroundNode: WallpaperBackgroundNode?,
         completion: @escaping () -> Void,
@@ -130,7 +110,7 @@ final class ChatSendMessageContextScreenComponent: Component {
         self.hasEntityKeyboard = hasEntityKeyboard
         self.gesture = gesture
         self.sourceSendButton = sourceSendButton
-        self.textInputSource = textInputSource
+        self.textInputView = textInputView
         self.emojiViewProvider = emojiViewProvider
         self.wallpaperBackgroundNode = wallpaperBackgroundNode
         self.completion = completion
@@ -418,7 +398,7 @@ final class ChatSendMessageContextScreenComponent: Component {
             var isMessageVisible: Bool = mediaPreview != nil
             
             let textString: NSAttributedString
-            if let attributedText = component.textInputSource?.attributedText {
+            if let attributedText = component.textInputView?.attributedText {
                 textString = attributedText
                 if textString.length != 0 {
                     isMessageVisible = true
@@ -765,8 +745,8 @@ final class ChatSendMessageContextScreenComponent: Component {
             }
             
             let localSourceTextInputViewFrame: CGRect
-            if let textInputSource = component.textInputSource {
-                localSourceTextInputViewFrame = convertFrame(textInputSource.sourceView.bounds, from: textInputSource.sourceView, to: self)
+            if let textInputView = component.textInputView {
+                localSourceTextInputViewFrame = convertFrame(textInputView.bounds, from: textInputView, to: self)
             } else {
                 localSourceTextInputViewFrame = convertFrame(component.sourceSendButton.bounds, from: component.sourceSendButton, to: self)
             }
@@ -827,7 +807,7 @@ final class ChatSendMessageContextScreenComponent: Component {
                 textString: textString,
                 richTextPreview: component.richTextPreview,
                 maxRichBubbleWidth: maxRichBubbleWidth,
-                textInputSource: component.textInputSource,
+                sourceTextInputView: component.textInputView as? ChatInputTextView,
                 emojiViewProvider: component.emojiViewProvider,
                 sourceMediaPreview: mediaPreview,
                 mediaCaptionIsAbove: self.mediaCaptionIsAbove,
@@ -1298,7 +1278,7 @@ final class ChatSendMessageContextScreenComponent: Component {
                     actionsStackNode.layer.animateSpring(from: 0.001 as NSNumber, to: 1.0 as NSNumber, keyPath: "transform.scale", duration: 0.42, damping: 104.0)
                     
                     messageItemView.animateIn(
-                        textInputSource: component.textInputSource,
+                        sourceTextInputView: component.textInputView as? ChatInputTextView,
                         isEditMessage: isEditMessage,
                         transition: transition
                     )
@@ -1307,7 +1287,7 @@ final class ChatSendMessageContextScreenComponent: Component {
                     transition.setScale(view: actionsStackNode.view, scale: 0.001)
                     
                     messageItemView.animateOut(
-                        textInputSource: component.textInputSource,
+                        sourceTextInputView: component.textInputView as? ChatInputTextView,
                         toEmpty: self.animateOutToEmpty,
                         isEditMessage: isEditMessage,
                         transition: transition
@@ -1409,14 +1389,14 @@ final class ChatSendMessageContextScreenComponent: Component {
                                     return
                                 }
                                 if mediaPreview == nil {
-                                    component.textInputSource?.sourceView.isHidden = true
+                                    component.textInputView?.isHidden = true
                                 }
                                 component.sourceSendButton.isHidden = true
                             })
                         }
                     } else {
                         if mediaPreview == nil {
-                            component.textInputSource?.sourceView.isHidden = true
+                            component.textInputView?.isHidden = true
                         }
                         component.sourceSendButton.isHidden = true
                     }
@@ -1428,7 +1408,7 @@ final class ChatSendMessageContextScreenComponent: Component {
                 
                 if self.animateOutToEmpty {
                     if mediaPreview == nil {
-                        component.textInputSource?.sourceView.isHidden = false
+                        component.textInputView?.isHidden = false
                     }
                     component.sourceSendButton.isHidden = false
                     
@@ -1450,7 +1430,7 @@ final class ChatSendMessageContextScreenComponent: Component {
                         self.performedActionsOnAnimateOut = true
                         if let component = self.component, !self.animateOutToEmpty {
                             if mediaPreview == nil {
-                                component.textInputSource?.sourceView.isHidden = false
+                                component.textInputView?.isHidden = false
                             }
                             component.sourceSendButton.isHidden = false
                         }
@@ -1505,7 +1485,7 @@ public class ChatSendMessageContextScreen: ViewControllerComponentContainer, Cha
         hasEntityKeyboard: Bool,
         gesture: ContextGesture?,
         sourceSendButton: UIView,
-        textInputSource: ChatSendMessageContextScreenTextInputSource?,
+        textInputView: UITextView?,
         emojiViewProvider: ((ChatTextInputTextCustomEmojiAttribute) -> UIView)?,
         wallpaperBackgroundNode: WallpaperBackgroundNode?,
         completion: @escaping () -> Void,
@@ -1531,7 +1511,7 @@ public class ChatSendMessageContextScreen: ViewControllerComponentContainer, Cha
                 hasEntityKeyboard: hasEntityKeyboard,
                 gesture: gesture,
                 sourceSendButton: sourceSendButton,
-                textInputSource: textInputSource,
+                textInputView: textInputView,
                 emojiViewProvider: emojiViewProvider,
                 wallpaperBackgroundNode: wallpaperBackgroundNode,
                 completion: completion,
