@@ -16,8 +16,8 @@ import LocationUI
 import UndoUI
 import ContextUI
 import TranslateUI
+import TextProcessingScreen
 import Pasteboard
-import ChatRichTextEditorComposer
 
 final class InstantPageControllerNode: ASDisplayNode, ASScrollViewDelegate {
     private weak var controller: InstantPageController?
@@ -1550,13 +1550,12 @@ final class InstantPageControllerNode: ASDisplayNode, ASScrollViewDelegate {
                             guard let self else {
                                 return
                             }
-                            let controller = await context.sharedContext.makeTextProcessingScreen(
+                            let controller = await TextProcessingScreen(
                                 context: context,
-                                theme: nil,
                                 mode: .translate(fromLanguage: language, applyResult: nil),
-                                inputText: .plain(text: text, entities: []),
+                                inputText: TextWithEntities(text: text, entities: []),
                                 copyResult: { [weak self] text in
-                                    storeComposedRichMessageInPasteboard(text)
+                                    storeMessageTextInPasteboard(text.text, entities: text.entities)
                                     self?.present(UndoOverlayController(presentationData: presentationData, content: .copy(text: strings.Conversation_TextCopied), elevatedLayout: true, animateInAsReplacement: false, action: { _ in return false }), nil)
                                 },
                                 translateChat: nil

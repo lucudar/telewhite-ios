@@ -750,8 +750,7 @@ private func parseImage(_ input: [String: Any], _ media: inout [EngineMedia.Id: 
         id: id,
         caption: caption,
         url: nil,
-        webpageId: nil,
-        spoiler: false
+        webpageId: nil
     )
 }
 
@@ -821,8 +820,8 @@ private func parseFigure(_ input: [String: Any], _ media: inout [EngineMedia.Id:
     guard var block else {
         return nil
     }
-    if let caption, case let .image(id, _, url, webpageId, spoiler) = block {
-        block = .image(id: id, caption: InstantPageCaption(text: caption, credit: .empty), url: url, webpageId: webpageId, spoiler: spoiler)
+    if let caption, case let .image(id, _, url, webpageId) = block {
+        block = .image(id: id, caption: InstantPageCaption(text: caption, credit: .empty), url: url, webpageId: webpageId)
     }
     return block
 }
@@ -850,7 +849,7 @@ private func parsePageBlocks(_ input: [Any], _ url: String, _ media: inout [Engi
             case "pre":
                 result.append(.preformatted(text: .fixed(trim(parseRichText(item, &media))), language: nil))
             case "blockquote":
-                result.append(.blockQuote(blocks: [.paragraph(.italic(trim(parseRichText(item, &media))))], caption: .empty, collapsed: nil))
+                result.append(.blockQuote(blocks: [.paragraph(.italic(trim(parseRichText(item, &media))))], caption: .empty))
             case "img":
                 if let image = parseImage(item, &media) {
                     result.append(image)

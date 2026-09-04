@@ -142,9 +142,8 @@ public final class InstantPageTheme {
     public let overlayPanelColor: UIColor
     public let separatorColor: UIColor
     public let secondaryControlColor: UIColor
-    public let quoteAccentColor: UIColor
-
-    public init(type: InstantPageThemeType, pageBackgroundColor: UIColor, textCategories: InstantPageTextCategories, serif: Bool, codeBlockBackgroundColor: UIColor, linkColor: UIColor, textHighlightColor: UIColor, linkHighlightColor: UIColor, markerColor: UIColor, panelBackgroundColor: UIColor, panelHighlightedBackgroundColor: UIColor, panelPrimaryColor: UIColor, panelSecondaryColor: UIColor, panelAccentColor: UIColor, tableBorderColor: UIColor, tableHeaderColor: UIColor, controlColor: UIColor, imageTintColor: UIColor?, overlayPanelColor: UIColor, separatorColor: UIColor, secondaryControlColor: UIColor, quoteAccentColor: UIColor) {
+    
+    public init(type: InstantPageThemeType, pageBackgroundColor: UIColor, textCategories: InstantPageTextCategories, serif: Bool, codeBlockBackgroundColor: UIColor, linkColor: UIColor, textHighlightColor: UIColor, linkHighlightColor: UIColor, markerColor: UIColor, panelBackgroundColor: UIColor, panelHighlightedBackgroundColor: UIColor, panelPrimaryColor: UIColor, panelSecondaryColor: UIColor, panelAccentColor: UIColor, tableBorderColor: UIColor, tableHeaderColor: UIColor, controlColor: UIColor, imageTintColor: UIColor?, overlayPanelColor: UIColor, separatorColor: UIColor, secondaryControlColor: UIColor) {
         self.type = type
         self.pageBackgroundColor = pageBackgroundColor
         self.textCategories = textCategories
@@ -166,11 +165,10 @@ public final class InstantPageTheme {
         self.overlayPanelColor = overlayPanelColor
         self.separatorColor = separatorColor
         self.secondaryControlColor = secondaryControlColor
-        self.quoteAccentColor = quoteAccentColor
     }
     
     public func withUpdatedFontStyles(sizeMultiplier: CGFloat, lineSpacingFactor: CGFloat, forceSerif: Bool) -> InstantPageTheme {
-        return InstantPageTheme(type: type, pageBackgroundColor: pageBackgroundColor, textCategories: self.textCategories.withUpdatedFontStyles(sizeMultiplier: sizeMultiplier, lineSpacingFactor: lineSpacingFactor, forceSerif: forceSerif), serif: forceSerif, codeBlockBackgroundColor: codeBlockBackgroundColor, linkColor: linkColor, textHighlightColor: textHighlightColor, linkHighlightColor: linkHighlightColor, markerColor: markerColor, panelBackgroundColor: panelBackgroundColor, panelHighlightedBackgroundColor: panelHighlightedBackgroundColor, panelPrimaryColor: panelPrimaryColor, panelSecondaryColor: panelSecondaryColor, panelAccentColor: panelAccentColor, tableBorderColor: tableBorderColor, tableHeaderColor: tableHeaderColor, controlColor: controlColor, imageTintColor: imageTintColor, overlayPanelColor: overlayPanelColor, separatorColor: separatorColor, secondaryControlColor: secondaryControlColor, quoteAccentColor: quoteAccentColor)
+        return InstantPageTheme(type: type, pageBackgroundColor: pageBackgroundColor, textCategories: self.textCategories.withUpdatedFontStyles(sizeMultiplier: sizeMultiplier, lineSpacingFactor: lineSpacingFactor, forceSerif: forceSerif), serif: forceSerif, codeBlockBackgroundColor: codeBlockBackgroundColor, linkColor: linkColor, textHighlightColor: textHighlightColor, linkHighlightColor: linkHighlightColor, markerColor: markerColor, panelBackgroundColor: panelBackgroundColor, panelHighlightedBackgroundColor: panelHighlightedBackgroundColor, panelPrimaryColor: panelPrimaryColor, panelSecondaryColor: panelSecondaryColor, panelAccentColor: panelAccentColor, tableBorderColor: tableBorderColor, tableHeaderColor: tableHeaderColor, controlColor: controlColor, imageTintColor: imageTintColor, overlayPanelColor: overlayPanelColor, separatorColor: separatorColor, secondaryControlColor: secondaryControlColor)
     }
 
     func headingTextAttributes(level: Int32, link: Bool) -> InstantPageTextAttributes {
@@ -243,8 +241,7 @@ private let lightTheme = InstantPageTheme(
     imageTintColor: nil,
     overlayPanelColor: .white,
     separatorColor: UIColor(rgb: 0xe2e2e2),
-    secondaryControlColor: .black,
-    quoteAccentColor: .black
+    secondaryControlColor: .black
 )
 
 private let sepiaTheme = InstantPageTheme(
@@ -278,8 +275,7 @@ private let sepiaTheme = InstantPageTheme(
     imageTintColor: nil,
     overlayPanelColor: UIColor(rgb: 0xf8f1e2),
     separatorColor: UIColor(rgb: 0xe2e2e2),
-    secondaryControlColor: .black,
-    quoteAccentColor: UIColor(rgb: 0x4f321d)
+    secondaryControlColor: .black
 )
 
 private let grayTheme = InstantPageTheme(
@@ -313,8 +309,7 @@ private let grayTheme = InstantPageTheme(
     imageTintColor: UIColor(rgb: 0xcecece),
     overlayPanelColor: UIColor(rgb: 0x5a5a5c),
     separatorColor: UIColor(rgb: 0x484848),
-    secondaryControlColor: .black,
-    quoteAccentColor: UIColor(rgb: 0xcecece)
+    secondaryControlColor: .black
 )
 
 private let darkTheme = InstantPageTheme(
@@ -348,8 +343,7 @@ private let darkTheme = InstantPageTheme(
     imageTintColor: UIColor(rgb: 0xb0b0b0),
     overlayPanelColor: UIColor(rgb: 0x232323),
     separatorColor: UIColor(rgb: 0x303030),
-    secondaryControlColor: UIColor(rgb: 0xb0b0b0),
-    quoteAccentColor: UIColor(rgb: 0xb0b0b0)
+    secondaryControlColor: UIColor(rgb: 0xb0b0b0)
 )
 
 private func fontSizeMultiplierForVariant(_ variant: InstantPagePresentationFontSize) -> CGFloat {

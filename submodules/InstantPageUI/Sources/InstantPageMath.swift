@@ -41,7 +41,7 @@ public final class InstantPageMathAttachment: NSObject {
     }
 }
 
-public func instantPageMathAttachment(latex: String, fontSize: CGFloat, textColor: UIColor, mode: InstantPageMathMode) -> InstantPageMathAttachment? {
+func instantPageMathAttachment(latex: String, fontSize: CGFloat, textColor: UIColor, mode: InstantPageMathMode) -> InstantPageMathAttachment? {
     let effectiveFontSize: CGFloat
     let multiplier: CGFloat = 1.12
     switch mode {
