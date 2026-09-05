@@ -712,7 +712,7 @@ private func layoutBlock(
         return layoutCodeBlock(text, language: language, boundingWidth: boundingWidth,
                                horizontalInset: horizontalInset, context: &context)
 
-    case let .blockQuote(blocks, caption):
+    case let .blockQuote(blocks, caption, _):
         return layoutBlockQuote(blocks: blocks, caption: caption,
                                 boundingWidth: boundingWidth, horizontalInset: horizontalInset, kind: kind,
                                 isLast: isLast, context: &context)
@@ -721,7 +721,7 @@ private func layoutBlock(
                                boundingWidth: boundingWidth, horizontalInset: horizontalInset,
                                context: &context)
 
-    case let .image(id, caption, url, webpageId):
+    case let .image(id, caption, url, webpageId, _):
         if case let .image(image) = context.media[id], let largest = largestImageRepresentation(image.representations) {
             let naturalSize = CGSize(width: CGFloat(largest.dimensions.width), height: CGFloat(largest.dimensions.height))
             let mediaUrl: InstantPageUrlItem? = url.flatMap { InstantPageUrlItem(url: $0, webpageId: webpageId) }
@@ -762,7 +762,7 @@ private func layoutBlock(
             return []
         }
 
-    case let .video(id, caption, _, _):
+    case let .video(id, caption, _, _, _):
         if case let .file(file) = context.media[id], let dimensions = file.dimensions {
             let naturalSize = CGSize(width: CGFloat(dimensions.width), height: CGFloat(dimensions.height))
             let mediaIndex = context.mediaIndexCounter
@@ -1866,13 +1866,13 @@ private func layoutCollage(
     var itemSizes: [CGSize] = []
     for block in innerBlocks {
         switch block {
-        case let .image(id, _, _, _):
+        case let .image(id, _, _, _, _):
             if case let .image(image) = context.media[id], let largest = largestImageRepresentation(image.representations) {
                 itemSizes.append(CGSize(width: CGFloat(largest.dimensions.width), height: CGFloat(largest.dimensions.height)))
             } else {
                 itemSizes.append(CGSize())
             }
-        case let .video(id, _, _, _):
+        case let .video(id, _, _, _, _):
             if case let .file(file) = context.media[id], let dimensions = file.dimensions {
                 itemSizes.append(CGSize(width: CGFloat(dimensions.width), height: CGFloat(dimensions.height)))
             } else {
@@ -1898,14 +1898,14 @@ private func layoutCollage(
             frame.size.width += instantPageV2MediaEdgeBleed
         }
         switch block {
-        case let .image(id, blockCaption, url, webpageId):
+        case let .image(id, blockCaption, url, webpageId, _):
             guard case let .image(image) = context.media[id] else { continue }
             let mediaIndex = context.mediaIndexCounter
             context.mediaIndexCounter += 1
             let mediaUrl: InstantPageUrlItem? = url.flatMap { InstantPageUrlItem(url: $0, webpageId: webpageId) }
             let media = InstantPageMedia(index: mediaIndex, media: .image(image), url: mediaUrl, caption: blockCaption.text, credit: blockCaption.credit)
             result.append(.mediaImage(InstantPageV2MediaImageItem(frame: frame, cornerRadius: 0.0, media: media, webPage: webpage, attributes: [])))
-        case let .video(id, blockCaption, _, _):
+        case let .video(id, blockCaption, _, _, _):
             guard case let .file(file) = context.media[id] else { continue }
             let mediaIndex = context.mediaIndexCounter
             context.mediaIndexCounter += 1
@@ -1948,7 +1948,7 @@ private func layoutSlideshow(
     var height: CGFloat = 0.0
     for block in innerBlocks {
         switch block {
-        case let .image(id, blockCaption, url, webpageId):
+        case let .image(id, blockCaption, url, webpageId, _):
             if case let .image(image) = context.media[id], let imageSize = largestImageRepresentation(image.representations)?.dimensions {
                 let mediaIndex = context.mediaIndexCounter
                 context.mediaIndexCounter += 1
