@@ -559,8 +559,6 @@ private func autosaveLabelAndValue(presentationData: PresentationData, settings:
                 } else {
                     peerTypeValue = .groups
                 }
-            case .community:
-                continue
             }
             
             if peerTypeValue == peerType {

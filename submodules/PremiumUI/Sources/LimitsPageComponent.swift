@@ -195,7 +195,6 @@ private enum Limit: CaseIterable {
     case savedGifs
     case favedStickers
     case about
-    case message
     case captions
     case folders
     case chatsPerFolder
@@ -216,8 +215,6 @@ private enum Limit: CaseIterable {
             return strings.Premium_Limits_FavedStickers
         case .about:
             return strings.Premium_Limits_Bio
-        case .message:
-            return strings.Premium_Limits_Messages
         case .captions:
             return strings.Premium_Limits_Captions
         case .folders:
@@ -245,8 +242,6 @@ private enum Limit: CaseIterable {
                 return strings.Premium_Limits_FavedStickersInfo
             case .about:
                 return strings.Premium_Limits_BioInfo
-            case .message:
-                return strings.Premium_Limits_MessagesInfo
             case .captions:
                 return strings.Premium_Limits_CaptionsInfo
             case .folders:
@@ -275,8 +270,6 @@ private enum Limit: CaseIterable {
                 value = configuration.maxFavedStickerCount
             case .about:
                 value = configuration.maxAboutLength
-            case .message:
-                value = configuration.maxMessageLength
             case .captions:
                 value = configuration.maxCaptionLength
             case .folders:
@@ -373,7 +366,6 @@ private final class LimitsListComponent: CombinedComponent {
                 UIColor(rgb: 0xae4c92),
                 UIColor(rgb: 0x9153e5),
                 UIColor(rgb: 0x825af6),
-                UIColor(rgb: 0x676bf7),
                 UIColor(rgb: 0x676bf7),
                 UIColor(rgb: 0x5991f8),
                 UIColor(rgb: 0x5b99d0),

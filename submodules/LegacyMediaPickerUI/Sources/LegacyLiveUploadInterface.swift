@@ -50,7 +50,6 @@ public final class LegacyLiveUploadInterface: VideoConversionWatcher, TGLiveUplo
     
     private let data = Promise<EngineMediaResource.ResourceData>()
     private let dataValue = Atomic<EngineMediaResource.ResourceData?>(value: nil)
-    private var preUploadDisposable: Disposable?
     
     public init(context: AccountContext) {
         self.context = context
@@ -65,7 +64,7 @@ public final class LegacyLiveUploadInterface: VideoConversionWatcher, TGLiveUplo
             if let strongSelf = self {
                 if strongSelf.path == nil {
                     strongSelf.path = path
-                    strongSelf.preUploadDisposable = strongSelf.context.engine.resources.preUpload(id: strongSelf.id, encrypt: false, tag: nil, source: strongSelf.data.get())
+                    strongSelf.context.engine.resources.preUpload(id: strongSelf.id, encrypt: false, tag: nil, source: strongSelf.data.get())
                 }
                 strongSelf.size = size
                 
@@ -84,7 +83,6 @@ public final class LegacyLiveUploadInterface: VideoConversionWatcher, TGLiveUplo
     }
     
     deinit {
-        self.preUploadDisposable?.dispose()
     }
     
     override public func fileUpdated(_ completed: Bool) -> Any! {

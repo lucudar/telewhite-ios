@@ -1228,17 +1228,6 @@ open class TextNode: ASDisplayNode, TextNodeProtocol {
         }
     }
     
-    private static func shouldRenderAttachment(_ image: UIImage, renderContentTypes: RenderContentTypes) -> Bool {
-        if renderContentTypes == .all {
-            return true
-        }
-        if image.renderingMode == .alwaysOriginal {
-            return renderContentTypes.contains(.emoji)
-        } else {
-            return renderContentTypes.contains(.text)
-        }
-    }
-
     public internal(set) var cachedLayout: TextNodeLayout?
     public var renderContentTypes: RenderContentTypes = .all
     
@@ -2598,10 +2587,6 @@ open class TextNode: ASDisplayNode, TextNodeProtocol {
                 
                 for attachment in line.attachments {
                     let image = attachment.attachment
-                    if !TextNode.shouldRenderAttachment(image, renderContentTypes: renderContentTypes) {
-                        continue
-                    }
-
                     var textColor: UIColor?
                     layout.attributedString?.enumerateAttributes(in: attachment.range, options: []) { attributes, range, _ in
                         if let color = attributes[NSAttributedString.Key.foregroundColor] as? UIColor {

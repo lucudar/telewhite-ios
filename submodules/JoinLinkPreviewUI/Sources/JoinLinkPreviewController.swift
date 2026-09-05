@@ -152,13 +152,7 @@ public final class LegacyJoinLinkPreviewController: ViewController {
                     }
                     strongSelf.dismiss()
                 case let .webView(webView):
-                    let chatTitle: String
-                    if case let .invite(invite)? = strongSelf.resolvedState {
-                        chatTitle = invite.title
-                    } else {
-                        chatTitle = ""
-                    }
-                    strongSelf.context.sharedContext.openJoinChatWebView(context: strongSelf.context, parentController: strongSelf, updatedPresentationData: nil, webView: webView, chatTitle: chatTitle)
+                    strongSelf.context.sharedContext.openJoinChatWebView(context: strongSelf.context, parentController: strongSelf, updatedPresentationData: nil, webView: webView)
                 }
             }
         }, error: { [weak self] error in
@@ -204,7 +198,7 @@ public func JoinLinkPreviewController(
 ) -> ViewController {
     if let data = context.currentAppConfiguration.with({ $0 }).data, data["ios_killswitch_legacy_join_link"] != nil {
         return LegacyJoinLinkPreviewController(context: context, link: link, navigateToPeer: navigateToPeer, parentNavigationController: parentNavigationController, resolvedState: resolvedState)
-    } else if case let .invite(invite) = resolvedState, invite.subscriptionPricing == nil, invite.subscriptionFormId == nil, !invite.flags.canRefulfillSubscription {
+    } else if case let .invite(invite) = resolvedState, !invite.flags.requestNeeded, !invite.flags.isBroadcast, !invite.flags.canRefulfillSubscription { 
         var verificationStatus: JoinSubjectScreenMode.Group.VerificationStatus?
         if invite.flags.isFake {
             verificationStatus = .fake
@@ -215,11 +209,10 @@ public func JoinLinkPreviewController(
         }
         return context.sharedContext.makeJoinSubjectScreen(context: context, mode: .group(JoinSubjectScreenMode.Group(
             link: link,
-            isGroup: !invite.flags.isBroadcast,
+            isGroup: !invite.flags.isChannel,
             isPublic: invite.flags.isPublic,
             isRequest: invite.flags.requestNeeded,
             verificationStatus: verificationStatus,
-            nameColor: invite.nameColor,
             image: invite.photoRepresentation,
             title: invite.title,
             about: invite.about,

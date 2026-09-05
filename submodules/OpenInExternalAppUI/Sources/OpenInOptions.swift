@@ -200,13 +200,7 @@ private func allOpenInOptions(context: AccountContext, item: OpenInItem) -> [Ope
             }))
 
             options.append(OpenInOption(identifier: "vivaldi", application: .other(title: "Vivaldi", identifier: 1633234600, scheme: "vivaldi", store: "us"), action: {
-                if let url = URL(string: url), var components = URLComponents(url: url, resolvingAgainstBaseURL: true) {
-                    components.scheme = "vivaldi"
-                    if let url = components.string {
-                        return .openUrl(url: url)
-                    }
-                }
-                return .none
+                return .openUrl(url: "vivaldi://\(url)")
             }))
         case let .location(location, directions):
             let lat = location.latitude
@@ -347,10 +341,6 @@ private func allOpenInOptions(context: AccountContext, item: OpenInItem) -> [Ope
             
             options.append(OpenInOption(identifier: "yango", application: .other(title: "Yango", identifier: 1437157286, scheme: "yangoride", store: nil), action: {
                 return .openUrl(url: "yangoride://route?end-lat=\(lat)&end-lon=\(lon)")
-            }))
-        
-            options.append(OpenInOption(identifier: "rizogo", application: .other(title: "Rizo GO", identifier: 6466694224, scheme: "rizogo", store: nil), action: {
-                return .openUrl(url: "rizogo://route?end-lat=\(lat)&end-lon=\(lon)")
             }))
     }
     return options

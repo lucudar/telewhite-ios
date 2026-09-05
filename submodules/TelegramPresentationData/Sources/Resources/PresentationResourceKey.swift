@@ -105,7 +105,6 @@ public enum PresentationResourceKey: Int32 {
     case chatListBadgeBackgroundInactiveMention
     case chatListBadgeBackgroundPinned
     case chatListMutedIcon
-    case chatListHiddenIcon
     case chatListVerifiedIcon
     case chatListPremiumIcon
     case chatListScamRegularIcon
@@ -138,7 +137,6 @@ public enum PresentationResourceKey: Int32 {
     case chatListCallVideoIncomingIcon
     case chatListCallVideoOutgoingIcon
     case chatListVoiceMessageIcon
-    case chatListAudioIcon
     
     case chatListGeneralTopicIcon
     case chatListGeneralTopicTemplateIcon

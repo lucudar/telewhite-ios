@@ -375,7 +375,6 @@ open class ListViewImpl: ASDisplayNode, ListView, ASScrollViewDelegate, ASGestur
             self.tapGestureRecognizer?.isEnabled = self.tapped != nil
         }
     }
-    public final var getCustomItemDeleteAnimationDuration: ((ListViewItemNode) -> Double?)?
     
     private let frictionSlider = UISlider()
     private let springSlider = UISlider()
@@ -5472,7 +5471,7 @@ open class ListViewImpl: ASDisplayNode, ListView, ASScrollViewDelegate, ASGestur
     }
     
     open func customItemDeleteAnimationDuration(itemNode: ListViewItemNode) -> Double? {
-        return self.getCustomItemDeleteAnimationDuration?(itemNode)
+        return nil
     }
 }
 

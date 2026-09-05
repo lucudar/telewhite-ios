@@ -411,90 +411,44 @@ public struct ChatInterfaceForwardOptionsState: Codable, Equatable {
 }
 
 public struct ChatTextInputState: Codable, Equatable {
-    /// The stored source of truth (Piece 5): the structural value model + a structural (tree-path) selection.
-    public var content: ChatInputContent
-    public var selection: ChatInputSelection
-
-    /// Derived transitional compat view — the chat `NSAttributedString` currency. Readers keep working
-    /// unchanged; the model is the storage. (Removed only once all readers move off it — Option B.)
-    public var inputText: NSAttributedString {
-        return attributedString(from: self.content)
-    }
-
-    /// Derived transitional flat selection (compat), **read-only** — nothing assigns it (selection writes go
-    /// through `init(inputText:selectionRange:)`). New/migrated code should prefer the structural `selection`
-    /// (and semantic mutation methods) over arithmetic on this flat range.
-    public var selectionRange: Range<Int> {
-        let r = self.selection.nsRange(in: self.content)
-        return r.location ..< (r.location + r.length)
-    }
-
-    /// Whether the composer is empty. Cheap structural check on the stored model — prefer this over
-    /// `inputText.string.isEmpty` / `inputText.length == 0`, which now allocate via the derived `inputText`.
-    public var isEmpty: Bool {
-        return self.content.isEmpty
-    }
-
+    public var inputText: NSAttributedString
+    public var selectionRange: Range<Int>
+    
     public static func ==(lhs: ChatTextInputState, rhs: ChatTextInputState) -> Bool {
-        // `content` is a value type whose `==` compares custom emoji by `fileId` + `enableAnimation` (the Piece 3
-        // semantics, now intrinsic to the stored model), so this is plain value equality — no reference caveat.
-        return lhs.content == rhs.content && lhs.selection == rhs.selection
+        return lhs.inputText.isEqual(to: rhs.inputText) && lhs.selectionRange == rhs.selectionRange
     }
-
+    
     public init() {
-        self.content = ChatInputContent()
-        self.selection = ChatInputSelection(nsRange: NSRange(location: 0, length: 0), in: self.content)
+        self.inputText = NSAttributedString()
+        self.selectionRange = 0 ..< 0
     }
-
+    
     public init(inputText: NSAttributedString, selectionRange: Range<Int>) {
-        self.content = chatInputContent(from: inputText)
-        self.selection = ChatInputSelection(nsRange: NSRange(location: selectionRange.lowerBound, length: selectionRange.upperBound - selectionRange.lowerBound), in: self.content)
+        self.inputText = inputText
+        self.selectionRange = selectionRange
     }
-
+    
     public init(inputText: NSAttributedString) {
-        self.content = chatInputContent(from: inputText)
-        self.selection = ChatInputSelection(nsRange: NSRange(location: self.content.length, length: 0), in: self.content)
-    }
-
-    /// Build directly from a structural `ChatInputContent` (the model storage), applying a flat selection
-    /// range against it. Mirrors `init(inputText:selectionRange:)`, but skips the `NSAttributedString`
-    /// round-trip — used by the draft-restore `.instantPage` path, where the content comes straight from
-    /// `chatInputContent(fromInstantPage:)` and would lose structure if flattened to text first.
-    public init(content: ChatInputContent, selectionRange: Range<Int>) {
-        self.content = content
-        self.selection = ChatInputSelection(nsRange: NSRange(location: selectionRange.lowerBound, length: selectionRange.upperBound - selectionRange.lowerBound), in: self.content)
+        self.inputText = inputText
+        let length = inputText.length
+        self.selectionRange = length ..< length
     }
 
     public init(from decoder: Decoder) throws {
-        // Prefer the structural model persisted under "cm" (the form written since 2026-06-19); fall back to the
-        // legacy `ChatTextInputStateText` under "at" so existing drafts (no "cm") still decode unchanged. The flat
-        // selection ints (`as0`/`as1`) are persisted by both forms and applied against the resolved `content` here,
-        // so the caret is preserved in both branches.
         let container = try decoder.container(keyedBy: StringCodingKey.self)
-        if let content = try? container.decode(ChatInputContent.self, forKey: "cm") {
-            self.content = content
-        } else {
-            let attributedText = ((try? container.decode(ChatTextInputStateText.self, forKey: "at")) ?? ChatTextInputStateText()).attributedText()
-            self.content = chatInputContent(from: attributedText)
-        }
+        self.inputText = ((try? container.decode(ChatTextInputStateText.self, forKey: "at")) ?? ChatTextInputStateText()).attributedText()
         let rangeFrom = (try? container.decode(Int32.self, forKey: "as0")) ?? 0
         let rangeTo = (try? container.decode(Int32.self, forKey: "as1")) ?? 0
-        let flatRange: NSRange
         if rangeFrom <= rangeTo {
-            flatRange = NSRange(location: Int(rangeFrom), length: Int(rangeTo - rangeFrom))
+            self.selectionRange = Int(rangeFrom) ..< Int(rangeTo)
         } else {
-            flatRange = NSRange(location: self.content.length, length: 0)
+            let length = self.inputText.length
+            self.selectionRange = length ..< length
         }
-        self.selection = ChatInputSelection(nsRange: flatRange, in: self.content)
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: StringCodingKey.self)
-
-        // Store the structural model directly under "cm" — this is the preferred persisted form (it keeps the
-        // structure the flat `ChatTextInputStateText` round-trip would fragment, e.g. a multi-line quote). The
-        // legacy `"at"`/`"as0"`/`"as1"` keys below are kept as a back-compat mirror so any old reader still works.
-        try container.encode(self.content, forKey: "cm")
 
         try container.encode(ChatTextInputStateText(attributedText: self.inputText), forKey: "at")
         try container.encode(Int32(self.selectionRange.lowerBound), forKey: "as0")
@@ -1186,7 +1140,6 @@ public protocol ChatController: ViewController {
     func updateIsScrollingLockedAtTop(isScrollingLockedAtTop: Bool)
     
     func playShakeAnimation()
-    func playConfettiAnimation()
     
     func removeAd(opaqueId: Data)
     
@@ -1328,27 +1281,14 @@ public enum ChatHistoryNodeHistoryState: Equatable {
     case loaded(isEmpty: Bool, hasReachedLimits: Bool)
 }
 
-public protocol ChatHistoryListNode: ASDisplayNode {
+public protocol ChatHistoryListNode: ListView {
     var historyState: ValuePromise<ChatHistoryNodeHistoryState> { get }
-
+    
     func scrollToEndOfHistory()
     func updateLayout(transition: ContainedViewLayoutTransition, updateSizeAndInsets: ListViewUpdateSizeAndInsets)
     func messageInCurrentHistoryView(_ id: EngineMessage.Id) -> EngineMessage?
-
+    
     var contentPositionChanged: (ListViewVisibleContentOffset) -> Void { get set }
-
-    // Curated ListView surface reached via the ChatHistoryListNode protocol type
-    // (PeerInfoListPaneNode + ChatLoadingNode). Everything else moves to concrete-only forwarders.
-    var bounces: Bool { get set }
-    var scrollEnabled: Bool { get set }
-    var preloadPages: Bool { get set }
-    var defaultToSynchronousTransactionWhileScrolling: Bool { get set }
-    var insets: UIEdgeInsets { get }
-    func visibleContentOffset() -> ListViewVisibleContentOffset
-    func transferVelocity(_ velocity: CGFloat)
-    func forEachItemNode(_ f: (ASDisplayNode) -> Void)
-    func forEachVisibleItemNode(_ f: (ASDisplayNode) -> Void)
-    func forEachItemHeaderNode(_ f: (ListViewItemHeaderNode) -> Void)
 }
 
 public extension ChatFolderTitle {

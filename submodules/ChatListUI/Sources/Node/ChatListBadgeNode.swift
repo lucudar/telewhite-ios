@@ -34,7 +34,6 @@ private func measureString(_ string: String) -> String {
 }
 
 final class ChatListBadgeNode: ASDisplayNode {
-    private let containerNode: ASDisplayNode
     let backgroundNode: ASImageNode
     let textNode: TextNode
     private let measureTextNode: TextNode
@@ -47,9 +46,6 @@ final class ChatListBadgeNode: ASDisplayNode {
     var disableBounce: Bool = false
     
     override init() {
-        self.containerNode = ASDisplayNode()
-        self.containerNode.isUserInteractionEnabled = false
-
         self.backgroundNode = ASImageNode()
         self.backgroundNode.isLayerBacked = true
         self.backgroundNode.displaysAsynchronously = false
@@ -62,10 +58,9 @@ final class ChatListBadgeNode: ASDisplayNode {
         self.measureTextNode = TextNode()
         
         super.init()
-
-        self.addSubnode(self.containerNode)
-        self.containerNode.addSubnode(self.backgroundNode)
-        self.containerNode.addSubnode(self.textNode)
+        
+        self.addSubnode(self.backgroundNode)
+        self.addSubnode(self.textNode)
     }
     
     func asyncLayout() -> (CGSize, CGFloat, UIFont, UIImage?, ChatListBadgeContent) -> (CGSize, (Bool, Bool) -> Void) {
@@ -125,13 +120,13 @@ final class ChatListBadgeNode: ASDisplayNode {
                             strongSelf.isHiddenInternal = false
                             if !strongSelf.disableBounce {
                                 if bounce {
-                                    strongSelf.containerNode.layer.animateScale(from: 0.0001, to: 1.2, duration: 0.2, removeOnCompletion: false, completion: { [weak self] _ in
+                                    strongSelf.layer.animateScale(from: 0.0001, to: 1.2, duration: 0.2, removeOnCompletion: false, completion: { [weak self] _ in
                                         if let strongSelf = self {
-                                            strongSelf.containerNode.layer.animateScale(from: 1.15, to: 1.0, duration: 0.12, removeOnCompletion: false)
+                                            strongSelf.layer.animateScale(from: 1.15, to: 1.0, duration: 0.12, removeOnCompletion: false)
                                         }
                                     })
                                 } else {
-                                    strongSelf.containerNode.layer.animateScale(from: 0.0001, to: 1.0, duration: 0.2, removeOnCompletion: false)
+                                    strongSelf.layer.animateScale(from: 0.0001, to: 1.0, duration: 0.2, removeOnCompletion: false)
                                 }
                             }
                         } else if !currentIsEmpty && !nextIsEmpty && currentContent?.text != content.text {
@@ -144,9 +139,9 @@ final class ChatListBadgeNode: ASDisplayNode {
                             }
                             
                             if animateScale && !strongSelf.disableBounce {
-                                strongSelf.containerNode.layer.animateScale(from: 1.0, to: 1.2, duration: 0.12, removeOnCompletion: false, completion: { [weak self] finished in
+                                strongSelf.layer.animateScale(from: 1.0, to: 1.2, duration: 0.12, removeOnCompletion: false, completion: { [weak self] finished in
                                     if let strongSelf = self {
-                                        strongSelf.containerNode.layer.animateScale(from: 1.2, to: 1.0, duration: 0.12, removeOnCompletion: false)
+                                        strongSelf.layer.animateScale(from: 1.2, to: 1.0, duration: 0.12, removeOnCompletion: false)
                                     }
                                 })
                             }
@@ -167,10 +162,10 @@ final class ChatListBadgeNode: ASDisplayNode {
                         } else if !currentIsEmpty && nextIsEmpty && !strongSelf.isHiddenInternal {
                             strongSelf.isHiddenInternal = true
                             if !strongSelf.disableBounce {
-                                strongSelf.containerNode.layer.animateScale(from: 1.0, to: 0.0001, duration: 0.12, removeOnCompletion: false, completion: { [weak self] finished in
+                                strongSelf.layer.animateScale(from: 1.0, to: 0.0001, duration: 0.12, removeOnCompletion: false, completion: { [weak self] finished in
                                     if let strongSelf = self {
                                         strongSelf.isHidden = true
-                                        strongSelf.containerNode.layer.removeAnimation(forKey: "transform.scale")
+                                        strongSelf.layer.removeAnimation(forKey: "transform.scale")
                                     }
                                 })
                             } else {
@@ -195,8 +190,6 @@ final class ChatListBadgeNode: ASDisplayNode {
                     let _ = textLayoutAndApply?.1()
      
                     let backgroundFrame = CGRect(x: 0.0, y: 0.0, width: badgeWidth, height: strongSelf.backgroundNode.image?.size.height ?? 0.0)
-                    strongSelf.containerNode.position = backgroundFrame.center
-                    strongSelf.containerNode.bounds = CGRect(origin: CGPoint(), size: backgroundFrame.size)
                     if let (textLayout, _) = textLayoutAndApply {
                         let badgeTextFrame = CGRect(origin: CGPoint(x: backgroundFrame.midX - textLayout.size.width / 2.0, y: backgroundFrame.minY + UIScreenPixel + floorToScreenPixels((backgroundFrame.height - textLayout.size.height) / 2.0)), size: textLayout.size)
                         strongSelf.textNode.position = badgeTextFrame.center

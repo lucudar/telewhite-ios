@@ -77,16 +77,16 @@ private func paidContentGroupType(paidContent: TelegramMediaPaidContent) -> Mess
     return currentType
 }
 
-public func chatListItemStrings(strings: PresentationStrings, nameDisplayOrder: PresentationPersonNameOrder, dateTimeFormat: PresentationDateTimeFormat, contentSettings: ContentSettings, messages: [EngineMessage], chatPeer: EngineRenderedPeer, accountPeerId: EnginePeer.Id, enableMediaEmoji: Bool = true, isPeerGroup: Bool = false) -> (peer: EnginePeer?, hideAuthor: Bool, messageText: String, messageEntities: [MessageTextEntity], spoilers: [NSRange]?, customEmojiRanges: [(NSRange, ChatTextInputTextCustomEmojiAttribute)]?, richTextPreview: NSAttributedString?) {
+public func chatListItemStrings(strings: PresentationStrings, nameDisplayOrder: PresentationPersonNameOrder, dateTimeFormat: PresentationDateTimeFormat, contentSettings: ContentSettings, messages: [EngineMessage], chatPeer: EngineRenderedPeer, accountPeerId: EnginePeer.Id, enableMediaEmoji: Bool = true, isPeerGroup: Bool = false) -> (peer: EnginePeer?, hideAuthor: Bool, messageText: String, messageEntities: [MessageTextEntity], spoilers: [NSRange]?, customEmojiRanges: [(NSRange, ChatTextInputTextCustomEmojiAttribute)]?) {
     let peer: EnginePeer?
     
     let message = messages.last
     
     if let restrictionReason = message?._asMessage().restrictionReason(platform: "ios", contentSettings: contentSettings) {
-        return (nil, false, restrictionReason, [], nil, nil, nil)
+        return (nil, false, restrictionReason, [], nil, nil)
     }
     if let restrictionReason = chatPeer.chatMainPeer?.restrictionText(platform: "ios", contentSettings: contentSettings) {
-        return (nil, false, restrictionReason, [], nil, nil, nil)
+        return (nil, false, restrictionReason, [], nil, nil)
     }
     
     var hideAuthor = false
@@ -94,7 +94,6 @@ public func chatListItemStrings(strings: PresentationStrings, nameDisplayOrder: 
     var messageEntities: [MessageTextEntity] = []
     var spoilers: [NSRange]?
     var customEmojiRanges: [(NSRange, ChatTextInputTextCustomEmojiAttribute)]?
-    var richTextPreview: NSAttributedString?
     if let message = message {
         if let messageMain = messageMainPeer(message) {
             peer = messageMain
@@ -105,13 +104,10 @@ public func chatListItemStrings(strings: PresentationStrings, nameDisplayOrder: 
         messageText = ""
         for message in messages {
             if let richText = message.richText {
-                let preview = richText.instantPage.previewAttributedText(strings: strings)
-                messageText = preview.string
-                richTextPreview = preview
+                messageText = richText.instantPage.previewText(strings: strings)
                 messageEntities = []
             } else if !message.text.isEmpty {
                 messageText = message.text
-                richTextPreview = nil
                 messageEntities = message._asMessage().textEntitiesAttribute?.entities ?? []
                 for entity in messageEntities {
                     if case let .CustomEmoji(_, fileId) = entity.type {
@@ -484,8 +480,5 @@ public func chatListItemStrings(strings: PresentationStrings, nameDisplayOrder: 
         }
     }
     
-    if richTextPreview?.string != messageText {
-        richTextPreview = nil
-    }
-    return (peer, hideAuthor, messageText, messageEntities, spoilers, customEmojiRanges, richTextPreview)
+    return (peer, hideAuthor, messageText, messageEntities, spoilers, customEmojiRanges)
 }

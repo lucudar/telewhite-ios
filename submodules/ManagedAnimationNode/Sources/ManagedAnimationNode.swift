@@ -311,17 +311,6 @@ open class ManagedAnimationNode: ASDisplayNode {
     public func trackTo(item: ManagedAnimationItem, immediately: Bool = false) {
         if immediately {
             self.trackStack.removeAll()
-            if let state = self.state, state.item.source == item.source {
-                self.state = ManagedAnimationState(displaySize: self.intrinsicSize, item: item, current: state)
-            } else {
-                self.state = ManagedAnimationState(displaySize: self.intrinsicSize, item: item, current: nil)
-            }
-            self.didTryAdvancingState = false
-            self.previousTimestamp = CACurrentMediaTime()
-            self.delta = 0.0
-            self.displayLink.isPaused = false
-            self.updateAnimation()
-            return
         }
         self.trackStack.append(item)
         self.didTryAdvancingState = false
@@ -339,50 +328,38 @@ open class ManagedAnimationNode: ASDisplayNode {
 public final class SimpleAnimationNode: ManagedAnimationNode {
     private let stillItem: ManagedAnimationItem
     private let stillEndItem: ManagedAnimationItem
-    private var animationItem: ManagedAnimationItem
+    private let animationItem: ManagedAnimationItem
     
     public let size: CGSize
     private let playOnce: Bool
     public private(set) var didPlay = false
     
-    public init(animationName: String, replaceColors: [UInt32: UInt32]? = nil, size: CGSize, playOnce: Bool = false, startFrame: Int = 0) {
-        let startFrame = max(0, startFrame)
-        let source = ManagedAnimationSource.local(animationName)
+    public init(animationName: String, replaceColors: [UInt32: UInt32]? = nil, size: CGSize, playOnce: Bool = false) {
         self.size = size
         self.playOnce = playOnce
-        self.stillItem = ManagedAnimationItem(source: source, replaceColors: replaceColors, frames: .range(startFrame: startFrame, endFrame: startFrame), duration: 0.01)
-        self.stillEndItem = ManagedAnimationItem(source: source, replaceColors: replaceColors, frames: .still(.end), duration: 0.01)
-        self.animationItem = ManagedAnimationItem(source: source, replaceColors: replaceColors)
+        self.stillItem = ManagedAnimationItem(source: .local(animationName), replaceColors: replaceColors, frames: .range(startFrame: 0, endFrame: 0), duration: 0.01)
+        self.stillEndItem = ManagedAnimationItem(source: .local(animationName), replaceColors: replaceColors, frames: .still(.end), duration: 0.01)
+        self.animationItem = ManagedAnimationItem(source: .local(animationName), replaceColors: replaceColors)
 
         super.init(size: size)
         
         self.trackTo(item: self.stillItem)
-        if startFrame > 0, let state = self.state {
-            let clampedStartFrame = min(startFrame, max(0, state.frameCount - 1))
-            let fps = state.fps > 0.0 ? state.fps : 60.0
-            self.animationItem = ManagedAnimationItem(
-                source: source,
-                replaceColors: replaceColors,
-                frames: .range(startFrame: clampedStartFrame, endFrame: state.frameCount),
-                duration: Double(max(1, state.frameCount - clampedStartFrame)) / fps
-            )
-        }
     }
     
-    public func play(immediately: Bool = false) {
+    public func play() {
         if !self.playOnce || !self.didPlay {
             self.didPlay = true
-            self.trackTo(item: self.animationItem, immediately: immediately)
+            self.trackTo(item: self.animationItem)
         }
     }
     
-    public func reset(immediately: Bool = false) {
+    public func reset() {
         self.didPlay = false
-        self.trackTo(item: self.stillItem, immediately: immediately)
+        self.trackTo(item: self.stillItem)
     }
     
-    public func seekToEnd(immediately: Bool = false) {
+    public func seekToEnd() {
         self.didPlay = false
-        self.trackTo(item: self.stillEndItem, immediately: immediately)
+        self.trackTo(item: self.stillEndItem)
     }
 }

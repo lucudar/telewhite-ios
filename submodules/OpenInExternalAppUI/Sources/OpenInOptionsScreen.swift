@@ -482,10 +482,7 @@ private final class OpenInAppView: UIControl {
     
     override init(frame: CGRect) {
         self.iconView = TransformImageView(frame: CGRect(origin: CGPoint(), size: CGSize(width: 64.0, height: 64.0)))
-        self.iconView.isUserInteractionEnabled = false
-        
         self.titleLabel = UILabel()
-        self.titleLabel.isUserInteractionEnabled = false
         
         super.init(frame: frame)
         

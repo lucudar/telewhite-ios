@@ -19,7 +19,7 @@ private final class WebBrowserSettingsControllerArguments {
     let updateDefaultBrowser: (String?) -> Void
     let clearCookies: () -> Void
     let clearCache: () -> Void
-    let addException: (Bool) -> Void
+    let addException: () -> Void
     let removeException: (AccountWebBrowserException) -> Void
     let clearExceptions: () -> Void
     
@@ -28,7 +28,7 @@ private final class WebBrowserSettingsControllerArguments {
         updateDefaultBrowser: @escaping (String?) -> Void,
         clearCookies: @escaping () -> Void,
         clearCache: @escaping () -> Void,
-        addException: @escaping (Bool) -> Void,
+        addException: @escaping () -> Void,
         removeException: @escaping (AccountWebBrowserException) -> Void,
         clearExceptions: @escaping () -> Void
     ) {
@@ -294,7 +294,7 @@ private enum WebBrowserSettingsControllerEntry: ItemListNodeEntry {
                 })
             case let .neverAdd(_, text):
                 return ItemListPeerActionItem(presentationData: presentationData, systemStyle: .glass, icon: PresentationResourcesItemList.plusIconImage(presentationData.theme), title: text, sectionId: self.section, height: .generic, color: .accent, editing: false, action: {
-                    arguments.addException(false)
+                    arguments.addException()
                 })
             case let .neverExceptionsInfo(_, text):
                 return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
@@ -310,7 +310,7 @@ private enum WebBrowserSettingsControllerEntry: ItemListNodeEntry {
                 })
             case let .alwaysAdd(_, text):
                 return ItemListPeerActionItem(presentationData: presentationData, systemStyle: .glass, icon: PresentationResourcesItemList.plusIconImage(presentationData.theme), title: text, sectionId: self.section, height: .generic, color: .accent, editing: false, action: {
-                    arguments.addException(true)
+                    arguments.addException()
                 })
             case let .alwaysExceptionsInfo(_, text):
                 return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
@@ -342,6 +342,7 @@ private func webBrowserSettingsControllerEntries(context: AccountContext, presen
     entries.append(.clearCookies(presentationData.theme, presentationData.strings.WebBrowser_ClearCookies))
     entries.append(.clearCookiesInfo(presentationData.theme, presentationData.strings.WebBrowser_ClearCookies_Info))
     
+    //TODO:localize
     if accountSettings.openExternalBrowser {
         entries.append(.neverHeader(presentationData.theme, presentationData.strings.WebBrowser_Exceptions_OpenInApp))
         entries.append(.neverAdd(presentationData.theme, presentationData.strings.WebBrowser_Exceptions_AddException))
@@ -378,7 +379,7 @@ private func webBrowserSettingsControllerEntries(context: AccountContext, presen
 public func webBrowserSettingsController(context: AccountContext) -> ViewController {
     var clearCookiesImpl: (() -> Void)?
     var clearCacheImpl: (() -> Void)?
-    var addExceptionImpl: ((Bool) -> Void)?
+    var addExceptionImpl: (() -> Void)?
     var removeExceptionImpl: ((AccountWebBrowserException) -> Void)?
     var clearExceptionsImpl: (() -> Void)?
     
@@ -401,8 +402,8 @@ public func webBrowserSettingsController(context: AccountContext) -> ViewControl
         clearCache: {
             clearCacheImpl?()
         },
-        addException: { external in
-            addExceptionImpl?(external)
+        addException: {
+            addExceptionImpl?()
         },
         removeException: { exception in
             removeExceptionImpl?(exception)
@@ -507,9 +508,9 @@ public func webBrowserSettingsController(context: AccountContext) -> ViewControl
         controller?.present(alertController, in: .window(.root))
     }
     
-    addExceptionImpl = { [weak controller] external in
+    addExceptionImpl = { [weak controller] in
         var dismissImpl: (() -> Void)?
-        let linkController = webBrowserDomainController(context: context, external: external, apply: { url in
+        let linkController = webBrowserDomainController(context: context, apply: { url in
             if let url {
                 let _ = (context.account.postbox.transaction { transaction -> AccountWebBrowserSettings in
                     return transaction.getPreferencesEntry(key: PreferencesKeys.webBrowserSettings)?.get(AccountWebBrowserSettings.self) ?? AccountWebBrowserSettings.defaultSettings
