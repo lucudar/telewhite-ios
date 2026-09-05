@@ -553,6 +553,8 @@ private func autosaveLabelAndValue(presentationData: PresentationData, settings:
                 peerTypeValue = .privateChats
             case .legacyGroup:
                 peerTypeValue = .groups
+            case .community:
+                peerTypeValue = .channels
             case let .channel(channel):
                 if case .broadcast = channel.info {
                     peerTypeValue = .channels
