@@ -1138,7 +1138,7 @@ public enum ChatListSearchEntry: Comparable, Identifiable {
                                     filterTitle = presentationData.strings.ChatList_Search_Messages_Channels
                                 case .groups:
                                     filterTitle = presentationData.strings.ChatList_Search_Messages_GroupChats
-                                case .privateChats:
+                                case .privateChats, .bots:
                                     filterTitle = presentationData.strings.ChatList_Search_Messages_PrivateChats
                                 case .globalPosts:
                                     filterTitle = presentationData.strings.ChatList_HeaderPublicPosts
@@ -1231,7 +1231,7 @@ public enum ChatListSearchEntry: Comparable, Identifiable {
                     filterTitle = presentationData.strings.ChatList_Search_Messages_Channels
                 case .groups:
                     filterTitle = presentationData.strings.ChatList_Search_Messages_GroupChats
-                case .privateChats:
+                case .privateChats, .bots:
                     filterTitle = presentationData.strings.ChatList_Search_Messages_PrivateChats
                 case .globalPosts:
                     filterTitle = presentationData.strings.ChatList_HeaderPublicPosts
@@ -1257,7 +1257,7 @@ public enum ChatListSearchEntry: Comparable, Identifiable {
                     filterTitle = presentationData.strings.ChatList_Search_Messages_Channels
                 case .groups:
                     filterTitle = presentationData.strings.ChatList_Search_Messages_GroupChats
-                case .privateChats:
+                case .privateChats, .bots:
                     filterTitle = presentationData.strings.ChatList_Search_Messages_PrivateChats
                 case .globalPosts:
                     filterTitle = presentationData.strings.ChatList_HeaderPublicPosts
@@ -1495,7 +1495,7 @@ private struct DownloadItem: Equatable {
 
 private func filteredPeerSearchQueryResults(value: ([FoundPeer], [FoundPeer]), scope: TelegramSearchPeersScope) -> ([FoundPeer], [FoundPeer]) {
     switch scope {
-    case .everywhere, .privateChats, .groups, .globalPosts:
+    case .everywhere, .privateChats, .groups, .globalPosts, .bots:
         return value
     case .channels:
         return (
@@ -2073,7 +2073,7 @@ final class ChatListSearchListPaneNode: ASDisplayNode, ChatListSearchPaneNode {
         
         var defaultFoundRemoteMessagesSignal: Signal<([FoundRemoteMessages], Bool), NoError> = .single(([FoundRemoteMessages(messages: [], readCounters: [:], threadsData: [:], totalCount: 0)], false))
         if key == .globalPosts, let data = context.currentAppConfiguration.with({ $0 }).data, let value = data["ios_load_empty_global_posts"] as? Double, value != 0.0 {
-            let searchSignal = context.engine.messages.searchMessages(location: .general(scope: .globalPosts(allowPaidStars: nil), groupId: nil, tags: nil, minDate: nil, maxDate: nil, folderId: nil), query: "", state: nil, limit: 50)
+            let searchSignal = context.engine.messages.searchMessages(location: .general(scope: .globalPosts(allowPaidStars: nil), groupId: nil, tags: nil, minDate: nil, maxDate: nil, folderId: nil, communityId: nil), query: "", state: nil, limit: 50)
             |> map { resultData -> ChatListSearchMessagesResult in
                 let (result, updatedState) = resultData
                     
@@ -2738,7 +2738,7 @@ final class ChatListSearchListPaneNode: ASDisplayNode, ChatListSearchPaneNode {
                 let searchSignals: [Signal<(SearchMessagesResult, SearchMessagesState), NoError>]
                 
                 if key == .globalPosts {
-                    searchSignals = [context.engine.messages.searchMessages(location: .general(scope: .globalPosts(allowPaidStars: approvedGlobalPostQueryState?.price), groupId: nil, tags: nil, minDate: nil, maxDate: nil, folderId: nil), query: finalQuery, state: nil, limit: 50)]
+                    searchSignals = [context.engine.messages.searchMessages(location: .general(scope: .globalPosts(allowPaidStars: approvedGlobalPostQueryState?.price), groupId: nil, tags: nil, minDate: nil, maxDate: nil, folderId: nil, communityId: nil), query: finalQuery, state: nil, limit: 50)]
                 } else {
                     searchSignals = searchLocations.map { searchLocation in
                         return context.engine.messages.searchMessages(location: searchLocation, query: finalQuery, state: nil, limit: 50)

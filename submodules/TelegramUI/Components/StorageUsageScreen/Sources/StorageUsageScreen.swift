@@ -1066,6 +1066,8 @@ final class StorageUsageScreenComponent: Component {
                                 result[.privateChats, default: 0] += 1
                             case .legacyGroup:
                                 result[.groups, default: 0] += 1
+                            case .community:
+                                result[.channels, default: 0] += 1
                             case let .channel(channel):
                                 if case .group = channel.info {
                                     result[.groups, default: 0] += 1
@@ -3147,6 +3149,8 @@ final class StorageUsageScreenComponent: Component {
                             peerCategory = .privateChats
                         case .legacyGroup:
                             peerCategory = .groups
+                        case .community:
+                            peerCategory = .channels
                         case let .channel(channel):
                             if case .group = channel.info {
                                 peerCategory = .groups

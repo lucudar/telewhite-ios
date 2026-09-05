@@ -1001,6 +1001,8 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
                                 globalValue = globalSettings.privateChats
                             case .legacyGroup:
                                 globalValue = globalSettings.groupChats
+                            case .community:
+                                globalValue = globalSettings.channels
                             case let .channel(channel):
                                 if case .broadcast = channel.info {
                                     globalValue = globalSettings.channels
