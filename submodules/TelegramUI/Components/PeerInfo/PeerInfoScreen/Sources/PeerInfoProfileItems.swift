@@ -90,6 +90,7 @@ func infoItems(
         let ItemNote = 3004
         let ItemAppFooter = 3005
         let ItemTelewhiteId = 3006
+        let ItemRegistrationDate = 3007
         let ItemAffiliate = 4000
         let ItemAffiliateInfo = 4001
         let ItemBusinessHours = 5000
@@ -201,6 +202,67 @@ func infoItems(
             }, requestLayout: { animated in
                 interaction.requestLayout(animated)
             }))
+
+            // Вычислить примерную дату регистрации из User ID
+            // Telegram ID кодирует дату регистрации в зависимости от диапазона
+            let userId = user.id.id._internalGetInt64Value()
+            let registrationDate: Date?
+
+            if userId > 0 && userId < 10_000_000_000 {
+                // Алгоритм вычисления зависит от диапазона ID
+                let timestamp: TimeInterval
+
+                if userId < 1_000_000 {
+                    // Очень старые аккаунты (2013): ID * 4 секунды
+                    timestamp = TimeInterval(userId * 4)
+                } else if userId < 1_000_000_000 {
+                    // Старые аккаунты (2013-2016): более сложная формула
+                    // Примерная дата создания основана на росте базы пользователей
+                    let baseTimestamp: TimeInterval = 1380000000 // ~24 сентября 2013
+                    let idOffset = Double(userId - 1_000_000)
+                    // Средний рост ~10М пользователей в год
+                    let secondsPerUser = (365.25 * 24 * 3600) / 10_000_000
+                    timestamp = baseTimestamp + (idOffset * secondsPerUser)
+                } else {
+                    // Современные ID (2016+): извлечь timestamp из старших битов
+                    // ID формата: (timestamp << 32) | random_bits
+                    let extractedTimestamp = Int64(userId >> 32)
+                    if extractedTimestamp > 1400000000 && extractedTimestamp < 2000000000 {
+                        timestamp = TimeInterval(extractedTimestamp)
+                    } else {
+                        // Фоллбэк: линейная интерполяция
+                        let baseTimestamp: TimeInterval = 1451606400 // 1 января 2016
+                        let idOffset = Double(userId - 1_000_000_000)
+                        let secondsPerUser = (365.25 * 24 * 3600) / 100_000_000
+                        timestamp = baseTimestamp + (idOffset * secondsPerUser)
+                    }
+                }
+
+                registrationDate = Date(timeIntervalSince1970: timestamp)
+            } else {
+                // ID вне допустимого диапазона
+                registrationDate = nil
+            }
+
+            if let regDate = registrationDate {
+                let dateFormatter = DateFormatter()
+                dateFormatter.locale = Locale(identifier: presentationData.strings.baseLanguageCode)
+                dateFormatter.dateStyle = .long
+                dateFormatter.timeStyle = .none
+                let dateText = dateFormatter.string(from: regDate)
+
+                items[currentPeerInfoSection]!.append(PeerInfoScreenLabeledValueItem(
+                    id: ItemRegistrationDate,
+                    label: "Дата регистрации",
+                    text: "≈ \(dateText)",
+                    textColor: .primary,
+                    action: nil,
+                    longTapAction: nil,
+                    requestLayout: { animated in
+                        interaction.requestLayout(animated)
+                    }
+                ))
+            }
         }
 
         if let cachedData = data.cachedData as? CachedUserData {
