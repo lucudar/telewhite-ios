@@ -1,31 +1,26 @@
-name: Prepare registration date fix
+name: Registration date validation
 
-# One-shot branch-only patch + Foundation tests. It never builds/publishes an
-# IPA, touches master, or sends a Telegram query. Converted to a read-only PR check after success.
 on:
-  push:
-    branches: [fix/registration-date-ayugram]
+  pull_request:
+    branches: [master]
     paths:
       - '.github/workflows/registration-date.yml'
-      - 'scripts/apply-registration-date-patch.py'
       - 'Tests/TelewhiteRegistrationDateTests.swift'
       - 'submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/TelewhiteRegistrationDate*.swift'
+      - 'submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoProfileItems.swift'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  prepare:
+  parser-tests:
     runs-on: macos-26
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: fix/registration-date-ayugram
-          fetch-depth: 1
+          persist-credentials: false
           submodules: false
-      - name: Apply hash-guarded profile edit
-        run: python3 scripts/apply-registration-date-patch.py
       - name: Compile and run Foundation tests
         shell: bash
         run: |
@@ -35,16 +30,8 @@ jobs:
             "$SOURCES/TelewhiteRegistrationDate.swift" Tests/TelewhiteRegistrationDateTests.swift \
             -o "$RUNNER_TEMP/telewhite-registration-tests"
           "$RUNNER_TEMP/telewhite-registration-tests"
-          xcrun swiftc -frontend -parse "$SOURCES/TelewhiteRegistrationDateItem.swift" "$SOURCES/PeerInfoProfileItems.swift"
-      - name: Commit verified patch and remove patch script
+      - name: Parse UI source syntax (not a full iOS build)
         shell: bash
         run: |
-          set -euo pipefail
-          test "$GITHUB_REF_NAME" = 'fix/registration-date-ayugram'
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoProfileItems.swift
-          git rm scripts/apply-registration-date-patch.py
-          git -c core.whitespace=cr-at-eol diff --cached --check
-          git commit -m 'Wire registration date UI after passing Swift parser tests'
-          git push origin HEAD:refs/heads/fix/registration-date-ayugram
+          SOURCES=submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources
+          xcrun swiftc -frontend -parse "$SOURCES/TelewhiteRegistrationDateItem.swift" "$SOURCES/PeerInfoProfileItems.swift"
