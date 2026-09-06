@@ -575,6 +575,26 @@ func infoItems(
             }))
         }
 
+        // Telewhite: дата создания канала
+        if channel.creationDate > 0 {
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateStyle = .long
+            dateFormatter.timeStyle = .none
+            let creationDate = Date(timeIntervalSince1970: TimeInterval(channel.creationDate))
+            let dateText = dateFormatter.string(from: creationDate)
+
+            items[currentPeerInfoSection]!.append(PeerInfoScreenLabeledValueItem(
+                id: ItemTelewhiteId + 1,
+                label: "Дата создания",
+                text: dateText,
+                textColor: .primary,
+                action: nil,
+                requestLayout: { animated in
+                    interaction.requestLayout(animated)
+                }
+            ))
+        }
+
         if let _ = data.threadData {
             let mainUsername: String
             if let addressName = channel.addressName {
@@ -848,6 +868,51 @@ func infoItems(
                     interaction.requestLayout(animated)
                 }))
             }
+        }
+
+        // Telewhite: ID и дата создания группы
+        if TelewhiteModsSettings.current.showChatIds {
+            let idText = "\(group.id.id._internalGetInt64Value())"
+            let copyIdAndNotify: () -> Void = { [weak interaction] in
+                UIPasteboard.general.string = idText
+                if let controller = interaction?.getController() {
+                    controller.present(UndoOverlayController(presentationData: presentationData, content: .copy(text: "ID \(idText) скопирован"), elevatedLayout: false, animateInAsReplacement: false, action: { _ in return false }), in: .current)
+                }
+            }
+            items[currentPeerInfoSection]!.append(PeerInfoScreenLabeledValueItem(
+                id: 100,
+                label: "Telewhite ID",
+                text: idText,
+                textColor: .accent,
+                action: { _, _ in
+                    copyIdAndNotify()
+                },
+                longTapAction: { _ in
+                    copyIdAndNotify()
+                },
+                requestLayout: { animated in
+                    interaction.requestLayout(animated)
+                }
+            ))
+        }
+
+        if group.creationDate > 0 {
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateStyle = .long
+            dateFormatter.timeStyle = .none
+            let creationDate = Date(timeIntervalSince1970: TimeInterval(group.creationDate))
+            let dateText = dateFormatter.string(from: creationDate)
+
+            items[currentPeerInfoSection]!.append(PeerInfoScreenLabeledValueItem(
+                id: 101,
+                label: "Дата создания",
+                text: dateText,
+                textColor: .primary,
+                action: nil,
+                requestLayout: { animated in
+                    interaction.requestLayout(animated)
+                }
+            ))
         }
     }
 
