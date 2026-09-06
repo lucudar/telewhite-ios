@@ -204,43 +204,83 @@ func infoItems(
             }))
 
             // Вычислить примерную дату регистрации из User ID
-            // Telegram ID кодирует дату регистрации в зависимости от диапазона
+            // Используется датасет известных ID + линейная интерполяция
+            // Источник: https://github.com/jobians/telegram-id-age
             let userId = user.id.id._internalGetInt64Value()
             let registrationDate: Date?
 
-            if userId > 0 && userId < 10_000_000_000 {
-                // Алгоритм вычисления зависит от диапазона ID
-                let timestamp: TimeInterval
+            // Датасет: ключевые точки ID → Unix timestamp
+            // Покрытие: 2013-11-01 до 2026-01-01 (будет обновляться)
+            let dataset: [(id: Int64, timestamp: TimeInterval)] = [
+                (51, 1383264000),          // 2013-11-01
+                (100000, 1383696000),      // 2013-11-06
+                (500000, 1386460800),      // 2013-12-08
+                (1000000, 1388620800),     // 2014-01-02
+                (5000000, 1399680000),     // 2014-05-10
+                (10000000, 1406419200),    // 2014-07-27
+                (50000000, 1435708800),    // 2015-07-01
+                (100000000, 1459987200),   // 2015-04-07
+                (200000000, 1483228800),   // 2017-01-01
+                (300000000, 1501545600),   // 2017-08-01
+                (400000000, 1517443200),   // 2018-02-01
+                (500000000, 1530403200),   // 2018-07-01
+                (600000000, 1541030400),   // 2018-11-01
+                (700000000, 1551398400),   // 2019-03-01
+                (800000000, 1559347200),   // 2019-06-01
+                (900000000, 1567296000),   // 2019-09-01
+                (1000000000, 1574899200),  // 2019-11-28
+                (1100000000, 1580515200),  // 2020-02-01
+                (1200000000, 1585699200),  // 2020-04-01
+                (1300000000, 1590969600),  // 2020-06-01
+                (1400000000, 1596240000),  // 2020-08-01
+                (1500000000, 1600646400),  // 2020-09-21
+                (1600000000, 1604188800),  // 2020-11-01
+                (1700000000, 1609459200),  // 2021-01-01
+                (1800000000, 1614556800),  // 2021-03-01
+                (1900000000, 1619827200),  // 2021-05-01
+                (2000000000, 1625097600),  // 2021-07-01
+                (2500000000, 1648771200),  // 2022-04-01
+                (3000000000, 1667260800),  // 2022-11-01
+                (3500000000, 1683849600),  // 2023-05-12
+                (4000000000, 1696118400),  // 2023-10-01
+                (4500000000, 1706745600),  // 2024-02-01
+                (5000000000, 1717200000),  // 2024-06-01
+                (5500000000, 1727740800),  // 2024-10-01
+                (6000000000, 1735689600),  // 2025-01-01
+                (6500000000, 1743465600),  // 2025-04-01
+                (7000000000, 1751328000),  // 2025-07-01
+                (7500000000, 1759276800),  // 2025-10-01
+                (8000000000, 1767225600),  // 2026-01-01
+            ]
 
-                if userId < 1_000_000 {
-                    // Очень старые аккаунты (2013): ID * 4 секунды
-                    timestamp = TimeInterval(userId * 4)
-                } else if userId < 1_000_000_000 {
-                    // Старые аккаунты (2013-2016): более сложная формула
-                    // Примерная дата создания основана на росте базы пользователей
-                    let baseTimestamp: TimeInterval = 1380000000 // ~24 сентября 2013
-                    let idOffset = Double(userId - 1_000_000)
-                    // Средний рост ~10М пользователей в год
-                    let secondsPerUser = (365.25 * 24 * 3600) / 10_000_000
-                    timestamp = baseTimestamp + (idOffset * secondsPerUser)
-                } else {
-                    // Современные ID (2016+): извлечь timestamp из старших битов
-                    // ID формата: (timestamp << 32) | random_bits
-                    let extractedTimestamp = Int64(userId >> 32)
-                    if extractedTimestamp > 1400000000 && extractedTimestamp < 2000000000 {
-                        timestamp = TimeInterval(extractedTimestamp)
-                    } else {
-                        // Фоллбэк: линейная интерполяция
-                        let baseTimestamp: TimeInterval = 1451606400 // 1 января 2016
-                        let idOffset = Double(userId - 1_000_000_000)
-                        let secondsPerUser = (365.25 * 24 * 3600) / 100_000_000
-                        timestamp = baseTimestamp + (idOffset * secondsPerUser)
+            if userId > 0 && userId <= dataset.last!.id {
+                // Найти два ближайших ID для интерполяции
+                var lowerBound: (id: Int64, timestamp: TimeInterval)?
+                var upperBound: (id: Int64, timestamp: TimeInterval)?
+
+                for i in 0..<dataset.count {
+                    if dataset[i].id <= userId {
+                        lowerBound = dataset[i]
+                    }
+                    if dataset[i].id >= userId && upperBound == nil {
+                        upperBound = dataset[i]
+                        break
                     }
                 }
 
-                registrationDate = Date(timeIntervalSince1970: timestamp)
+                if let lower = lowerBound, let upper = upperBound {
+                    // Линейная интерполяция между двумя точками
+                    let ratio = Double(userId - lower.id) / Double(upper.id - lower.id)
+                    let estimatedTimestamp = lower.timestamp + ratio * (upper.timestamp - lower.timestamp)
+                    registrationDate = Date(timeIntervalSince1970: estimatedTimestamp)
+                } else if let lower = lowerBound {
+                    // ID выше последней известной точки - используем последнюю
+                    registrationDate = Date(timeIntervalSince1970: lower.timestamp)
+                } else {
+                    registrationDate = nil
+                }
             } else {
-                // ID вне допустимого диапазона
+                // ID вне диапазона датасета
                 registrationDate = nil
             }
 
