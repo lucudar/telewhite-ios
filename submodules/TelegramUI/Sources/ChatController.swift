@@ -3291,6 +3291,8 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                                         }
                                     case .legacyGroup:
                                         peerType = .group
+                                    case .community:
+                                        peerType = .channel
                                     case .secretChat:
                                         return
                                     }
