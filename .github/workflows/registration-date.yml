@@ -1,0 +1,37 @@
+name: Registration date validation
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - '.github/workflows/registration-date.yml'
+      - 'Tests/TelewhiteRegistrationDateTests.swift'
+      - 'submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/TelewhiteRegistrationDate*.swift'
+      - 'submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoProfileItems.swift'
+
+permissions:
+  contents: read
+
+jobs:
+  parser-tests:
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          submodules: false
+      - name: Compile and run Foundation tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCES=submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources
+          xcrun swiftc -warnings-as-errors -parse-as-library \
+            "$SOURCES/TelewhiteRegistrationDate.swift" Tests/TelewhiteRegistrationDateTests.swift \
+            -o "$RUNNER_TEMP/telewhite-registration-tests"
+          "$RUNNER_TEMP/telewhite-registration-tests"
+      - name: Parse UI source syntax (not a full iOS build)
+        shell: bash
+        run: |
+          SOURCES=submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources
+          xcrun swiftc -frontend -parse "$SOURCES/TelewhiteRegistrationDateItem.swift" "$SOURCES/PeerInfoProfileItems.swift"
