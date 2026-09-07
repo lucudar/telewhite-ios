@@ -2071,7 +2071,13 @@ func _internal_deleteStories(account: Account, peerId: PeerId, ids: [Int32]) -> 
 }
 
 func _internal_markStoryAsSeen(account: Account, peerId: PeerId, id: Int32, asPinned: Bool) -> Signal<Never, NoError> {
-    if UserDefaults.standard.bool(forKey: "telewhite.mods.ghostMode") || UserDefaults.standard.bool(forKey: "telewhite.mods.ghostStories") {
+    let defaults = UserDefaults.standard
+    if defaults.bool(forKey: "telewhite.mods.ghostMode") || defaults.bool(forKey: "telewhite.mods.ghostStories") {
+        return .complete()
+    }
+    // Проверка per-chat ghost для конкретного пользователя
+    let ghostPeerIds = Set((defaults.array(forKey: "telewhite.mods.ghostPeerIds") as? [NSNumber] ?? []).map { $0.int64Value })
+    if ghostPeerIds.contains(peerId.toInt64()) {
         return .complete()
     }
     if asPinned {

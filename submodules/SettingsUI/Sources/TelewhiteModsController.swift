@@ -1189,11 +1189,7 @@ private func telewhitePickColor(context: AccountContext, title: String, initialC
     present(prompt)
 }
 
-private let telewhiteMenuIconCache: NSCache<NSString, UIImage> = {
-    let cache = NSCache<NSString, UIImage>()
-    cache.countLimit = 100
-    return cache
-}()
+private var telewhiteMenuIconCache: [String: UIImage] = [:]
 
 // Telewhite: glyphs for the Mods menu rows. These were hand-drawn bezier paths that
 // read as approximations — a lock that looked like a bag, a "wave" for media — and
@@ -1217,8 +1213,8 @@ private func telewhiteMenuIconSymbolNames(_ icon: TelewhiteModsMenuIcon) -> [Str
 }
 
 private func telewhiteMenuIcon(_ icon: TelewhiteModsMenuIcon, color: UIColor) -> UIImage? {
-    let cacheKey = "\(icon.rawValue)-\(color.argb)" as NSString
-    if let cached = telewhiteMenuIconCache.object(forKey: cacheKey) {
+    let cacheKey = "\(icon.rawValue)-\(color.argb)"
+    if let cached = telewhiteMenuIconCache[cacheKey] {
         return cached
     }
 
@@ -1247,7 +1243,7 @@ private func telewhiteMenuIcon(_ icon: TelewhiteModsMenuIcon, color: UIColor) ->
             height: tinted.size.height
         ))
     }
-    telewhiteMenuIconCache.setObject(image, forKey: cacheKey)
+    telewhiteMenuIconCache[cacheKey] = image
     return image
 }
 
@@ -1491,7 +1487,10 @@ private func telewhiteModsEntries(tab: TelewhiteModsTab, settings: TelewhiteMods
         // point of this screen is one tap, and stableId 61 + index has to stay clear
         // of the privacy block at 100.
         let current = normalizeTranslationLanguage(settings.translationTargetLanguage)
-        for (index, code) in popularTranslationLanguages.enumerated() {
+        // Защита от stableId collision: максимум 38 языков (61+38=99, следующий блок начинается с 100)
+        let maxLanguages = min(popularTranslationLanguages.count, 38)
+        for index in 0..<maxLanguages {
+            let code = popularTranslationLanguages[index]
             entries.append(.translationLanguageOption(Int32(index), telewhiteLanguageDisplayName(code), code, normalizeTranslationLanguage(code) == current))
         }
 
@@ -1649,7 +1648,8 @@ public func telewhiteModsController(context: AccountContext) -> ViewController {
     let stateValue = Atomic(value: initialSettings)
     let statePromise = ValuePromise(initialSettings, ignoreRepeated: true)
 
-    let updateSettings: ((TelewhiteModsSettings) -> TelewhiteModsSettings) -> Void = { f in
+    let updateSettings: ((TelewhiteModsSettings) -> TelewhiteModsSettings) -> Void = { [weak context] f in
+        guard let context = context else { return }
         // Remember what the cache mod looked like before the change: the block below must be
         // able to tell "the mod is off" from "the mod has just been switched off".
         var wasAutoCacheCleanup = false
@@ -1691,7 +1691,8 @@ public func telewhiteModsController(context: AccountContext) -> ViewController {
                 return current
             }).start()
             let _ = (context.sharedContext.accountManager.sharedData(keys: [SharedDataKeys.cacheStorageSettings])
-            |> take(1)).start(next: { sharedData in
+            |> take(1)).start(next: { [weak context] sharedData in
+                guard let context = context else { return }
                 let cacheSettings = sharedData.entries[SharedDataKeys.cacheStorageSettings]?.get(CacheStorageSettings.self) ?? CacheStorageSettings.defaultSettings
                 context.account.postbox.mediaBox.setMaxStoreTimes(general: cacheSettings.defaultCacheStorageTimeout, shortLived: 60 * 60, gigabytesLimit: cacheLimit)
             })
@@ -1701,12 +1702,14 @@ public func telewhiteModsController(context: AccountContext) -> ViewController {
 
     var pushControllerImpl: ((ViewController) -> Void)?
 
-    let arguments = TelewhiteModsControllerArguments(updateSettings: updateSettings, updateTranslationSettings: { f in
+    let arguments = TelewhiteModsControllerArguments(updateSettings: updateSettings, updateTranslationSettings: { [weak context] f in
+        guard let context = context else { return }
         // The root screen is menu rows only today, so nothing here needs it — but a
         // silent no-op would make any translation row moved to the root stop working
         // without a trace. It costs one line to keep it honest.
         let _ = updateTranslationSettingsInteractively(accountManager: context.sharedContext.accountManager, f).start()
-    }, openTab: { tab in
+    }, openTab: { [weak context] tab in
+        guard let context = context else { return }
         pushControllerImpl?(telewhiteModsSectionController(context: context, tab: tab, statePromise: statePromise, stateValue: stateValue, updateSettings: updateSettings))
     })
 

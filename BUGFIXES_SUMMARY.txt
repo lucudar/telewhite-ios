@@ -1,0 +1,18 @@
+ИСПРАВЛЕНО 7 БАГОВ — 7 сентября 2026
+
+КРИТИЧНЫЕ (2):
+✅ Division by zero в Registration Date для "красивых" ID
+✅ Ghost Mode race condition — онлайн мог мелькнуть при включении
+
+СРЕДНИЕ (5):
+✅ Stories игнорировали per-chat ghost
+✅ 4x Retain cycles в TelewhiteModsController (memory leaks)
+✅ stableId collision риск в translation languages
+
+ФАЙЛЫ:
+- PeerInfoProfileItems.swift (проверка lower.id == upper.id)
+- ManagedAccountPresence.swift (перечитывание ghost state)
+- Stories.swift (проверка ghostPeerIds)
+- TelewhiteModsController.swift ([weak context] в 4 closures + limit 38 языков)
+
+ДЕТАЛИ: docs/BUG_FIXES_2026-09-07.md

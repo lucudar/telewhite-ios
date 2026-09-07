@@ -43,6 +43,8 @@ private final class AccountPresenceManagerImpl {
     }
     
     private func updatePresence(_ isOnline: Bool) {
+        // Перечитываем ghost state перед каждым network request для предотвращения race condition
+        // (пользователь может включить Ghost Mode между вызовами updatePresence)
         let ghostEnabled = TelewhitePresenceGuard.shouldSuppressPresence()
         let isOnline = isOnline && !ghostEnabled
         let request: Signal<Api.Bool, MTRpcError>
@@ -60,7 +62,9 @@ private final class AccountPresenceManagerImpl {
         } else {
             self.onlineTimer?.invalidate()
             self.onlineTimer = nil
-            if ghostEnabled && self.wasOnline {
+            // Перечитываем ghost state снова для else ветки
+            let ghostEnabledNow = TelewhitePresenceGuard.shouldSuppressPresence()
+            if ghostEnabledNow && self.wasOnline {
                 // Sending can briefly mark the account online on the server. Reassert
                 // offline quickly around the send, then keep a slower maintenance pulse.
                 let timeout: Double
