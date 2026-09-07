@@ -1,47 +1,40 @@
-name: Prepare Telewhite stability fix
+name: Telewhite stability checks
 
 on:
-  push:
-    branches: [fix/remove-ayugram-stability]
+  pull_request:
+    branches: [master]
     paths:
       - '.github/workflows/registration-date.yml'
-      - 'scripts/apply-stability-patch.py'
       - 'Tests/TelewhiteRegistrationDateTests.swift'
       - 'Tests/verify_telewhite_stability.py'
       - 'submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/TelewhiteRegistrationDate*.swift'
+      - 'submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoProfileItems.swift'
+      - 'submodules/SettingsUI/Sources/TelewhiteModsController.swift'
+      - 'submodules/TelegramPresentationData/Sources/TelewhiteSettingsIcons.swift'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  prepare:
+  regression-tests:
     runs-on: macos-26
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: fix/remove-ayugram-stability
+          persist-credentials: false
           submodules: false
-      - name: Apply version-guarded UI fixes
-        run: python3 scripts/apply-stability-patch.py
-      - name: Test Telegram-only date and UI source contracts
+      - name: Test Telegram-only registration parser
         shell: bash
         run: |
           set -euo pipefail
           SOURCES=submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources
           xcrun swiftc -warnings-as-errors -parse-as-library "$SOURCES/TelewhiteRegistrationDate.swift" Tests/TelewhiteRegistrationDateTests.swift -o "$RUNNER_TEMP/registration-tests"
           "$RUNNER_TEMP/registration-tests"
-          python3 Tests/verify_telewhite_stability.py
-          xcrun swiftc -frontend -parse "$SOURCES/TelewhiteRegistrationDateItem.swift" "$SOURCES/PeerInfoProfileItems.swift" submodules/SettingsUI/Sources/TelewhiteModsController.swift submodules/TelegramPresentationData/Sources/TelewhiteSettingsIcons.swift
-      - name: Commit tested edits and remove one-shot patch script
+      - name: Verify UI source contracts and menu ordering
+        run: python3 Tests/verify_telewhite_stability.py
+      - name: Parse UI syntax (not a full iOS build)
         shell: bash
         run: |
-          set -euo pipefail
-          test "$GITHUB_REF_NAME" = 'fix/remove-ayugram-stability'
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add submodules/SettingsUI/Sources/TelewhiteModsController.swift submodules/TelegramPresentationData/Sources/TelewhiteSettingsIcons.swift
-          git rm scripts/apply-stability-patch.py
-          git diff --cached --check
-          git commit -m 'Apply tested icon refresh and cache stability fixes'
-          git push origin HEAD:refs/heads/fix/remove-ayugram-stability
+          SOURCES=submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources
+          xcrun swiftc -frontend -parse "$SOURCES/TelewhiteRegistrationDateItem.swift" "$SOURCES/PeerInfoProfileItems.swift" submodules/SettingsUI/Sources/TelewhiteModsController.swift submodules/TelegramPresentationData/Sources/TelewhiteSettingsIcons.swift
