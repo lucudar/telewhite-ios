@@ -238,7 +238,7 @@ func telewhiteRenderSettingsSymbolIcon(name: String, size: CGSize, variant expli
         color = UIColor(rgb: 0x9A9AA0)
     }
 
-    let cacheKey = "\(name)-\(color.argb)-\(variant.rawValue)" as NSString
+    let cacheKey = "\(name)-\(color.argb)-\(variant.rawValue)-\(size.width)x\(size.height)" as NSString
     if let cached = telewhiteSettingsIconCache.object(forKey: cacheKey) {
         return cached
     }
@@ -402,7 +402,8 @@ public func telewhiteThemeModsUpdated() -> Signal<[Bool], NoError> {
                 telewhiteAmoledModeEnabled(),
                 variant == 1, variant == 2, variant == 3,
                 chatListRows == 1, chatListRows == 3,
-                chatListDensity == 1, chatListDensity == 2, chatListDensity == 3
+                chatListDensity == 1, chatListDensity == 2, chatListDensity == 3,
+                variant == 4, variant == 5, variant == 6
             ]
         }
         subscriber.putNext(flags())

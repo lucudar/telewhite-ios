@@ -1,4 +1,4 @@
-name: Registration date validation
+name: Telewhite stability checks
 
 on:
   pull_request:
@@ -6,14 +6,17 @@ on:
     paths:
       - '.github/workflows/registration-date.yml'
       - 'Tests/TelewhiteRegistrationDateTests.swift'
+      - 'Tests/verify_telewhite_stability.py'
       - 'submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/TelewhiteRegistrationDate*.swift'
       - 'submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoProfileItems.swift'
+      - 'submodules/SettingsUI/Sources/TelewhiteModsController.swift'
+      - 'submodules/TelegramPresentationData/Sources/TelewhiteSettingsIcons.swift'
 
 permissions:
   contents: read
 
 jobs:
-  parser-tests:
+  regression-tests:
     runs-on: macos-26
     timeout-minutes: 10
     steps:
@@ -21,17 +24,17 @@ jobs:
         with:
           persist-credentials: false
           submodules: false
-      - name: Compile and run Foundation tests
+      - name: Test Telegram-only registration parser
         shell: bash
         run: |
           set -euo pipefail
           SOURCES=submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources
-          xcrun swiftc -warnings-as-errors -parse-as-library \
-            "$SOURCES/TelewhiteRegistrationDate.swift" Tests/TelewhiteRegistrationDateTests.swift \
-            -o "$RUNNER_TEMP/telewhite-registration-tests"
-          "$RUNNER_TEMP/telewhite-registration-tests"
-      - name: Parse UI source syntax (not a full iOS build)
+          xcrun swiftc -warnings-as-errors -parse-as-library "$SOURCES/TelewhiteRegistrationDate.swift" Tests/TelewhiteRegistrationDateTests.swift -o "$RUNNER_TEMP/registration-tests"
+          "$RUNNER_TEMP/registration-tests"
+      - name: Verify UI source contracts and menu ordering
+        run: python3 Tests/verify_telewhite_stability.py
+      - name: Parse UI syntax (not a full iOS build)
         shell: bash
         run: |
           SOURCES=submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources
-          xcrun swiftc -frontend -parse "$SOURCES/TelewhiteRegistrationDateItem.swift" "$SOURCES/PeerInfoProfileItems.swift"
+          xcrun swiftc -frontend -parse "$SOURCES/TelewhiteRegistrationDateItem.swift" "$SOURCES/PeerInfoProfileItems.swift" submodules/SettingsUI/Sources/TelewhiteModsController.swift submodules/TelegramPresentationData/Sources/TelewhiteSettingsIcons.swift
