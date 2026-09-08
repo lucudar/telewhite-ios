@@ -1189,7 +1189,11 @@ private func telewhitePickColor(context: AccountContext, title: String, initialC
     present(prompt)
 }
 
-private var telewhiteMenuIconCache: [String: UIImage] = [:]
+private let telewhiteMenuIconCache: NSCache<NSString, UIImage> = {
+    let cache = NSCache<NSString, UIImage>()
+    cache.countLimit = 100
+    return cache
+}()
 
 // Telewhite: glyphs for the Mods menu rows. These were hand-drawn bezier paths that
 // read as approximations — a lock that looked like a bag, a "wave" for media — and
@@ -1213,8 +1217,8 @@ private func telewhiteMenuIconSymbolNames(_ icon: TelewhiteModsMenuIcon) -> [Str
 }
 
 private func telewhiteMenuIcon(_ icon: TelewhiteModsMenuIcon, color: UIColor) -> UIImage? {
-    let cacheKey = "\(icon.rawValue)-\(color.argb)"
-    if let cached = telewhiteMenuIconCache[cacheKey] {
+    let cacheKey = "\(icon.rawValue)-\(color.argb)" as NSString
+    if let cached = telewhiteMenuIconCache.object(forKey: cacheKey) {
         return cached
     }
 
@@ -1243,7 +1247,7 @@ private func telewhiteMenuIcon(_ icon: TelewhiteModsMenuIcon, color: UIColor) ->
             height: tinted.size.height
         ))
     }
-    telewhiteMenuIconCache[cacheKey] = image
+    telewhiteMenuIconCache.setObject(image, forKey: cacheKey)
     return image
 }
 
