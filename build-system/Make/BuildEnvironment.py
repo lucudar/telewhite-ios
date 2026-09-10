@@ -14,18 +14,32 @@ def is_apple_silicon():
 def get_clean_env(use_clean_env=True):
     clean_env = os.environ.copy()
     if use_clean_env:
-        clean_env['PATH'] = '/usr/bin:/bin:/usr/sbin:/sbin'
+        if os.name == 'nt':
+            # On Windows, use semicolon as path separator
+            clean_env['PATH'] = 'C:\\Program Files\\Git\\usr\\bin;C:\\Program Files\\Git\\mingw64\\bin'
+        else:
+            clean_env['PATH'] = '/usr/bin:/bin:/usr/sbin:/sbin:/mingw64/bin'
     return clean_env
 
 
 def resolve_executable(program, use_clean_env=True):
     def is_executable(fpath):
-        return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
+        if not os.path.isfile(fpath):
+            return False
+        # On Windows, just check if file exists with .exe extension
+        if os.name == 'nt':
+            return True
+        return os.access(fpath, os.X_OK)
 
     for path in get_clean_env(use_clean_env=use_clean_env)["PATH"].split(os.pathsep):
         executable_file = os.path.join(path, program)
         if is_executable(executable_file):
             return executable_file
+        # Try with .exe extension on Windows
+        if os.name == 'nt':
+            executable_file_exe = executable_file + '.exe'
+            if is_executable(executable_file_exe):
+                return executable_file_exe
     return None
 
 
@@ -113,7 +127,7 @@ def check_run_system(command):
 
 
 def get_bazel_version(bazel_path):
-    command_result = run_executable_with_output(bazel_path, ['--version']).strip('\n')
+    command_result = run_executable_with_output(bazel_path, ['--version']).strip()
     if not command_result.startswith('bazel '):
         raise Exception('{} is not a valid bazel binary'.format(bazel_path))
     command_result = command_result.replace('bazel ', '')
@@ -190,20 +204,21 @@ class BuildEnvironment:
                     versions.bazel_version, actual_bazel_version, self.bazel_path))
                 self.bazel_version = actual_bazel_version
             else:
-                print('Required bazel version is "{}", but "{}"" is reported by {}'.format(
+                print('Required bazel version is "{}", but "{}" is reported by {}'.format(
                     versions.bazel_version, actual_bazel_version, self.bazel_path))
                 exit(1)
 
-        actual_xcode_version = get_xcode_version()
-        if actual_xcode_version != versions.xcode_version:
-            if override_xcode_version:
-                print('Overriding the required Xcode version {} with {} as reported by \'xcode-select -p\''.format(
-                    versions.xcode_version, actual_xcode_version, self.bazel_path))
-                versions.xcode_version = actual_xcode_version
-            else:
-                print('Required Xcode version is {}, but {} is reported by \'xcode-select -p\''.format(
-                    versions.xcode_version, actual_xcode_version, self.bazel_path))
-                exit(1)
+        if os.name != 'nt':
+            actual_xcode_version = get_xcode_version()
+            if actual_xcode_version != versions.xcode_version:
+                if override_xcode_version:
+                    print('Overriding the required Xcode version {} with {} as reported by \'xcode-select -p\''.format(
+                        versions.xcode_version, actual_xcode_version, self.bazel_path))
+                    versions.xcode_version = actual_xcode_version
+                else:
+                    print('Required Xcode version is {}, but {} is reported by \'xcode-select -p\''.format(
+                        versions.xcode_version, actual_xcode_version, self.bazel_path))
+                    exit(1)
 
         self.app_version = versions.app_version
         self.xcode_version = versions.xcode_version

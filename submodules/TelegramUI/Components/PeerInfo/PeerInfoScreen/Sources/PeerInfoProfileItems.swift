@@ -1819,3 +1819,83 @@ func editingItems(data: PeerInfoScreenData?, boostStatus: ChannelBoostStatus?, s
     }
     return result
 }
+
+private func localMonthAtIndex(_ index: Int, strings: PresentationStrings) -> String {
+    switch index {
+    case 0:
+        return strings.Month_ShortJanuary
+    case 1:
+        return strings.Month_ShortFebruary
+    case 2:
+        return strings.Month_ShortMarch
+    case 3:
+        return strings.Month_ShortApril
+    case 4:
+        return strings.Month_ShortMay
+    case 5:
+        return strings.Month_ShortJune
+    case 6:
+        return strings.Month_ShortJuly
+    case 7:
+        return strings.Month_ShortAugust
+    case 8:
+        return strings.Month_ShortSeptember
+    case 9:
+        return strings.Month_ShortOctober
+    case 10:
+        return strings.Month_ShortNovember
+    case 11:
+        return strings.Month_ShortDecember
+    default:
+        return ""
+    }
+}
+
+private func telewhiteRegistrationDateItem(
+    id: Int,
+    peerId: EnginePeer.Id,
+    telegramMonth: Int32?,
+    context: AccountContext,
+    presentationData: PresentationData,
+    interaction: PeerInfoInteraction
+) -> PeerInfoScreenItem {
+    let dateText: String
+    if let month = telegramMonth {
+        // telegramMonth — это количество месяцев с момента запуска Telegram (август 2013)
+        // Telegram был запущен в августе 2013 года
+        let startYear = 2013
+        let startMonth = 8 // август
+        
+        let totalMonths = Int(month) + startMonth - 1
+        let year = startYear + totalMonths / 12
+        let monthIndex = (totalMonths % 12)
+        
+        let monthName = localMonthAtIndex(monthIndex, strings: presentationData.strings)
+        dateText = "\(monthName) \(year)"
+    } else {
+        dateText = "Неизвестно"
+    }
+    
+    let copyAction: () -> Void = { [weak interaction] in
+        UIPasteboard.general.string = dateText
+        if let controller = interaction?.getController() {
+            controller.present(UndoOverlayController(presentationData: presentationData, content: .copy(text: "Дата регистрации скопирована"), elevatedLayout: false, animateInAsReplacement: false, action: { _ in return false }), in: .current)
+        }
+    }
+    
+    return PeerInfoScreenLabeledValueItem(
+        id: id,
+        label: "Дата регистрации",
+        text: dateText,
+        textColor: .primary,
+        action: { _, _ in
+            copyAction()
+        },
+        longTapAction: { _ in
+            copyAction()
+        },
+        requestLayout: { animated in
+            interaction.requestLayout(animated)
+        }
+    )
+}

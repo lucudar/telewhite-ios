@@ -62,7 +62,10 @@ def locate_bazel(base_path, cache_host_or_path, cache_dir):
         os.mkdir(build_input_dir)
 
     versions = BuildEnvironmentVersions(base_path=os.getcwd())
-    if is_apple_silicon():
+    if os.name == 'nt':
+        # Windows
+        arch = 'windows-x86_64.exe'
+    elif is_apple_silicon():
         arch = 'darwin-arm64'
     else:
         arch = 'darwin-x86_64'
@@ -73,7 +76,8 @@ def locate_bazel(base_path, cache_host_or_path, cache_dir):
     resolved_cache_path = resolve_cache_path(cache_host_or_path, cache_dir)
 
     if not os.path.isfile(bazel_path):
-        if resolved_cache_host is not None and versions.bazel_version_sha256 is not None:
+        # Skip remote cache lookup on Windows (versions.json holds macOS hash)
+        if resolved_cache_host is not None and versions.bazel_version_sha256 is not None and os.name != 'nt':
             http_cache_host = transform_cache_host_into_http(resolved_cache_host)
 
             with tempfile.NamedTemporaryFile(delete=True) as temp_output_file:
@@ -97,7 +101,8 @@ def locate_bazel(base_path, cache_host_or_path, cache_dir):
                 shutil.copyfile(cached_path, bazel_path)
 
 
-    if os.path.isfile(bazel_path) and versions.bazel_version_sha256 is not None:
+    # Skip SHA256 check on Windows (versions.json holds macOS hash)
+    if os.path.isfile(bazel_path) and versions.bazel_version_sha256 is not None and os.name != 'nt':
         test_sha256 = calculate_sha256(bazel_path)
         if test_sha256 != versions.bazel_version_sha256:
             print(f"Bazel at {bazel_path} does not match SHA256 {versions.bazel_version_sha256}, removing")
@@ -116,13 +121,15 @@ def locate_bazel(base_path, cache_host_or_path, cache_dir):
             bazel_path
         ])
 
-        if os.path.isfile(bazel_path) and versions.bazel_version_sha256 is not None:
+        # Skip SHA256 check on Windows (versions.json holds macOS hash)
+        if os.path.isfile(bazel_path) and versions.bazel_version_sha256 is not None and os.name != 'nt':
             test_sha256 = calculate_sha256(bazel_path)
             if test_sha256 != versions.bazel_version_sha256:
                 print(f"Bazel at {bazel_path} does not match SHA256 {versions.bazel_version_sha256}, removing")
                 os.remove(bazel_path)
 
-        if resolved_cache_host is not None and versions.bazel_version_sha256 is not None:
+        # Skip remote cache upload on Windows (versions.json holds macOS hash)
+        if resolved_cache_host is not None and versions.bazel_version_sha256 is not None and os.name != 'nt':
             http_cache_host = transform_cache_host_into_http(resolved_cache_host)
             print(f"Uploading bazel@{versions.bazel_version_sha256} to bazel-remote")
             call_executable([
