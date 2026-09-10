@@ -362,24 +362,27 @@ private func makeTelegramUrl(_ path: String, queryItems: [URLQueryItem] = []) ->
 }
 
 func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, url: String, forceExternal: Bool, presentationData: PresentationData, navigationController: NavigationController?, dismissInput: @escaping () -> Void) {
-    if forceExternal || url.lowercased().hasPrefix("tel:") || url.lowercased().hasPrefix("calshow:") {
-        if url.lowercased().hasPrefix("tel:+888") {
+    // Telewhite: чистим трекеры из URL
+    let cleanedUrl = telewhiteCleanURL(url)
+    
+    if forceExternal || cleanedUrl.lowercased().hasPrefix("tel:") || cleanedUrl.lowercased().hasPrefix("calshow:") {
+        if cleanedUrl.lowercased().hasPrefix("tel:+888") {
             context.sharedContext.presentGlobalController(textAlertController(context: context, title: nil, text: presentationData.strings.Conversation_CantPhoneCallAnonymousNumberError, actions: [
                 TextAlertAction(type: .genericAction, title: presentationData.strings.Common_OK, action: {
                 }),
             ], parseMarkdown: true), nil)
             return
         }
-        context.sharedContext.applicationBindings.openUrl(url)
+        context.sharedContext.applicationBindings.openUrl(cleanedUrl)
         return
     }
     
-    guard let canonicalUrl = canonicalExternalUrl(from: url) else {
+    guard let canonicalUrl = canonicalExternalUrl(from: cleanedUrl) else {
         return
     }
     
     if canonicalUrl.scheme == "mailto" {
-        context.sharedContext.applicationBindings.openUrl(url)
+        context.sharedContext.applicationBindings.openUrl(cleanedUrl)
         return
     }
     
@@ -388,18 +391,18 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
     if let host = parsedUrl.host?.lowercased() {
         if host == "itunes.apple.com" {
             if context.sharedContext.applicationBindings.canOpenUrl(parsedUrl.absoluteString) {
-                context.sharedContext.applicationBindings.openUrl(url)
+                context.sharedContext.applicationBindings.openUrl(cleanedUrl)
                 return
             }
         }
         if host == "twitter.com" || host == "mobile.twitter.com" {
             if context.sharedContext.applicationBindings.canOpenUrl("twitter://status") {
-                context.sharedContext.applicationBindings.openUrl(url)
+                context.sharedContext.applicationBindings.openUrl(cleanedUrl)
                 return
             }
         } else if host == "instagram.com" {
             if context.sharedContext.applicationBindings.canOpenUrl("instagram://photo") {
-                context.sharedContext.applicationBindings.openUrl(url)
+                context.sharedContext.applicationBindings.openUrl(cleanedUrl)
                 return
             }
         }
